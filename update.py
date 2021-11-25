@@ -99,10 +99,10 @@ class ClientShard(object):
             idxs_val,
             idxs_test
         ) = get_split_idxs(idxs)
-        print("Computations made with the following legths: ")
-        print("Train: " + str(len(idxs_train)))
-        print("Valid: " + str(len(idxs_train)))
-        print("Test: " + str(len(idxs_test)))
+        #print("Computations made with the following legths: ")
+        #print("Train: " + str(len(idxs_train)))
+        #print("Valid: " + str(len(idxs_train)))
+        #print("Test: " + str(len(idxs_test)))
 
         batch_size_val  = int(len(idxs_val)/10) if int(len(idxs_val)/10)>0 else 1
         batch_size_test = int(len(idxs_test)/10) if int(len(idxs_test)/10)>0 else 1
