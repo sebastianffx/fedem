@@ -108,6 +108,18 @@ def mnist_noniid(dataset, num_users):
                 (dict_users[i], idxs[rand*num_imgs:(rand+1)*num_imgs]), axis=0)
     return dict_users
 
+def synthetic_segmentation_unequal(dataset, imagepaths_train, num_users):
+    dict_users = {i: [] for i in range(num_users)}
+    for i in range(len(imagepaths_train)):
+        if 'circle' in imagepaths_train[i]:#this assumes just 2 users
+            dict_users[0].append(i)
+        else:
+            dict_users[1].append(i)
+
+    dict_users = {i: np.array(dict_users[i]) for i in range(num_users)}
+    print(dict_users)
+    return dict_users
+
 
 def mnist_noniid_unequal(dataset, num_users):
     """Sample non-I.I.D client data from

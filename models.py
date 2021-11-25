@@ -7,8 +7,11 @@ import os
 
 import torch.nn.functional as nn_fnx
 
+import monai
 from torch import nn, optim
 from os import path, getcwd, makedirs
+
+
 
 sys.path.insert(0, path.join(getcwd(), "..", ".."))
 
@@ -34,8 +37,8 @@ NLP_MODEL_CONFIG = {
         "lr": 2e-5,
     },
 }
-
 def get_model(args, img_size=None, nlp_model_dict=NLP_MODEL_CONFIG):
+    
     """Return model (and tokenizer if task is NLP) based on the provided args.
     For task CV optional argument to return specific sized images.
 
@@ -80,6 +83,15 @@ def get_model(args, img_size=None, nlp_model_dict=NLP_MODEL_CONFIG):
                 global_model = CNNFashion_Mnist(args=args)
             elif args.dataset == 'cifar':
                 global_model = VGG(vgg_name="VGG11")
+            elif args.dataset == 'synthetic':
+                global_model = monai_unet(args,unet_name="unet_synthetic")
+            elif args.dataset == 'ISLES18':
+                print("TO IMPLEMENT MONAI SEGMENTATION NETWORK ON ISLES")
+                global_model = VGG(vgg_name="VGG11")
+            elif args.dataset == 'BRATS':
+                print("TO IMPLEMENT MONAI SEGMENTATION NETWORK ON BRATS")
+                global_model = VGG(vgg_name="VGG11")
+
             else:
                 raise NotImplementedError(
                     f"""Unrecognised dataset {args.dataset}.
@@ -281,3 +293,16 @@ class modelC(nn.Module):
         pool_out.squeeze_(-1)
         pool_out.squeeze_(-1)
         return pool_out
+
+#This is the unet for the synthetic dataset
+def monai_unet(args, unet_name="unet_synthetic", spatial_dims=2,in_channels=1,out_channels=1,channels_tupple=(16, 32, 64, 128, 256),strides_tuple=(2, 2, 2, 2), num_res_units=2):
+    device =  'cuda' if args.gpu else 'cpu'
+    model = monai.networks.nets.UNet(
+            spatial_dims=spatial_dims,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            channels=channels_tupple,
+            strides=strides_tuple,
+            num_res_units=num_res_units,
+        ).to(device)
+    return model

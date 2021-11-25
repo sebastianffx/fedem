@@ -14,7 +14,7 @@ from os import path, getcwd
 
 sys.path.insert(0, path.join(getcwd(), "..", ".."))
 from models import get_optimizer
-
+import monai 
 
 def get_split_idxs(idxs, train_frac: float = 0.8, val_frac: float = 0.1, test_frac: float = 0.1):
     assert (train_frac + val_frac + test_frac) == 1
@@ -25,7 +25,6 @@ def get_split_idxs(idxs, train_frac: float = 0.8, val_frac: float = 0.1, test_fr
 
     return (idxs_train, idxs_val, idxs_test)
 
-
 def load_split_dataset(dataset, idxs, batch_size, task, shuffle=False):
     splitloader = DataLoader(
         DatasetSplit(dataset, idxs, task),
@@ -33,7 +32,6 @@ def load_split_dataset(dataset, idxs, batch_size, task, shuffle=False):
         shuffle=shuffle,
     )
     return splitloader
-
 
 class DatasetSplit(Dataset):
     """An abstract Dataset class wrapped around Pytorch Dataset class.
@@ -77,13 +75,18 @@ class ClientShard(object):
         self.client_idx = client_idx
         self.logger = logger
         self.device = device
-        (
+        #print(client_idx)
+        #print(dataset)
+        #print(idxs)
+        #print(logger)
+        #print(device)
+        (   
             self.trainloader,
             self.validloader,
             self.testloader
         ) = self.train_val_test(dataset=dataset, idxs=list(idxs))
         # Default criterion set to NLL loss function
-        self.criterion = nn.NLLLoss().to(self.device)
+        self.criterion =  monai.losses.DiceLoss(sigmoid=True)#nn.NLLLoss().to(self.device)
 
     def train_val_test(self, dataset, idxs):
         """
@@ -96,10 +99,21 @@ class ClientShard(object):
             idxs_val,
             idxs_test
         ) = get_split_idxs(idxs)
+        print("Computations made with the following legths: ")
+        print("Train: " + str(len(idxs_train)))
+        print("Valid: " + str(len(idxs_train)))
+        print("Test: " + str(len(idxs_test)))
 
+        batch_size_val  = int(len(idxs_val)/10) if int(len(idxs_val)/10)>0 else 1
+        batch_size_test = int(len(idxs_test)/10) if int(len(idxs_test)/10)>0 else 1
+        
+        print("Ratio Train: " + str(self.args.local_bs))
+        print("Ratio Valid: " + str(batch_size_val))
+        print("Ratio Test: " + str(batch_size_test))
+        
         trainloader = load_split_dataset(dataset=dataset, idxs=idxs_train, batch_size=self.args.local_bs, task=self.args.task, shuffle=True)
-        validloader = load_split_dataset(dataset=dataset, idxs=idxs_val, batch_size=int(len(idxs_val)/10), task=self.args.task,)
-        testloader = load_split_dataset(dataset=dataset, idxs=idxs_test, batch_size=int(len(idxs_test)/10), task=self.args.task,)
+        validloader = load_split_dataset(dataset=dataset, idxs=idxs_val, batch_size=batch_size_val, task=self.args.task,)
+        testloader  = load_split_dataset(dataset=dataset, idxs=idxs_test, batch_size=batch_size_test, task=self.args.task,)
 
         return (trainloader, validloader, testloader)
 
@@ -218,6 +232,19 @@ class ClientShard(object):
             )
         accuracy = correct / total
         return accuracy, loss
+
+
+def get_split_idxs(idxs, train_frac: float = 0.8, val_frac: float = 0.1, test_frac: float = 0.1):
+    assert (train_frac + val_frac + test_frac) == 1
+    #print("The indices are: " +str(idxs))
+    idxs_train = idxs[:int(train_frac * len(idxs))]
+    idxs_val = idxs[int(train_frac * len(idxs)):int((train_frac + val_frac) * len(idxs))]
+    idxs_test = idxs[int((train_frac + val_frac) * len(idxs)):]
+    #print(idxs_train)
+    #print(idxs_val)
+    #print(idxs_test)
+    return (idxs_train, idxs_val, idxs_test)
+
 
 
 def test_inference(args, model, test_dataset, device):

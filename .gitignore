@@ -9,6 +9,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 .DS*
+data/cifar/
 build/
 develop-eggs/
 dist/

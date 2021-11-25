@@ -5,11 +5,13 @@
 import sys
 import copy
 import torch
-
+from glob import glob
 import datasets as ds
+import os
 
 from torchvision import datasets, transforms
 from os import path, getcwd
+import numpy as np
 
 from models import MAX_SEQUENCE_LENGTH
 from sampling import (
@@ -20,7 +22,23 @@ from sampling import (
     cifar_noniid,
     ade_iid,
     ade_noniid,
+    synthetic_segmentation_unequal
 )
+from monai.data import ArrayDataset, create_test_image_2d, decollate_batch
+
+
+from monai.transforms import (
+    Activations,
+    AddChannel,
+    AsDiscrete,
+    Compose,
+    LoadImage,
+    RandRotate90,
+    RandSpatialCrop,
+    ScaleIntensity,
+    EnsureType,
+)
+
 
 
 def num_batches_per_epoch(num_datapoints: int, batch_size: int) -> int:
@@ -46,7 +64,6 @@ def get_dataset(args, tokenizer=None, max_seq_len=MAX_SEQUENCE_LENGTH, custom_sa
     the keys are the user index and the values are the corresponding data for
     each of those users.
     """
-
     if args.task == 'nlp':
         assert args.dataset == "ade", "Parsed dataset not implemented."
         [complete_dataset] = ds.load_dataset("ade_corpus_v2", "Ade_corpus_v2_classification", split=["train"])
@@ -134,6 +151,51 @@ def get_dataset(args, tokenizer=None, max_seq_len=MAX_SEQUENCE_LENGTH, custom_sa
                     else:
                         # Chose euqal splits for every user
                         user_groups = cifar_noniid(train_dataset, args.num_users)
+        if args.dataset =='synthetic':
+            print("loading synthetic data...")
+            data_dir = '.data/synthetic/'
+            train_imtrans = transforms.Compose(
+            [
+                LoadImage(image_only=True),
+                AddChannel(),
+                ScaleIntensity(),
+                RandSpatialCrop((96, 96), random_size=False),
+                RandRotate90(prob=0.5, spatial_axes=(0, 1)),
+                EnsureType(),
+            ])
+            train_segtrans = Compose(
+            [
+                LoadImage(image_only=True),
+                AddChannel(),
+                ScaleIntensity(),
+                RandSpatialCrop((96, 96), random_size=False),
+                RandRotate90(prob=0.5, spatial_axes=(0, 1)),
+                EnsureType(),
+            ])
+            val_imtrans = Compose([LoadImage(image_only=True), AddChannel(), ScaleIntensity(), EnsureType()])
+            val_segtrans = Compose([LoadImage(image_only=True), AddChannel(), ScaleIntensity(), EnsureType()])
+
+            #Reading the image paths
+            print(args.ROOT_DATA + 'train/' + args.dataset +'/')
+            train_dir = args.ROOT_DATA + '/' + args.dataset + '/train/' 
+            val_dir   = args.ROOT_DATA + '/' + args.dataset + '/val/' 
+            test_dir  = args.ROOT_DATA + '/' + args.dataset + '/test/' 
+            imagepaths_train = sorted(glob(os.path.join(train_dir, "*img*.png")))
+            segmpaths_train   = sorted(glob(os.path.join(train_dir, "*seg*.png")))
+            print(len(imagepaths_train),len(segmpaths_train))
+            imagepaths_val = sorted(glob(os.path.join(val_dir, "*img*.png")))
+            segmpaths_val   = sorted(glob(os.path.join(val_dir, "*seg*.png")))
+            print(len(imagepaths_val),len(segmpaths_val))
+            imagepaths_test = sorted(glob(os.path.join(test_dir, "*img*.png")))
+            segmpaths_test   = sorted(glob(os.path.join(test_dir, "*seg*.png")))
+            print(len(imagepaths_test),len(segmpaths_test))
+            train_dataset = ArrayDataset(imagepaths_train, train_imtrans, segmpaths_train, train_segtrans)#np.zeros((10,10,10))
+            test_dataset  = ArrayDataset(imagepaths_test, val_imtrans, segmpaths_test, val_segtrans)
+
+
+            print("Num users: " + str(args.num_users))
+            
+            user_groups   =  synthetic_segmentation_unequal(train_dataset, imagepaths_train, args.num_users)#{0:{0,1,2,3,4,5},1:{6,7,8,9,10}}#custom_sampling(dataset=train_dataset, num_users=args.num_users)
 
 
         elif args.dataset == 'mnist' or 'fmnist':
@@ -169,10 +231,12 @@ def get_dataset(args, tokenizer=None, max_seq_len=MAX_SEQUENCE_LENGTH, custom_sa
                 Options are: `cifar`, `mnist`, `fmnist`.
                 """
             )
+    
+    
     else:
         raise NotImplementedError(
             f"""Unrecognised task {args.task}.
-            Options are: `nlp` and `cv`.
+            Options are: 'nlp', 'cv' and 'segmentation'.
             """
         )
 
