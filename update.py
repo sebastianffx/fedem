@@ -3,6 +3,7 @@
 # Python version: 3.6
 
 import sys
+import numpy as np
 import torch
 
 from torch import nn
@@ -15,17 +16,24 @@ from os import path, getcwd
 sys.path.insert(0, path.join(getcwd(), "..", ".."))
 from models import get_optimizer
 import monai 
+from monai.data import  decollate_batch
+from monai.inferers import sliding_window_inference
+from monai.metrics import DiceMetric
+from monai.transforms import (
+    Activations,
+    AsDiscrete,
+    Compose,
+    EnsureType,
+)
 
-def get_split_idxs(idxs, train_frac: float = 0.8, val_frac: float = 0.1, test_frac: float = 0.1):
-    assert (train_frac + val_frac + test_frac) == 1
 
-    idxs_train = idxs[:int(train_frac * len(idxs))]
-    idxs_val = idxs[int(train_frac * len(idxs)):int((train_frac + val_frac) * len(idxs))]
-    idxs_test = idxs[int((train_frac + val_frac) * len(idxs)):]
 
-    return (idxs_train, idxs_val, idxs_test)
+
 
 def load_split_dataset(dataset, idxs, batch_size, task, shuffle=False):
+    #print("Splitting the dataset with: ")
+    #print(idxs)
+    #print(dataset)
     splitloader = DataLoader(
         DatasetSplit(dataset, idxs, task),
         batch_size=batch_size,
@@ -64,7 +72,7 @@ class ClientShard(object):
     """A class that performs model fit on a client dataset.
     """
     def __init__(self, args, client_idx, dataset, idxs, logger, device):
-        """Initialize the object with clinet datasets and parsed arguments.
+        """Initialize the object with client datasets and parsed arguments.
         Args:
             args:
             dataset:
@@ -75,11 +83,11 @@ class ClientShard(object):
         self.client_idx = client_idx
         self.logger = logger
         self.device = device
-        #print(client_idx)
-        #print(dataset)
-        #print(idxs)
-        #print(logger)
-        #print(device)
+
+        self.dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+        self.dice_metric_test = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+        self.post_trans = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold_values=True)])
+
         (   
             self.trainloader,
             self.validloader,
@@ -107,11 +115,11 @@ class ClientShard(object):
         batch_size_val  = int(len(idxs_val)/10) if int(len(idxs_val)/10)>0 else 1
         batch_size_test = int(len(idxs_test)/10) if int(len(idxs_test)/10)>0 else 1
         
-        print("Ratio Train: " + str(self.args.local_bs))
-        print("Ratio Valid: " + str(batch_size_val))
-        print("Ratio Test: " + str(batch_size_test))
+        #print("Ratio Train: " + str(self.args.local_bs))
+        #print("Ratio Valid: " + str(batch_size_val))
+        #print("Ratio Test: " + str(batch_size_test))
         
-        trainloader = load_split_dataset(dataset=dataset, idxs=idxs_train, batch_size=self.args.local_bs, task=self.args.task, shuffle=True)
+        trainloader = load_split_dataset(dataset=dataset, idxs=idxs_train, batch_size=self.args.local_bs, task=self.args.task, shuffle=False)
         validloader = load_split_dataset(dataset=dataset, idxs=idxs_val, batch_size=batch_size_val, task=self.args.task,)
         testloader  = load_split_dataset(dataset=dataset, idxs=idxs_test, batch_size=batch_size_test, task=self.args.task,)
 
@@ -212,18 +220,48 @@ class ClientShard(object):
                     total += len(batch_labels)
 
         elif self.args.task == 'cv':
-            for batch_idx, (images, labels) in enumerate(self.testloader):
-                images, labels = images.to(self.device), labels.to(self.device)
-                # Inference
-                outputs = model(images)
-                batch_loss = self.criterion(outputs, labels)
-                loss += batch_loss.item()
+            if self.args.dataset == 'synthetic':#Is a segmentation task
+                #print("Infering segmentation masks")
+                roi_size = (96, 96)
+                sw_batch_size = 4
+                losses = []
+                for batch_idx, (images, labels) in enumerate(self.testloader):
+                    val_images, val_labels = images.to(self.device), labels.to(self.device)
+                    roi_size = (96, 96)
+                    val_outputs = sliding_window_inference(val_images, roi_size, sw_batch_size, model)
+                    #val_outputs = torch.from_numpy(np.array([self.post_trans(i) for i in decollate_batch(val_outputs)]))
+                    # compute metric for current iteration
+                    #print("========")
+                    #val_outputs = torch.from_numpy(np.array([self.post_trans(i) for i in decollate_batch(val_outputs)]))
+                    
+                    #print(val_outputs.shape,val_labels.shape)
+                    self.dice_metric(y_pred=val_outputs, y=val_labels)
+                    #print(len(val_outputs))
+                    #print(val_outputs.shape)
+                    #print(val_labels.shape)
+                    for i in range(len(val_outputs)):
+                        loss = self.criterion(val_outputs[i], labels[i])
+                        losses.append(loss)
+                metric = self.dice_metric.aggregate().item() 
+                # reset the status for next validation round
+                self.dice_metric.reset()
+                return metric, torch.mean(torch.tensor(losses))
 
-                # Prediction
-                _, pred_labels = torch.max(outputs, 1)
-                pred_labels = pred_labels.view(-1)
-                correct += torch.sum(torch.eq(pred_labels, labels)).item()
-                total += len(labels)
+
+            else: #Is a classification task
+                for batch_idx, (images, labels) in enumerate(self.testloader):
+                    images, labels = images.to(self.device), labels.to(self.device)
+                    # Inference
+                    outputs = model(images)
+                    batch_loss = self.criterion(outputs, labels)
+                    loss += batch_loss.item()
+
+                    # Prediction
+                    _, pred_labels = torch.max(outputs, 1)
+                    pred_labels = pred_labels.view(-1)
+                    correct += torch.sum(torch.eq(pred_labels, labels)).item()
+                    total += len(labels)
+            
         else:
             raise NotImplementedError(
                 f"""Unrecognised task {self.args.task}.
@@ -306,3 +344,4 @@ def test_inference(args, model, test_dataset, device):
 
     accuracy = correct/total
     return accuracy, loss
+
