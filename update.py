@@ -291,10 +291,14 @@ def test_inference(args, model, test_dataset, device):
 
     model.eval()
     loss, total, correct = 0.0, 0.0, 0.0
-
-    criterion = nn.NLLLoss().to(device)
-    testloader = DataLoader(test_dataset, batch_size=128,
-                            shuffle=False)
+    if args.dataset == 'synthetic':
+        criterion =  monai.losses.DiceLoss(sigmoid=True)
+        dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+        post_trans = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold_values=True)])
+    else:
+        criterion = nn.NLLLoss().to(device)
+        testloader = DataLoader(test_dataset, batch_size=128,
+                                shuffle=False)
 
     if args.task == 'nlp':
         scaled_batch_size = 128
@@ -321,27 +325,46 @@ def test_inference(args, model, test_dataset, device):
                 batch_labels = inputs["labels"]
                 correct += torch.sum(torch.eq(pred_labels, torch.tensor(batch_labels))).item()
                 total += len(batch_labels)
-    elif args.task == 'cv':
-        for batch_idx, (images, labels) in enumerate(testloader):
-            images, labels = images.to(device), labels.to(device)
+    if args.task == 'cv':
+        if args.dataset == 'synthetic':#Is a segmentation task
+            #print("Infering segmentation masks")
+            roi_size = (96, 96)
+            sw_batch_size = 4
+            losses,metrics = [],[]
+            for test_image,test_label in test_dataset:
+                test_image, test_label = test_image[np.newaxis,:].to(device), test_label[np.newaxis,:].to(device)
+                log_probs = model(test_image)
+                loss = criterion(log_probs, test_label)
+                val_outputs = sliding_window_inference(test_image, roi_size, sw_batch_size, model)
+                dice_metric(y_pred=val_outputs, y=test_label)            
+                metric = dice_metric.aggregate().item()
+                losses.append(loss)
+                metrics.append(metric)
+            # reset the status for next validation round
+            dice_metric.reset()
+            return torch.mean(torch.tensor(metrics)), torch.mean(torch.tensor(losses))#Return AVG dice and loss on test_dataset
 
-            # Inference
-            outputs = model(images)
-            batch_loss = criterion(outputs, labels)
-            loss += batch_loss.item()
+        else: #Its CV classification
+            for batch_idx, (images, labels) in enumerate(testloader):
+                images, labels = images.to(device), labels.to(device)
 
-            # Prediction
-            _, pred_labels = torch.max(outputs, 1)
-            pred_labels = pred_labels.view(-1)
-            correct += torch.sum(torch.eq(pred_labels, labels)).item()
-            total += len(labels)
+                # Inference
+                outputs = model(images)
+                batch_loss = criterion(outputs, labels)
+                loss += batch_loss.item()
+
+                # Prediction
+                _, pred_labels = torch.max(outputs, 1)
+                pred_labels = pred_labels.view(-1)
+                correct += torch.sum(torch.eq(pred_labels, labels)).item()
+                total += len(labels)
+            accuracy = correct/total
+            return accuracy, loss
+
+        
     else:
         raise NotImplementedError(
             f"""Unrecognised task {args.task}.
             Options are: `nlp` and `cv`.
             """
         )
-
-    accuracy = correct/total
-    return accuracy, loss
-
