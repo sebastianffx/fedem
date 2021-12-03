@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+#Pytorch - tensorboard intermediate files
+*.pth
+*events*
+
 # Distribution / packaging
 .Python
 .DS*
