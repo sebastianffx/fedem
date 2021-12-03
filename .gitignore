@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#Pytorch models
+*.pth
 # C extensions
 *.so
 
