@@ -8,6 +8,8 @@ import os
 import torch.nn.functional as nn_fnx
 
 import monai
+from monai.networks.nets import SegResNet
+
 from torch import nn, optim
 from os import path, getcwd, makedirs
 
@@ -88,9 +90,9 @@ def get_model(args, img_size=None, nlp_model_dict=NLP_MODEL_CONFIG):
             elif args.dataset == 'ISLES18':
                 print("TO IMPLEMENT MONAI SEGMENTATION NETWORK ON ISLES")
                 global_model = VGG(vgg_name="VGG11")
-            elif args.dataset == 'BRATS':
-                print("TO IMPLEMENT MONAI SEGMENTATION NETWORK ON BRATS")
-                global_model = VGG(vgg_name="VGG11")
+            elif args.dataset == 'brats':
+                print("Loading BraTS segmentation Network")
+                global_model = brats_segmentation_network(args)
 
             else:
                 raise NotImplementedError(
@@ -306,3 +308,16 @@ def monai_unet(args, unet_name="unet_synthetic", spatial_dims=2,in_channels=1,ou
             num_res_units=num_res_units,
         ).to(device)
     return model
+
+def brats_segmentation_network(args):
+    device =  'cuda' if args.gpu else 'cpu'
+    model = SegResNet(
+    blocks_down=[1, 2, 2, 4],
+    blocks_up=[1, 1, 1],
+    init_filters=16,
+    in_channels=4,
+    out_channels=3,
+    dropout_prob=0.2,
+).to(device)
+    return model
+
