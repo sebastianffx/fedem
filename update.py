@@ -56,7 +56,8 @@ class DatasetSplit(Dataset):
     def __getitem__(self, item):
         if self.task == 'cv':
             content, label = self.dataset[self.idxs[item]]
-            return torch.tensor(content), torch.tensor(label)
+            #return torch.tensor(content.detach().clone()), torch.tensor(label.detach().clone())
+            return content.detach().clone(), label.detach().clone()
         elif self.task == 'nlp':
             return self.dataset[self.idxs[item]]
         else:

@@ -6,7 +6,7 @@ import sys
 import copy
 import torch
 from glob import glob
-import datasets as ds
+#import datasets as ds
 import os
 from natsort import natsorted
 
@@ -125,9 +125,9 @@ def get_dataset(args, tokenizer=None, max_seq_len=MAX_SEQUENCE_LENGTH, custom_sa
 
     elif args.task == 'cv':
         if args.dataset == 'brats':
-            brats_nifti__dir_paths = natsorted(glob(args.ROOT_DATA+'brats/'"**/**/"))
+            brats_nifti__dir_paths = natsorted(glob(args.ROOT_DATA+'/'"**/**/"))
             print(len(brats_nifti__dir_paths))
-            print(f"loading BraTS data from {args.ROOT_DATA}brats/")
+            print(f"loading BraTS data from {args.ROOT_DATA}/")
             imtrans = Compose(
                 [   LoadImage(image_only=True),
                     Spacing(
@@ -161,7 +161,7 @@ def get_dataset(args, tokenizer=None, max_seq_len=MAX_SEQUENCE_LENGTH, custom_sa
                 ]
             )
         
-            #The whole dataset will be sliced in terms of the indexes of each of the partitions of the "centralized" dataset
+            #The whole dataset will be sliced in terms of the indexes of each of the partitions of the "centralized" dataset read in the next 3 lines
             train_ids = tuple(open('./data/partitions/brats_centralized_train.txt').read().split('\n'))
             val_ids = tuple(open('./data/partitions/brats_centralized_validation.txt').read().split('\n'))
             test_ids = tuple(open('./data/partitions/brats_centralized_test.txt').read().split('\n'))
@@ -207,8 +207,11 @@ def get_dataset(args, tokenizer=None, max_seq_len=MAX_SEQUENCE_LENGTH, custom_sa
             test_dataset   = ArrayDataset(test_volumes_paths, imtrans, test_labels_paths, segtrans)
 
             user_groups = {i:[] for i in range(4)}
+            user_groups_test = {i:[] for i in range(4)}
+
             train_val_id_centers = train_ids_centers + val_ids_centers
 
+            #Generating mapping between train idxs and clients
             for i in range(len(train_val_volume_paths)):
                 #print(i)
                 cur_volume_id = train_val_volume_paths[i].split('/')[-2]
@@ -218,7 +221,17 @@ def get_dataset(args, tokenizer=None, max_seq_len=MAX_SEQUENCE_LENGTH, custom_sa
                             user_groups[j].append(i)
                             break
 
-            return train_val_dataset, test_dataset, user_groups
+            #Generating mapping between test idxs and clients
+            for i in range(len(test_volumes_paths)):
+                #print(i)
+                cur_volume_id = test_volumes_paths[i].split('/')[-2]
+                for j in range(len(test_ids_centers)):
+                    for k in range(len(test_ids_centers[j])):
+                        if cur_volume_id == test_ids_centers[j][k]:
+                            user_groups_test[j].append(i)
+                            break
+
+            return train_val_dataset, test_dataset, user_groups, user_groups_test
 
 
         if args.dataset == 'cifar':
