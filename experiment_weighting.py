@@ -60,40 +60,62 @@ if LOCATION == 'laptop':
 
 
 # In[3]:
-for i in range(5):
 
-    #Hyperparams cell
-    modality = 'CBF'
-    batch_size = 2
-    num_epochs = 300
-    learning_rate = 0.000932#lrs[0] #To comment in the loop
-    weighting_scheme = 'BETA'
-    beta_val=0.9
+def get_train_valid_test_partitions(modality, isles_data_root, num_centers=4):
+    centers_partitions = [[] for i in range(num_centers)]
+    for center_num in range(1,num_centers+1):
+        center_paths_train  = sorted(glob(isles_data_root+'center'+str(center_num)+'/train'+'/**/*'+modality+'*/*.nii'))
+        center_paths_valid  = sorted(glob(isles_data_root+'center'+str(center_num)+'/valid'+'/**/*'+modality+'*/*.nii'))
+        center_paths_test   = sorted(glob(isles_data_root+'center'+str(center_num)+'/test'+'/**/*'+modality+'*/*.nii'))
+        center_lbl_paths_train  = sorted(glob(isles_data_root+'center'+str(center_num)+'/train'+'/**/*OT*/*nii'))
+        center_lbl_paths_valid  = sorted(glob(isles_data_root+'center'+str(center_num)+'/valid'+'/**/*OT*/*nii'))
+        center_lbl_paths_test  = sorted(glob(isles_data_root+'center'+str(center_num)+'/test'+'/**/*OT*/*nii'))
+        centers_partitions[center_num-1] = [[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]]
+    return centers_partitions
 
+def center_dataloaders(partitions_paths_center, batch_size=2):#
+    center_ds_train = ArrayDataset(partitions_paths_center[0][0], imtrans, partitions_paths_center[1][0], segtrans)
+    center_train_loader   = torch.utils.data.DataLoader(
+        center_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+    )
 
-    # In[4]:
+    center_ds_valid = ArrayDataset(partitions_paths_center[0][1], imtrans, partitions_paths_center[1][1], segtrans)
+    center_valid_loader   = torch.utils.data.DataLoader(
+        center_ds_valid, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+    )
 
+    center_ds_test = ArrayDataset(partitions_paths_center[0][2], imtrans_test, partitions_paths_center[1][2], segtrans_test)
+    center_test_loader   = torch.utils.data.DataLoader(
+        center_ds_test, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+    )
+    return center_train_loader, center_valid_loader, center_test_loader
 
-    def get_train_valid_test_partitions(modality, isles_data_root, num_centers=4):
-        centers_partitions = [[] for i in range(num_centers)]
-        for center_num in range(1,num_centers+1):
-            center_paths_train  = sorted(glob(isles_data_root+'center'+str(center_num)+'/train'+'/**/*'+modality+'*/*.nii'))
-            center_paths_valid  = sorted(glob(isles_data_root+'center'+str(center_num)+'/valid'+'/**/*'+modality+'*/*.nii'))
-            center_paths_test   = sorted(glob(isles_data_root+'center'+str(center_num)+'/test'+'/**/*'+modality+'*/*.nii'))
-            center_lbl_paths_train  = sorted(glob(isles_data_root+'center'+str(center_num)+'/train'+'/**/*OT*/*nii'))
-            center_lbl_paths_valid  = sorted(glob(isles_data_root+'center'+str(center_num)+'/valid'+'/**/*OT*/*nii'))
-            center_lbl_paths_test  = sorted(glob(isles_data_root+'center'+str(center_num)+'/test'+'/**/*OT*/*nii'))
-            centers_partitions[center_num-1] = [[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]]
-        return centers_partitions
+def perform_one_local_epoch(train_loader, local_model, local_optimizer, loss_function, client_idx=0):
+    batch_loss_client = []
+    for batch_data in train_loader:
+        inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+        local_model.zero_grad()        
+        outputs = local_model(inputs)
+        loss = loss_function(outputs, labels)
+        loss.backward()
+        local_optimizer.step()
+        batch_loss_client.append(loss.item())
+    avg_loss_client = copy.deepcopy(sum(batch_loss_client) / len(batch_loss_client))
+    print("Loss for client: " +str(client_idx)+" :" +str(avg_loss_client))
+    return avg_loss_client   
 
+#Hyperparams cell
+modality = 'CBF'
+batch_size = 2
+num_epochs = 300
+learning_rate = 0.000932#lrs[0] #To comment in the loop
+weighting_scheme = 'BETA'
+beta_val=0.9
+partitions_paths = get_train_valid_test_partitions(modality, isles_data_root, 4)
+num_repetitions = 5
 
-    # In[5]:
+for i in range(num_repetitions):
 
-
-    partitions_paths = get_train_valid_test_partitions(modality, isles_data_root, 4)
-
-
-    # In[6]:
 
 
     len(partitions_paths[0][0][2]),len(partitions_paths[0][1][2]) #idx_order: center,img_label,partition
@@ -112,9 +134,6 @@ for i in range(5):
         max_intensity = 200
     if modality =='Tmax' or modality =='MTT':
         max_intensity = 30
-
-
-    # In[8]:
 
 
     imtrans = Compose(
@@ -179,29 +198,6 @@ for i in range(5):
         ]
     )
 
-
-    # In[9]:
-
-
-    def center_dataloaders(partitions_paths_center, batch_size=2):#
-        center_ds_train = ArrayDataset(partitions_paths_center[0][0], imtrans, partitions_paths_center[1][0], segtrans)
-        center_train_loader   = torch.utils.data.DataLoader(
-            center_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
-        )
-
-        center_ds_valid = ArrayDataset(partitions_paths_center[0][1], imtrans, partitions_paths_center[1][1], segtrans)
-        center_valid_loader   = torch.utils.data.DataLoader(
-            center_ds_valid, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
-        )
-
-        center_ds_test = ArrayDataset(partitions_paths_center[0][2], imtrans_test, partitions_paths_center[1][2], segtrans_test)
-        center_test_loader   = torch.utils.data.DataLoader(
-            center_ds_test, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
-        )
-        return center_train_loader, center_valid_loader, center_test_loader
-
-
-    # In[10]:
 
 
     centers_data_loaders = []
@@ -316,28 +312,6 @@ for i in range(5):
     global_model.train()
     epoch_loss = 0
     train_loss, train_dice = [], []
-
-
-    # In[17]:
-
-
-    def perform_one_local_epoch(train_loader, local_model, local_optimizer, loss_function, client_idx=0):
-        batch_loss_client = []
-        for batch_data in train_loader:
-            inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
-            local_model.zero_grad()        
-            outputs = local_model(inputs)
-            loss = loss_function(outputs, labels)
-            loss.backward()
-            local_optimizer.step()
-            batch_loss_client.append(loss.item())
-        avg_loss_client = copy.deepcopy(sum(batch_loss_client) / len(batch_loss_client))
-        print("Loss for client: " +str(client_idx)+" :" +str(avg_loss_client))
-        return avg_loss_client   
-
-
-    # In[18]:
-
 
     for epoch in range(num_epochs):
         print("-" * 10)
