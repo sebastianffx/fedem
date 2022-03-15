@@ -18,10 +18,10 @@ class Fedem:
     def __init__(self, options):
         #save all clients dataloader
         self.dataloaders = options['dataloader']
-        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_3sites")
 
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
-        for epoch in range(global_epoch):
+        for cur_epoch in range(global_epoch):
+            print("*** global_epoch:", cur_epoch+1, "***")
 
             #skiping center 2 as only 1 scan is available (train_loader sorted)
             index=[0,1,2]
@@ -30,18 +30,18 @@ class Fedem:
             # dispatch
             self.dispatch(index)
             # local updating
-            self.client_update(index, local_epoch, local_lr, epoch)
+            self.client_update(index, local_epoch, local_lr, cur_epoch)
             # aggregation
             self.aggregation(index, global_lr)
 
         return self.nn
 
-    def client_update(self, index, local_epoch, local_lr):
+    def client_update(self, index, local_epoch, local_lr, cur_epoch):
         for k in index:
             self.nns[k], round_loss = self.train(self.nns[k], k, self.dataloaders[k][0], local_epoch, local_lr)
             
             print(self.nns[k].name+" loss:", round_loss)
-            self.writer.add_scalar('training loss '+self.nns[k].name, round_loss, epoch)
+            self.writer.add_scalar('training loss '+self.nns[k].name, round_loss, cur_epoch)
 
     def dispatch(self, index):
         for j in index:
@@ -77,6 +77,8 @@ class FedAvg(Fedem):
         super(FedAvg, self).__init__(options)
 
         self.weighting_scheme = options['weighting_scheme']
+        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options['weighting_scheme'])
+
 
         if options['weighting_scheme'] == 'BETA':
             self.beta_val = options['beta_val']
@@ -146,6 +148,8 @@ class FedAvg(Fedem):
 class Scaffold(Fedem):
     def __init__(self, options):
         super(Scaffold, self).__init__(options)
+
+        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"SCAFFOLD")
 
         self.K = options['K']
         
