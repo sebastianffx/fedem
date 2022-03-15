@@ -37,11 +37,16 @@ class Fedem:
         return self.nn
 
     def client_update(self, index, local_epoch, local_lr, cur_epoch):
-        for k in index:
-            self.nns[k], round_loss = self.train(self.nns[k], k, self.dataloaders[k][0], local_epoch, local_lr)
+        tmp=0
+        for i in index:
+            self.nns[i], round_loss = self.train(self.nns[i], self.dataloaders[i][0], local_epoch, local_lr)
             
-            print(self.nns[k].name+" loss:", round_loss)
-            self.writer.add_scalar('training loss '+self.nns[k].name, round_loss, cur_epoch)
+            print(self.nns[i].name+" loss:", round_loss)
+            self.writer.add_scalar('training loss '+self.nns[i].name, round_loss, cur_epoch)
+            tmp+=round_loss
+            
+        tmp/=len(index)
+        self.writer.add_scalar('avg training loss', tmp, cur_epoch)
 
     def dispatch(self, index):
         for j in index:
@@ -53,6 +58,7 @@ class Fedem:
         model.eval()
         pred = []
         y = []
+        dice_metric.reset()
         for test_data in dataloader_test:
             with torch.no_grad():
                 test_img, test_label = test_data[0][:,:,:,:,0].to(device), test_data[1][:,:,:,:,0].to(device)
@@ -63,8 +69,8 @@ class Fedem:
 
         # aggregate the final mean dice result
         metric = dice_metric.aggregate().item()
-        dice_metric.reset()
         print('dice:', metric)
+        return metric
 
     def aggregation():
         raise NotImplementedError
@@ -77,7 +83,7 @@ class FedAvg(Fedem):
         super(FedAvg, self).__init__(options)
 
         self.weighting_scheme = options['weighting_scheme']
-        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options['weighting_scheme'])
+        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options['weighting_scheme']+options['suffix'])
 
 
         if options['weighting_scheme'] == 'BETA':
@@ -106,25 +112,6 @@ class FedAvg(Fedem):
             temp.name = options['clients'][i]
             self.nns.append(temp)
 
-    def train(self, ann, k, dataloader_train, local_epoch, local_lr):
-        #train client to train mode
-        ann.train()
-        ann.len = len(dataloader_train)
-                
-        loss_function = monai.losses.DiceLoss(sigmoid=True, include_background=False)
-        optimizer = Adam(ann.parameters(), local_lr)
-
-        for epoch in range(local_epoch):
-            for batch_data in dataloader_train:
-                inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
-                y_pred = ann(inputs)
-                loss = loss_function(y_pred, labels)
-                optimizer.zero_grad()        
-                loss.backward()
-                optimizer.step()
-                            
-        return ann, loss.item()
-
     def aggregation(self, index, global_lr):
         client_weights=[]
 
@@ -145,11 +132,30 @@ class FedAvg(Fedem):
         # Update global weights with the averaged model weights.
         self.nn.load_state_dict(global_weights)
 
+    def train(self, ann, dataloader_train, local_epoch, local_lr):
+        #train client to train mode
+        ann.train()
+        ann.len = len(dataloader_train)
+                
+        loss_function = monai.losses.DiceLoss(sigmoid=True, include_background=False)
+        optimizer = Adam(ann.parameters(), local_lr)
+
+        for epoch in range(local_epoch):
+            for batch_data in dataloader_train:
+                inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                y_pred = ann(inputs)
+                loss = loss_function(y_pred, labels)
+                optimizer.zero_grad()        
+                loss.backward()
+                optimizer.step()
+                            
+        return ann, loss.item()
+
 class Scaffold(Fedem):
     def __init__(self, options):
         super(Scaffold, self).__init__(options)
 
-        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"SCAFFOLD")
+        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"SCAFFOLD"+options['suffix'])
 
         self.K = options['K']
         
@@ -203,20 +209,7 @@ class Scaffold(Fedem):
             v.data += x[k].data*global_lr
             self.nn.control[k].data += c[k].data * (len(index) / self.K)
 
-    def global_test(self, aggreg_dataloader_test):
-        model = self.nn
-        model.eval()
-        
-        #test the global model on each individual dataloader
-        for k, client in enumerate(self.nns):
-            print("testing on", client.name, "dataloader")
-            test(model, self.dataloaders[k][2])
-        
-        #test the global model on aggregated dataloaders
-        print("testing on all the data")
-        test(model, aggreg_dataloader_test)
-
-    def train(self, ann, idx, dataloader_train, local_epoch, local_lr):
+    def train(self, ann, dataloader_train, local_epoch, local_lr):
         #train client to train mode
         ann.train()
         ann.len = len(dataloader_train)
@@ -244,6 +237,19 @@ class Scaffold(Fedem):
             ann.delta_y[k] = temp[k] - v.data
             ann.delta_control[k] = ann.control[k] - x.control[k]
         return ann, loss.item()
+
+    def global_test(self, aggreg_dataloader_test):
+        model = self.nn
+        model.eval()
+        
+        #test the global model on each individual dataloader
+        for k, client in enumerate(self.nns):
+            print("testing on", client.name, "dataloader")
+            test(model, self.dataloaders[k][2])
+        
+        #test the global model on aggregated dataloaders
+        print("testing on all the data")
+        test(model, aggreg_dataloader_test)
 
 #optimizer
 class ScaffoldOptimizer(Optimizer):
