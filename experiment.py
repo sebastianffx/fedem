@@ -33,7 +33,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
         tmp.append(test_dicemetric)
 
-    for metrics in tmp:
-        print(f"{networks_name[i]} avg dice: {mean(metrics)} std: {std(metrics)}")
+    for k, metrics in enumerate(tmp):
+        print(f"{networks_name[k]} avg dice: {mean(metrics)} std: {std(metrics)}")
 
     return tmp
