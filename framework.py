@@ -53,7 +53,7 @@ class Fedem:
             for old_params, new_params in zip(self.nns[j].parameters(), self.nn.parameters()):
                 old_params.data = new_params.data.clone()
 
-    def test(self, dataloader_test):
+    def test(self, dataloader_test, test=True):
         model=self.nn
         model.eval()
         pred = []
@@ -70,6 +70,10 @@ class Fedem:
         # aggregate the final mean dice result
         metric = dice_metric.aggregate().item()
         print('dice:', metric)
+        if test:
+            self.writer.add_scalar('test dice metric', metric)
+        else:
+            self.writer.add_scalar('validation dice metric', metric)
         return metric
 
     def aggregation():
