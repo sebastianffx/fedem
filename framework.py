@@ -20,15 +20,20 @@ class Fedem:
     def __init__(self, options):
         #save all clients dataloader
         self.dataloaders = options['dataloader']
+        self.valid_loader = options['valid_loader']
         self.options = options
-
+    
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
+        metric_values = list()
+        best_metric = -1
+        best_metric_epoch = -1
+
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
 
             #skiping center 2 as only 1 scan is available (train_loader sorted)
-            index=[0,1]#,3]
-            #index=[0]
+            index=[0,1,3]
+
             #perform sampling here if desired
 
             # dispatch
@@ -38,8 +43,15 @@ class Fedem:
             # aggregation
             self.aggregation(index, global_lr)
 
-        return self.nn
+            #Evaluation on validation and saving model if needed
+            if (cur_epoch + 1) % self.options['val_interval'] == 0:
+                best_metric,best_metric_epoch = self.validation_cycle(index,metric_values,cur_epoch,best_metric,best_metric_epoch)
 
+
+        return self.nn
+    def validation(self,index):        
+        return NotImplementedError
+    
     def client_update(self, index, local_epoch, local_lr, cur_epoch):
         tmp=0
         #round loss is assumed to be the generic model loss 
@@ -60,14 +72,23 @@ class Fedem:
             for old_params, new_params in zip(self.nns[j].parameters(), self.nn.parameters()):
                 old_params.data = new_params.data.clone()
 
-    def test(self, dataloader_test, test=True):
+
+    def test(self, dataloader_test, test=True, model_path=None):
         model=self.nn
+
+        if model_path != None:
+            print("Loading model weights: ")
+            print(model_path)
+            checkpoint = torch.load(model_path)
+            model.load_state_dict(checkpoint)
+
         model.eval()
         pred = []
         y = []
         dice_metric.reset()
         for test_data in dataloader_test:
-            with torch.no_grad():
+            with torch.no_grad():                
+                print(test_data[0].shape)
                 test_img, test_label = test_data[0][:,:,:,:,0].to(device), test_data[1][:,:,:,:,0].to(device)
                 test_pred = model(test_img)
                 #what is the purpose of the line below?
@@ -426,18 +447,18 @@ class FedRod(Fedem):
                 for k, v in ann.named_parameters():
                     for enc_layer in self.name_encoder_layers:
                         if enc_layer == k:
-                            ann.encoder_generic[k] = copy.deepcopy(v.data) #Keeping the generic encoder data
+                            ann.encoder_generic[k] = copy.deepcopy(v.data).to(device) #Keeping the generic encoder data
 
                 for k, v in ann.named_parameters():
                     for dec_layer in self.name_decoder_layers:
                         if dec_layer == k:
-                            ann.decoder_generic[k] = copy.deepcopy(v.data) #Keeping the generic decoder data
+                            ann.decoder_generic[k] = copy.deepcopy(v.data).to(device) #Keeping the generic decoder data
                 
                 #(2)Optimization of the Perzonalized path here equation (9) of the paper
                 #(3) Keeping the generic output to add it later to the personalized
                 output_generic = 0
                 if device.type =='cuda':
-                    output_generic = copy.deepcopy(y_pred_generic.cpu().detach().numpy())
+                    output_generic = copy.deepcopy(y_pred_generic.detach())
                 if device.type =='cpu':
                     output_generic = copy.deepcopy(y_pred_generic.detach().numpy())
 
@@ -452,7 +473,7 @@ class FedRod(Fedem):
                 for k, v in ann.named_parameters():
                     for dec_layer in self.name_decoder_layers:
                         if dec_layer == k:
-                            v.data = ann.decoder_personalized[k].data #"Swapping the heads"
+                            v.data = ann.decoder_personalized[k].data.to(device) #"Swapping the heads"
                             v.requires_grad = True #Deriving gradients only wrt to the personalized head
                
 
@@ -481,6 +502,40 @@ class FedRod(Fedem):
         print("testing on all the data")
         test(model, aggreg_dataloader_test)
         
+    def validation_cycle(self,index,metric_values,cur_epoch, best_metric,best_metric_epoch):
+        all_valid_loader = self.valid_loader
+        writer = self.writer
+        global_model = self.nn
+        metric = 0
+        global_model.eval()
+        with torch.no_grad():
+            val_images = None
+            val_labels = None
+            val_outputs = None
+            for val_data in all_valid_loader:
+                val_images, val_labels = val_data[0].to(device), val_data[1].to(device)
+                val_outputs = global_model(val_images[:,:,:,:,0])
+                val_outputs = val_outputs>0.5 #This assumes one slice in the last dim
+                dice_metric(y_pred=val_outputs, y=val_labels[:,:,:,:,0])
+            # aggregate the final mean dice result
+            metric = dice_metric.aggregate().item()
+            # reset the status for next validation round
+            dice_metric.reset()
+            metric_values.append(metric)             
+            if metric > best_metric:
+                best_metric = metric
+                best_metric_epoch = cur_epoch
+                torch.save(global_model.state_dict(), self.options['modality']+'_FEDROD_best_metric_model_segmentation2d_array.pth')
+                print("saved new best metric model")
+            print(
+                "current epoch: {} current mean dice: {:.4f} best mean dice: {:.4f} at epoch {}".format(
+                    cur_epoch +1, metric, best_metric, best_metric_epoch
+                )
+            )
+            writer.add_scalar("val_mean_dice", metric, cur_epoch)
+            
+        return best_metric, best_metric_epoch
+
 #optimizer
 class ScaffoldOptimizer(Optimizer):
     def __init__(self, params, lr, weight_decay):

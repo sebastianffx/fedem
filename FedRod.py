@@ -26,7 +26,7 @@ batch_size = 2
 
 clients=["center1", "center2", "center3", "center4"]
 #from SCAFFOLD manuscript, global_learning_rate should be = sqrt(#Samples sites)
-local_epochs, global_epochs = 2, 100
+local_epochs, global_epochs = 1, 10
 #no sampling
 K=len(clients)
 
@@ -95,6 +95,7 @@ for i in range(5):
             test_vol_pxls = (test_vol_pxls - 0) / (30 - 0)
         print(test_vol_pxls.shape)
         dices_volume =[]
+        slices_predictions, slices_gt = [],[]
 
         for slice_selected in range(test_vol_pxls.shape[-1]):
             out_test = model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
@@ -102,13 +103,19 @@ for i in range(5):
             pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
             cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
             cur_dice_metric = cur_dice_metric.cpu().detach().numpy()[0][0]
-            dices_volume.append(cur_dice_metric)
+            slices_predictions.append(pred)
+            slices_gt.append(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected])
+        slices_predictions = torch.tensor(slices_predictions)
+        slices_gt = torch.tensor(slices_gt)
+
+        #dices_volume.append(np.where(np.isnan(cur_dice_metric), 0, cur_dice_metric))
+        
         print("Dices for the volume " + path_test_case)
         print(dices_volume)
         print(np.mean(dices_volume))
         print(np.std(dices_volume))
         print("=================================")
-        test_dicemetric.append(dices_volume)
+        test_dicemetric.append(dice_metric(slices_predictions,slice))
 
     #test_dicemetric.append(fed_rod.test(all_test_loader, model_path='/home/otarola/miccai22/fedem/'+modality+'_FEDROD_best_metric_model_segmentation2d_array.pth'))
 print(test_dicemetric)
