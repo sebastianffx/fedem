@@ -1,10 +1,11 @@
 import copy
+import itertools
 from pandas import options
 import torch
 import random
 import monai
 import numpy as np
-import torchaudio
+import nibabel as nib
 
 from network import UNet_custom
 from monai.metrics import DiceMetric
@@ -504,36 +505,60 @@ class FedRod(Fedem):
         
     def validation_cycle(self,index,metric_values,cur_epoch, best_metric,best_metric_epoch):
         all_valid_loader = self.valid_loader
+
+        partitions_valid_imgs = [self.options['partitions_paths'][i][0][2] for i in range(len(self.options['partitions_paths']))]
+        partitions_valid_lbls = [self.options['partitions_paths'][i][1][2] for i in range(len(self.options['partitions_paths']))]
+        all_valid_paths  = list(itertools.chain.from_iterable(partitions_valid_imgs))
+        all_valid_labels = list(itertools.chain.from_iterable(partitions_valid_lbls))
+        pred = []
+        y = []
+        dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
         writer = self.writer
         global_model = self.nn
         metric = 0
         global_model.eval()
-        with torch.no_grad():
-            val_images = None
-            val_labels = None
-            val_outputs = None
-            for val_data in all_valid_loader:
-                val_images, val_labels = val_data[0].to(device), val_data[1].to(device)
-                val_outputs = global_model(val_images[:,:,:,:,0])
-                val_outputs = val_outputs>0.5 #This assumes one slice in the last dim
-                dice_metric(y_pred=val_outputs, y=val_labels[:,:,:,:,0])
-            # aggregate the final mean dice result
-            metric = dice_metric.aggregate().item()
-            # reset the status for next validation round
-            dice_metric.reset()
-            metric_values.append(metric)             
-            if metric > best_metric:
-                best_metric = metric
-                best_metric_epoch = cur_epoch
-                torch.save(global_model.state_dict(), self.options['modality']+'_FEDROD_best_metric_model_segmentation2d_array.pth')
-                print("saved new best metric model")
-            print(
-                "current epoch: {} current mean dice: {:.4f} best mean dice: {:.4f} at epoch {}".format(
-                    cur_epoch +1, metric, best_metric, best_metric_epoch
-                )
-            )
-            writer.add_scalar("val_mean_dice", metric, cur_epoch)
+        test_dicemetric = []
+
+        dice_metric.reset()
+        if self.options['modality'] =='CBF':
+            max_intensity = 1200
+        if self.options['modality'] =='CBV':
+            max_intensity = 200
+        if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
+            max_intensity = 30
+        for path_test_case, path_test_label in zip(all_valid_paths,all_valid_labels):            
+            test_vol = nib.load(path_test_case)
+            test_lbl = nib.load(path_test_label)
+
+            test_vol_pxls = test_vol.get_fdata()
+            test_vol_pxls = np.array(test_vol_pxls, dtype = np.float32)
+            test_lbl_pxls = test_lbl.get_fdata()
+            test_lbl_pxls = np.array(test_lbl_pxls)
+            test_vol_pxls = (test_vol_pxls - 0) / (max_intensity - 0) 
             
+            dices_volume =[]
+            with torch.no_grad():
+                for slice_selected in range(test_vol_pxls.shape[-1]):
+                    out_test = global_model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
+                    out_test = out_test.detach().cpu().numpy()
+                    pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
+                    cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))                
+                test_dicemetric.append(dice_metric.aggregate().item())
+            # reset the status for next computation round
+            dice_metric.reset()
+        metric = np.mean(test_dicemetric)
+        metric_values.append(metric)             
+        if metric > best_metric:
+            best_metric = metric
+            best_metric_epoch = cur_epoch
+            torch.save(global_model.state_dict(), self.options['modality']+'_FEDROD_best_metric_model_segmentation2d_array.pth')
+            print("saved new best metric model")
+        print(
+            "current epoch: {} current mean dice: {:.4f} best mean dice: {:.4f} at epoch {}".format(
+                cur_epoch +1, metric, best_metric, best_metric_epoch
+            )
+        )
+        writer.add_scalar("val_mean_dice", metric, cur_epoch)
         return best_metric, best_metric_epoch
 
 #optimizer

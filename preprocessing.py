@@ -27,10 +27,19 @@ def get_train_valid_test_partitions(path, modality, num_centers=4):
         center_lbl_paths_train  = sorted(glob(path+'center'+str(center_num)+'/train'+'/**/*OT*/*nii'))
         center_lbl_paths_valid  = sorted(glob(path+'center'+str(center_num)+'/valid'+'/**/*OT*/*nii'))
         center_lbl_paths_test   = sorted(glob(path+'center'+str(center_num)+'/test'+'/**/*OT*/*nii'))
+        print(len(center_paths_train),len(center_paths_valid),len(center_paths_test))
         centers_partitions[center_num-1] = [[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]]
     return centers_partitions
 
 def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
+    #print("Images-Labels: " + str(len(partitions_paths_center)))
+    #print(len(partitions_paths_center[0][0]))
+    #print(len(partitions_paths_center[1][0]))    
+    #print(len(partitions_paths_center[0][1]))
+    #print(len(partitions_paths_center[1][1]))
+    #print(len(partitions_paths_center[0][2]))
+    #print(len(partitions_paths_center[1][2]))
+
     center_ds_train = ArrayDataset(partitions_paths_center[0][0], transfo['imtrans'], partitions_paths_center[1][0], transfo['segtrans'])
     center_train_loader = torch.utils.data.DataLoader(
     	center_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
@@ -45,6 +54,12 @@ def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
     center_test_loader = torch.utils.data.DataLoader(
         center_ds_test, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
     	)
+    #print("===========LEN LOADERS==========")
+    #print(len(center_train_loader))
+    #print(len(center_valid_loader))
+    #print(len(center_test_loader))
+    #print("=====================")
+
     return center_train_loader, center_valid_loader, center_test_loader
 
 def dataPreprocessing(path, modality, number_site, batch_size):
@@ -98,6 +113,7 @@ def dataPreprocessing(path, modality, number_site, batch_size):
             #Resized
         ]
     )
+
     transfo['imtrans_neutral']=imtrans_neutral
 
     segtrans_neutral = Compose(
