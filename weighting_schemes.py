@@ -25,7 +25,9 @@ def average_weights_softmax(local_trained_weights, loaders_lengths):
 def average_weights_beta(local_trained_weights, loaders_lengths, beta_val=0.9):
 
     weight_classes = [(1-beta_val)/(1-np.power(beta_val,length)) for length in loaders_lengths]
-
+    #print(weight_classes)
+    #print(local_trained_weights)
+    #print(len(local_trained_weights))
     """Returns the global weights using a beta-weighted average
        local_trained_weights: The list of tensors (of the same shape) that will be averaged
     """

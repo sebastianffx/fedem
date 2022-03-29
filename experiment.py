@@ -1,4 +1,4 @@
-from framework import Scaffold, FedAvg
+from framework import Scaffold, FedAvg, FedRod, Fedem
 from preprocessing import dataPreprocessing
 from numpy import std, mean
 
@@ -15,7 +15,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             #create new loaders for each repetition
             _, centers_data_loaders, all_test_loader, all_valid_loader = dataPreprocessing(datapath, modality, number_site, batch_size)
             conf["dataloader"]=centers_data_loaders
-            
+            network = Fedem(conf)
             #add number to differentiate replicates
             if exp_name!=None:
                 conf["suffix"]="_"+exp_name+"_"+str(rep)
@@ -24,6 +24,8 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
             if "scaff" in conf.keys() and conf["scaff"]:
                 network = Scaffold(conf)
+            if "FedRod" in conf.keys() and conf["fed_rod"]:
+                network = FedRod(conf)
             elif 'weighting_scheme' in conf.keys():
                 network = FedAvg(conf)
             else:
@@ -32,7 +34,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'])
 
             valid_dicemetric.append(network.test(all_valid_loader, test=False))
-            test_dicemetric.append(network.test(all_test_loader))
+            test_dicemetric.append(network.global_test_cycle())
 
         tmp_valid.append(valid_dicemetric)
         tmp_test.append(test_dicemetric)

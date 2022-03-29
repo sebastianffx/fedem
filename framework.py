@@ -23,21 +23,21 @@ class Fedem:
         self.dataloaders = options['dataloader']
         self.valid_loader = options['valid_loader']
         self.options = options
-    
+        print(self.options['suffix'])
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
         metric_values = list()
         best_metric = -1
         best_metric_epoch = -1
-
+        index = [0,1,2]
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
 
             #skiping center 2 as only 1 scan is available (train_loader sorted)
-            index=[0,1,3]
 
             #perform sampling here if desired
 
             # dispatch
+            
             self.dispatch(index)
             # local updating
             self.client_update(index, local_epoch, local_lr, cur_epoch)
@@ -46,7 +46,7 @@ class Fedem:
 
             #Evaluation on validation and saving model if needed
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
-                best_metric,best_metric_epoch = self.validation_cycle(index,metric_values,cur_epoch,best_metric,best_metric_epoch)
+                best_metric,best_metric_epoch = self.global_validation_cycle(index,metric_values,cur_epoch,best_metric,best_metric_epoch)
 
 
         return self.nn
@@ -57,7 +57,7 @@ class Fedem:
         tmp=0
         #round loss is assumed to be the generic model loss 
         for i in index:
-            if self.options['fed_rod']:
+            if "fedrod" in self.options['suffix']:
                 self.nns[i], round_loss, round_loss_personalized_m = self.train(self.nns[i], self.dataloaders[i][0], local_epoch, local_lr)            
             else:
                 self.nns[i], round_loss = self.train(self.nns[i], self.dataloaders[i][0], local_epoch, local_lr)
@@ -89,7 +89,7 @@ class Fedem:
         dice_metric.reset()
         for test_data in dataloader_test:
             with torch.no_grad():                
-                print(test_data[0].shape)
+                #print(test_data[0].shape)
                 test_img, test_label = test_data[0][:,:,:,:,0].to(device), test_data[1][:,:,:,:,0].to(device)
                 test_pred = model(test_img)
                 #what is the purpose of the line below?
@@ -110,7 +110,112 @@ class Fedem:
 
     def train():
         raise NotImplementedError
+    
+    def global_validation_cycle(self,index,metric_values,cur_epoch, best_metric,best_metric_epoch):
+        partitions_valid_imgs = [self.options['partitions_paths'][i][0][1] for i in range(len(self.options['partitions_paths']))]
+        partitions_valid_lbls = [self.options['partitions_paths'][i][1][1] for i in range(len(self.options['partitions_paths']))]
+        all_valid_paths  = list(itertools.chain.from_iterable(partitions_valid_imgs))
+        all_valid_labels = list(itertools.chain.from_iterable(partitions_valid_lbls))
+        pred = []
+        y = []
+        dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+        writer = self.writer
+        global_model = self.nn
+        metric = 0
+        global_model.eval()
+        test_dicemetric = []
 
+        dice_metric.reset()
+        if self.options['modality'] =='CBF':
+            max_intensity = 1200
+        if self.options['modality'] =='CBV':
+            max_intensity = 200
+        if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
+            max_intensity = 30
+        for path_test_case, path_test_label in zip(all_valid_paths,all_valid_labels):            
+            test_vol = nib.load(path_test_case)
+            test_lbl = nib.load(path_test_label)
+
+            test_vol_pxls = test_vol.get_fdata()
+            test_vol_pxls = np.array(test_vol_pxls, dtype = np.float32)
+            test_lbl_pxls = test_lbl.get_fdata()
+            test_lbl_pxls = np.array(test_lbl_pxls)
+            test_vol_pxls = (test_vol_pxls - 0) / (max_intensity - 0) 
+            
+            dices_volume =[]
+            with torch.no_grad():
+                for slice_selected in range(test_vol_pxls.shape[-1]):
+                    out_test = global_model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
+                    out_test = out_test.detach().cpu().numpy()
+                    pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
+                    cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))                
+                test_dicemetric.append(dice_metric.aggregate().item())
+            # reset the status for next computation round
+            dice_metric.reset()
+        metric = np.mean(test_dicemetric)
+        metric_values.append(metric)             
+        if metric > best_metric:
+            best_metric = metric
+            best_metric_epoch = cur_epoch
+            torch.save(global_model.state_dict(), self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth')
+            print("saved new best metric model")
+        print(
+            "current epoch: {} current mean dice: {:.4f} best mean dice: {:.4f} at epoch {}".format(
+                cur_epoch +1, metric, best_metric, best_metric_epoch
+            )
+        )
+        writer.add_scalar("val_mean_dice", metric, cur_epoch)
+        return best_metric, best_metric_epoch
+
+    def global_test_cycle(self):                    
+        partitions_test_imgs = [self.options['partitions_paths'][i][0][2] for i in range(len(self.options['partitions_paths']))]
+        partitions_test_lbls = [self.options['partitions_paths'][i][1][2] for i in range(len(self.options['partitions_paths']))]
+        all_test_paths  = list(itertools.chain.from_iterable(partitions_test_imgs))
+        all_test_labels = list(itertools.chain.from_iterable(partitions_test_lbls))
+        
+
+        print("Loading best validation model weights: ")
+        model_path = self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
+        print(model_path)
+        checkpoint = torch.load(model_path)
+        self.nn.load_state_dict(checkpoint)
+        model = self.nn
+
+        pred = []
+        test_dicemetric = []
+        y = []
+        dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+
+        dice_metric.reset()
+        if self.options['modality'] =='CBF':
+            max_intensity = 1200
+        if self.options['modality'] =='CBV':
+            max_intensity = 200
+        if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
+            max_intensity = 30
+
+        for path_test_case, path_test_label in zip(all_test_paths,all_test_labels):            
+            test_vol = nib.load(path_test_case)
+            test_lbl = nib.load(path_test_label)
+
+            test_vol_pxls = test_vol.get_fdata()
+            test_vol_pxls = np.array(test_vol_pxls, dtype = np.float32)
+            test_lbl_pxls = test_lbl.get_fdata()
+            test_lbl_pxls = np.array(test_lbl_pxls)
+
+            test_vol_pxls = (test_vol_pxls - 0) / (max_intensity - 0)
+
+            for slice_selected in range(test_vol_pxls.shape[-1]):
+                out_test = model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
+                out_test = out_test.detach().cpu().numpy()
+                pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
+                cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
+            test_dicemetric.append(dice_metric.aggregate().item())
+            # reset the status for next computation round
+            dice_metric.reset()
+        print("Global model test DICE for all slices: ")
+        print(np.mean(test_dicemetric))
+        return(np.mean(test_dicemetric))
 class FedAvg(Fedem):
     def __init__(self, options):
         super(FedAvg, self).__init__(options)
@@ -503,63 +608,6 @@ class FedRod(Fedem):
         print("testing on all the data")
         test(model, aggreg_dataloader_test)
         
-    def validation_cycle(self,index,metric_values,cur_epoch, best_metric,best_metric_epoch):
-        all_valid_loader = self.valid_loader
-
-        partitions_valid_imgs = [self.options['partitions_paths'][i][0][2] for i in range(len(self.options['partitions_paths']))]
-        partitions_valid_lbls = [self.options['partitions_paths'][i][1][2] for i in range(len(self.options['partitions_paths']))]
-        all_valid_paths  = list(itertools.chain.from_iterable(partitions_valid_imgs))
-        all_valid_labels = list(itertools.chain.from_iterable(partitions_valid_lbls))
-        pred = []
-        y = []
-        dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
-        writer = self.writer
-        global_model = self.nn
-        metric = 0
-        global_model.eval()
-        test_dicemetric = []
-
-        dice_metric.reset()
-        if self.options['modality'] =='CBF':
-            max_intensity = 1200
-        if self.options['modality'] =='CBV':
-            max_intensity = 200
-        if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
-            max_intensity = 30
-        for path_test_case, path_test_label in zip(all_valid_paths,all_valid_labels):            
-            test_vol = nib.load(path_test_case)
-            test_lbl = nib.load(path_test_label)
-
-            test_vol_pxls = test_vol.get_fdata()
-            test_vol_pxls = np.array(test_vol_pxls, dtype = np.float32)
-            test_lbl_pxls = test_lbl.get_fdata()
-            test_lbl_pxls = np.array(test_lbl_pxls)
-            test_vol_pxls = (test_vol_pxls - 0) / (max_intensity - 0) 
-            
-            dices_volume =[]
-            with torch.no_grad():
-                for slice_selected in range(test_vol_pxls.shape[-1]):
-                    out_test = global_model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
-                    out_test = out_test.detach().cpu().numpy()
-                    pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
-                    cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))                
-                test_dicemetric.append(dice_metric.aggregate().item())
-            # reset the status for next computation round
-            dice_metric.reset()
-        metric = np.mean(test_dicemetric)
-        metric_values.append(metric)             
-        if metric > best_metric:
-            best_metric = metric
-            best_metric_epoch = cur_epoch
-            torch.save(global_model.state_dict(), self.options['modality']+'_FEDROD_best_metric_model_segmentation2d_array.pth')
-            print("saved new best metric model")
-        print(
-            "current epoch: {} current mean dice: {:.4f} best mean dice: {:.4f} at epoch {}".format(
-                cur_epoch +1, metric, best_metric, best_metric_epoch
-            )
-        )
-        writer.add_scalar("val_mean_dice", metric, cur_epoch)
-        return best_metric, best_metric_epoch
 
 #optimizer
 class ScaffoldOptimizer(Optimizer):
