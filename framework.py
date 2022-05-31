@@ -623,3 +623,37 @@ class ScaffoldOptimizer(Optimizer):
                 dp = p.grad.data + c.data - ci.data
                 #local learning rate
                 p.data = p.data - dp.data * group['lr']
+
+class Centralized():
+    def __init__(self):
+        self.nn = UNet_custom(spatial_dims=2,
+                            in_channels=1,
+                            out_channels=1,
+                            channels=(16, 32, 64, 128),
+                            strides=(2, 2, 2),
+                            kernel_size = (3,3),
+                            num_res_units=2,
+                            name='centralized').to(device)
+
+    def train(self, ann, dataloader_train, local_epoch, local_lr):
+        #First the generic encoder-decoder are updated       
+        ann.train()
+        ann.len = len(dataloader_train)
+                
+        loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
+
+        optimizer = torch.optim.Adam(ann.parameters(), lr=local_lr)
+
+        for epoch in range(local_epoch):
+            for batch_data in dataloader_train:
+                for k, v in ann.named_parameters():
+                    v.requires_grad = True
+                
+                inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                y_pred_generic = ann(inputs)
+                loss = loss_function(y_pred_generic, labels)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+        return ann

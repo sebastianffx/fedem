@@ -18,17 +18,29 @@ from monai.transforms import (
     EnsureType,
     Resized)
 
-def get_train_valid_test_partitions(path, modality, num_centers=4):
+def get_train_valid_test_partitions(path, modality, num_centers=4, nested=True):
     centers_partitions = [[] for i in range(num_centers)]
-    for center_num in range(1,num_centers+1):
-        center_paths_train  = sorted(glob(path+'center'+str(center_num)+'/train'+'/**/*'+modality+'*/*.nii'))
-        center_paths_valid  = sorted(glob(path+'center'+str(center_num)+'/valid'+'/**/*'+modality+'*/*.nii'))
-        center_paths_test   = sorted(glob(path+'center'+str(center_num)+'/test'+'/**/*'+modality+'*/*.nii'))
-        center_lbl_paths_train  = sorted(glob(path+'center'+str(center_num)+'/train'+'/**/*OT*/*nii'))
-        center_lbl_paths_valid  = sorted(glob(path+'center'+str(center_num)+'/valid'+'/**/*OT*/*nii'))
-        center_lbl_paths_test   = sorted(glob(path+'center'+str(center_num)+'/test'+'/**/*OT*/*nii'))
-        print(len(center_paths_train),len(center_paths_valid),len(center_paths_test))
-        centers_partitions[center_num-1] = [[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]]
+    if nested:
+        for center_num in range(1,num_centers+1):
+            center_paths_train  = sorted(glob(path+'center'+str(center_num)+'/train'+'/**/*'+modality+'*/*.nii'))
+            center_paths_valid  = sorted(glob(path+'center'+str(center_num)+'/valid'+'/**/*'+modality+'*/*.nii'))
+            center_paths_test   = sorted(glob(path+'center'+str(center_num)+'/test'+'/**/*'+modality+'*/*.nii'))
+            center_lbl_paths_train  = sorted(glob(path+'center'+str(center_num)+'/train'+'/**/*OT*/*nii'))
+            center_lbl_paths_valid  = sorted(glob(path+'center'+str(center_num)+'/valid'+'/**/*OT*/*nii'))
+            center_lbl_paths_test   = sorted(glob(path+'center'+str(center_num)+'/test'+'/**/*OT*/*nii'))
+            print(len(center_paths_train),len(center_paths_valid),len(center_paths_test))
+            centers_partitions[center_num-1] = [[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]]
+    else:
+        for center_num in range(1,num_centers+1):
+            center_paths_train  = sorted(glob(path+'center'+str(center_num)+'/train/'+f'*{modality.lower()}.nii*'))
+            center_paths_valid  = sorted(glob(path+'center'+str(center_num)+'/valid/'+f'*{modality.lower()}.nii*'))
+            center_paths_test   = sorted(glob(path+'center'+str(center_num)+'/test/' +f'*{modality.lower()}.nii*'))
+            center_lbl_paths_train  = sorted(glob(path+'center'+str(center_num)+'/train/'+'*msk.nii*'))
+            center_lbl_paths_valid  = sorted(glob(path+'center'+str(center_num)+'/valid/'+'*msk.nii*'))
+            center_lbl_paths_test   = sorted(glob(path+'center'+str(center_num)+'/test/' +'*msk.nii*'))
+            print(len(center_paths_train),len(center_paths_valid),len(center_paths_test))
+            centers_partitions[center_num-1] = [[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]]
+
     return centers_partitions
 
 def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
@@ -62,7 +74,7 @@ def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
 
     return center_train_loader, center_valid_loader, center_test_loader
 
-def dataPreprocessing(path, modality, number_site, batch_size):
+def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, centralized=False):
 	#creating the dataloader for 10 ISLES volumes using the T_max and the CBF
     #For cbf we are windowing 1-1024
     #For tmax we'll window 0-60
@@ -74,6 +86,8 @@ def dataPreprocessing(path, modality, number_site, batch_size):
         max_intensity = 200
     elif modality =='Tmax' or modality =='MTT':
         max_intensity = 30
+    elif modality == 'ADC':
+        max_intensity = 4000
 
     transfo = {}
 
@@ -83,7 +97,7 @@ def dataPreprocessing(path, modality, number_site, batch_size):
             ScaleIntensity(minv=0.0, maxv=max_intensity),
             AddChannel(),
             RandRotate90( prob=0.5, spatial_axes=[0, 1]),
-            RandSpatialCrop((224, 224,1), random_size=False),
+            RandSpatialCrop((size_crop, size_crop,1), random_size=False),
             EnsureType(),
             #Resized
         ]
@@ -94,7 +108,7 @@ def dataPreprocessing(path, modality, number_site, batch_size):
         [   LoadImage(image_only=True),
             AddChannel(),
             RandRotate90( prob=0.5, spatial_axes=[0, 1]),
-            RandSpatialCrop((224, 224,1), random_size=False),
+            RandSpatialCrop((size_crop, size_crop,1), random_size=False),
             EnsureType(),
             #Resized
         ]
@@ -108,7 +122,7 @@ def dataPreprocessing(path, modality, number_site, batch_size):
             #RandScaleIntensity( factors=0.1, prob=0.5),
             ScaleIntensity(minv=0.0, maxv=max_intensity),
             AddChannel(),
-            RandSpatialCrop((224, 224,1), random_size=False),
+            RandSpatialCrop((size_crop, size_crop,1), random_size=False),
             EnsureType(),
             #Resized
         ]
@@ -119,7 +133,7 @@ def dataPreprocessing(path, modality, number_site, batch_size):
     segtrans_neutral = Compose(
         [   LoadImage(image_only=True),
             AddChannel(),
-            RandSpatialCrop((224, 224,1), random_size=False),
+            RandSpatialCrop((size_crop, size_crop,1), random_size=False),
             EnsureType(),
             #Resized
         ]
@@ -130,7 +144,7 @@ def dataPreprocessing(path, modality, number_site, batch_size):
         [   LoadImage(image_only=True),
             ScaleIntensity(minv=0.0, maxv=max_intensity),
             AddChannel(),
-            #RandSpatialCrop((224, 224,1), random_size=False), In test we would like to process ALL slices
+            #RandSpatialCrop((size_crop, size_crop,1), random_size=False), In test we would like to process ALL slices
             EnsureType(),
             #Resized
         ]
@@ -140,7 +154,7 @@ def dataPreprocessing(path, modality, number_site, batch_size):
     segtrans_test = Compose(
         [   LoadImage(image_only=True),
             AddChannel(),
-            #RandSpatialCrop((224, 224,1), random_size=False),
+            #RandSpatialCrop((size_crop, size_crop,1), random_size=False),
             EnsureType(),
             #Resized
         ]
