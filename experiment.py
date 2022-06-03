@@ -2,6 +2,9 @@ from framework import Scaffold, FedAvg, FedRod, Fedem
 from preprocessing import dataPreprocessing
 from numpy import std, mean
 
+import os
+import nibabel as nb
+
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
                   number_site=3, batch_size=2, size_crop=100, nested=True):
     tmp_test = []
@@ -49,12 +52,34 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
     return tmp_valid, tmp_test
 
+def check_dataset(path, number_site, dim=(144,144,42)):
+    for i in range(1,number_site+1):
+        files_name=os.listdir(path+"train/")
+        for f in files_name:
+            tmp_shape = nb.load(path+"train/"+f).get_fdata().shape
+            if tmp_shape != dim:
+                print(path+"train/"+f, tmp_shape)
+
+        files_name=os.listdir(path+"valid/")
+        for f in files_name:
+            tmp_shape = nb.load(path+"valid/"+f).get_fdata().shape
+            if tmp_shape != dim:
+                print(path+"valid/"+f, tmp_shape)
+
+        files_name=os.listdir(path+"test/")
+        for f in files_name:
+            tmp_shape = nb.load(path+"train/"+f).get_fdata().shape
+            if tmp_shape != dim:
+                print(path+"test/"+f, tmp_shape)
+
 if __name__ == '__main__':
     path = 'astral_fedem_v2/'
     modality="ADC"
     networks_name = ["SCAFFOLD", "FEDAVG", "FEDBETA"]
 
     clients=["center1", "center2", "center3"]
+    number_site=len(clients)
+
     default = {"g_epoch":5,
                "l_epoch":5,
                "g_lr":1.7,
@@ -63,6 +88,8 @@ if __name__ == '__main__':
                "clients":clients,
                "suffix":"exp1"
                }
+
+    check_dataset(path, number_site, dim=(144,144,42))
 
     scaff = default.copy()
     scaff.update({"scaff":True})
@@ -82,7 +109,7 @@ if __name__ == '__main__':
                                                 networks_name=networks_name,
                                                 exp_name="test_astral",
                                                 modality=modality,
-                                                number_site=3,
+                                                number_site=number_site,
                                                 batch_size=2,
                                                 size_crop=100,
                                                 nested=False)
