@@ -49,7 +49,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     return tmp_valid, tmp_test
 
 if __name__ == '__main__':
-    path = 'astral_fedem_v1'
+    path = 'astral_fedem_v1/'
     modality="ADC"
     networks_name = ["SCAFFOLD", "FEDAVG", "FEDBETA"]
 
