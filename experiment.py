@@ -58,6 +58,7 @@ if __name__ == '__main__':
                "l_lr":0.00932,
                "K":len(clients),
                "clients":clients,
+               "suffix":"exp1"
                }
 
     scaff = default.copy()
