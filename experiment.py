@@ -2,7 +2,7 @@ from framework import Scaffold, FedAvg, FedRod, Fedem
 from preprocessing import dataPreprocessing
 from numpy import std, mean
 
-def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="Tmax", number_site=4, batch_size=2):
+def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC", number_site=3, batch_size=2):
     tmp_test = []
     tmp_valid = []
     for i, conf in enumerate(networks_config):
@@ -44,3 +44,37 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
         print(f"{networks_name[k]} test avg dice: {mean(test_metrics)} std: {std(test_metrics)}")
 
     return tmp_valid, tmp_test
+
+if __name__ == '__main__':
+    path = 'astral_fedem_v1'
+    networks_name = ["SCAFFOLD", "FEDAVG", "FEDBETA"]
+
+    clients=["center1", "center2", "center3"]
+    default = {"g_epoch":5,
+               "l_epoch":5,
+               "g_lr":1.7,
+               "l_lr":0.00932,
+               "K":len(clients),
+               "clients":clients,
+               }
+
+    scaff = default.copy()
+    scaff.update({"scaff":True})
+
+    fedavg = default.copy()
+    fedavg.update({"weighting_scheme":"FEDAVG"})
+
+    fedbeta = default.copy()
+    fedbeta.update({"weighting_scheme":"BETA",
+                    "beta_val":0.9})
+
+    networks_config = [scaff, fedavg, fedbeta]
+
+    valid_metrics, test_metrics = runExperiment(datapath=path,
+                                                num_repetitions=3,
+                                                networks_config=networks_config,
+                                                networks_name=networks_name,
+                                                exp_name="test_astral",
+                                                modality="ADC",
+                                                number_site=3,
+                                                batch_size=2)
