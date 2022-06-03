@@ -29,8 +29,6 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             else:
                 conf["suffix"]="_"+str(rep)
 
-            print("config for experiment", conf.keys())
-
             if "scaff" in conf.keys() and conf["scaff"]:
                 network = Scaffold(conf)
             elif "fedrod" in conf.keys() and conf["fedrod"]:

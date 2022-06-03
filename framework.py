@@ -57,7 +57,7 @@ class Fedem:
         tmp=0
         #round loss is assumed to be the generic model loss 
         for i in index:
-            if "fedrod" in self.options['suffix']:
+            if "fedrod" in self.options.keys():
                 self.nns[i], round_loss, round_loss_personalized_m = self.train(self.nns[i], self.dataloaders[i][0], local_epoch, local_lr)            
             else:
                 self.nns[i], round_loss = self.train(self.nns[i], self.dataloaders[i][0], local_epoch, local_lr)
