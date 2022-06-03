@@ -589,7 +589,8 @@ class FedRod(Fedem):
                             v.requires_grad = True #Deriving gradients only wrt to the personalized head
                
 
-                output_personalized = ann(inputs) + torch.tensor(output_generic).to(device) #regularized personalized output
+                #output_personalized = ann(inputs) + torch.tensor(output_generic).to(device) #regularized personalized output
+                output_personalized = ann(inputs) + output_generic.clone().detach().requires_grad(True).to(device) #changed to stop a torch warning
                 loss_personalized = loss_function(output_personalized, labels)
                 optimizer.zero_grad()
                 loss_personalized.backward()
