@@ -3,7 +3,7 @@ from preprocessing import dataPreprocessing
 from numpy import std, mean
 
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
-                  number_site=3, batch_size=2, nested=True):
+                  number_site=3, batch_size=2, size_crop=100, nested=True):
     tmp_test = []
     tmp_valid = []
     for i, conf in enumerate(networks_config):
@@ -83,4 +83,5 @@ if __name__ == '__main__':
                                                 modality=modality,
                                                 number_site=3,
                                                 batch_size=2,
+                                                size_crop=100,
                                                 nested=False)
