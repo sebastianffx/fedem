@@ -285,6 +285,7 @@ class FedAvg(Fedem):
         optimizer = Adam(ann.parameters(), local_lr)
 
         for epoch in range(local_epoch):
+            print(dataloader_train)
             for batch_data in dataloader_train:
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 print(inputs.shape, labels.shape)
