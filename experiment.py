@@ -58,7 +58,7 @@ def check_dataset(path, number_site, dim=(144,144,42)):
         for f in files_name:
             tmp_shape = nb.load("./"+path+"center"+str(i)+"/train/"+f).get_fdata().shape
             if tmp_shape != dim:
-                print("./"+path+"center"+str(i)+"/train/"+f+f, tmp_shape)
+                print("./"+path+"center"+str(i)+"/train/"+f, tmp_shape)
 
         files_name=os.listdir("./"+path+"center"+str(i)+"/valid/")
         for f in files_name:
@@ -71,6 +71,8 @@ def check_dataset(path, number_site, dim=(144,144,42)):
             tmp_shape = nb.load("./"+path+"center"+str(i)+"/test/"+f).get_fdata().shape
             if tmp_shape != dim:
                 print("./"+path+"center"+str(i)+"/test/"+f, tmp_shape)
+
+    ## padd them with zeros? instead of deleting them?
 
 if __name__ == '__main__':
     path = 'astral_fedem_v2/'
@@ -86,7 +88,8 @@ if __name__ == '__main__':
                "l_lr":0.00932,
                "K":len(clients),
                "clients":clients,
-               "suffix":"exp1"
+               "suffix":"exp1",
+               "val_interval":2,
                }
 
     check_dataset(path, number_site, dim=(144,144,42))
