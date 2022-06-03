@@ -24,7 +24,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             else:
                 conf["suffix"]="_"+str(rep)
 
-            print("config for experiment", conf.keys)
+            print("config for experiment", conf.keys())
 
             if "scaff" in conf.keys() and conf["scaff"]:
                 network = Scaffold(conf)
@@ -50,7 +50,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     return tmp_valid, tmp_test
 
 if __name__ == '__main__':
-    path = 'astral_fedem_v1/'
+    path = 'astral_fedem_v2/'
     modality="ADC"
     networks_name = ["SCAFFOLD", "FEDAVG", "FEDBETA"]
 

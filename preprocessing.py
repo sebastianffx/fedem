@@ -28,8 +28,9 @@ def get_train_valid_test_partitions(path, modality, num_centers=4, nested=True):
             center_lbl_paths_train  = sorted(glob(path+'center'+str(center_num)+'/train'+'/**/*OT*/*nii'))
             center_lbl_paths_valid  = sorted(glob(path+'center'+str(center_num)+'/valid'+'/**/*OT*/*nii'))
             center_lbl_paths_test   = sorted(glob(path+'center'+str(center_num)+'/test'+'/**/*OT*/*nii'))
-            print(len(center_paths_train),len(center_paths_valid),len(center_paths_test))
             centers_partitions[center_num-1] = [[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]]
+            print("site", str(center_num), "data loader contains (train/valid/test) map", len(center_paths_train), len(center_paths_valid), len(center_paths_test))
+            print("site", str(center_num), "data loader contains (train/valid/test) label", len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test))
     else:
         for center_num in range(1,num_centers+1):
             center_paths_train  = sorted(glob(path+'center'+str(center_num)+'/train/'+f'*{modality.lower()}.nii*'))
@@ -38,9 +39,9 @@ def get_train_valid_test_partitions(path, modality, num_centers=4, nested=True):
             center_lbl_paths_train  = sorted(glob(path+'center'+str(center_num)+'/train/'+'*msk.nii*'))
             center_lbl_paths_valid  = sorted(glob(path+'center'+str(center_num)+'/valid/'+'*msk.nii*'))
             center_lbl_paths_test   = sorted(glob(path+'center'+str(center_num)+'/test/' +'*msk.nii*'))
-            print(len(center_paths_train),len(center_paths_valid),len(center_paths_test))
             centers_partitions[center_num-1] = [[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]]
-            print("site", str(center_num), "data loader contains (train/valid/test)", len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test))
+            print("site", str(center_num), "data loader contains (train/valid/test) map", len(center_paths_train), len(center_paths_valid), len(center_paths_test))
+            print("site", str(center_num), "data loader contains (train/valid/test) label", len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test))
     return centers_partitions
 
 def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
