@@ -54,21 +54,21 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
 def check_dataset(path, number_site, dim=(144,144,42)):
     for i in range(1,number_site+1):
-        files_name=os.listdir("./"+path+"train/")
+        files_name=os.listdir("./"+path+"center"+str(i)+"/train/")
         for f in files_name:
-            tmp_shape = nb.load("./"+path+"train/"+f).get_fdata().shape
+            tmp_shape = nb.load("./"+path+"center"+str(i)+"/train/"+f).get_fdata().shape
             if tmp_shape != dim:
                 print(path+"train/"+f, tmp_shape)
 
-        files_name=os.listdir("./"+path+"valid/")
+        files_name=os.listdir("./"+path+"center"+str(i)+"/valid/")
         for f in files_name:
-            tmp_shape = nb.load("./"+path+"valid/"+f).get_fdata().shape
+            tmp_shape = nb.load("./"+path+"center"+str(i)+"/valid/"+f).get_fdata().shape
             if tmp_shape != dim:
                 print(path+"valid/"+f, tmp_shape)
 
-        files_name=os.listdir("./"+path+"test/")
+        files_name=os.listdir("./"+path+"center"+str(i)+"/test/")
         for f in files_name:
-            tmp_shape = nb.load("./"+path+"train/"+f).get_fdata().shape
+            tmp_shape = nb.load("./"+path+"center"+str(i)+"/test/"+f).get_fdata().shape
             if tmp_shape != dim:
                 print(path+"test/"+f, tmp_shape)
 
