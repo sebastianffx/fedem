@@ -52,7 +52,7 @@ def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
     #print(len(partitions_paths_center[1][1]))
     #print(len(partitions_paths_center[0][2]))
     #print(len(partitions_paths_center[1][2]))
-
+    """
     center_ds_train = ArrayDataset(partitions_paths_center[0][0], transfo['imtrans'], partitions_paths_center[1][0], transfo['segtrans'])
     center_train_loader = torch.utils.data.DataLoader(
     	center_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
@@ -64,6 +64,21 @@ def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
     	)
 
     center_ds_test = ArrayDataset(partitions_paths_center[0][2], transfo['imtrans_test'], partitions_paths_center[1][2], transfo['segtrans_test'])
+    center_test_loader = torch.utils.data.DataLoader(
+        center_ds_test, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+    	)
+    """
+    center_ds_train = ArrayDataset(partitions_paths_center[0][0], partitions_paths_center[1][0])
+    center_train_loader = torch.utils.data.DataLoader(
+    	center_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+    	)
+
+    center_ds_valid = ArrayDataset(partitions_paths_center[0][1], partitions_paths_center[1][1])
+    center_valid_loader = torch.utils.data.DataLoader(
+    	center_ds_valid, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+    	)
+
+    center_ds_test = ArrayDataset(partitions_paths_center[0][2], partitions_paths_center[1][2])
     center_test_loader = torch.utils.data.DataLoader(
         center_ds_test, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
     	)
