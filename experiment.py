@@ -64,16 +64,16 @@ def check_dataset(path, number_site, dim=(144,144,42), delete=True):
 
         files_name=os.listdir("./"+path+"center"+str(i)+"/valid/")
         for f in files_name:
-            bad_dim_files.append("./"+path+"center"+str(i)+"/valid/"+f)
             tmp_shape = nb.load("./"+path+"center"+str(i)+"/valid/"+f).get_fdata().shape
             if tmp_shape != dim:
+                bad_dim_files.append("./"+path+"center"+str(i)+"/valid/"+f)
                 print("./"+path+"center"+str(i)+"/valid/"+f, tmp_shape)
 
         files_name=os.listdir("./"+path+"center"+str(i)+"/test/")
         for f in files_name:
-            bad_dim_files.append("./"+path+"center"+str(i)+"/test/"+f)
             tmp_shape = nb.load("./"+path+"center"+str(i)+"/test/"+f).get_fdata().shape
             if tmp_shape != dim:
+                bad_dim_files.append("./"+path+"center"+str(i)+"/test/"+f)
                 print("./"+path+"center"+str(i)+"/test/"+f, tmp_shape)
 
     if delete:
