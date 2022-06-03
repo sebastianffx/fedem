@@ -40,7 +40,7 @@ def get_train_valid_test_partitions(path, modality, num_centers=4, nested=True):
             center_lbl_paths_test   = sorted(glob(path+'center'+str(center_num)+'/test/' +'*msk.nii*'))
             print(len(center_paths_train),len(center_paths_valid),len(center_paths_test))
             centers_partitions[center_num-1] = [[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]]
-
+            print("site", str(center_num, "data loader contains (train/valid/test)", len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test)))
     return centers_partitions
 
 def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
@@ -74,7 +74,7 @@ def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
 
     return center_train_loader, center_valid_loader, center_test_loader
 
-def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, centralized=False):
+def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, nested=True):
 	#creating the dataloader for 10 ISLES volumes using the T_max and the CBF
     #For cbf we are windowing 1-1024
     #For tmax we'll window 0-60
@@ -161,7 +161,7 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ce
     )
     transfo['segtrans_test']=segtrans_test
 
-    partitions_paths = get_train_valid_test_partitions(path, modality, number_site)
+    partitions_paths = get_train_valid_test_partitions(path, modality, number_site, nested)
     
     centers_data_loaders = []
     for i in range(len(partitions_paths)):#Adding all the centers data loaders

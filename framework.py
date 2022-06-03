@@ -356,9 +356,6 @@ class Scaffold(Fedem):
         loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
         optimizer = ScaffoldOptimizer(ann.parameters(), lr=local_lr, weight_decay=1e-4)
 
-        print(local_epoch)
-        print(len(dataloader_train))
-
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
@@ -367,8 +364,6 @@ class Scaffold(Fedem):
                 optimizer.zero_grad()
                 loss.backward()          
                 optimizer.step(self.nn.control, ann.control) #performing SGD on the control variables
-
-        print(loss)
                             
         # update c
         # c+ <- ci - c + 1/(E * lr) * (x-yi)

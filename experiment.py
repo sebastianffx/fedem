@@ -2,7 +2,8 @@ from framework import Scaffold, FedAvg, FedRod, Fedem
 from preprocessing import dataPreprocessing
 from numpy import std, mean
 
-def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC", number_site=3, batch_size=2):
+def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
+                  number_site=3, batch_size=2, nested=True):
     tmp_test = []
     tmp_valid = []
     for i, conf in enumerate(networks_config):
@@ -13,9 +14,10 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             print(f"{networks_name[i]} iteration {rep+1}")
 
             #create new loaders for each repetition
-            _, centers_data_loaders, all_test_loader, all_valid_loader = dataPreprocessing(datapath, modality, number_site, batch_size)
+            _, centers_data_loaders, all_test_loader, all_valid_loader = dataPreprocessing(datapath, modality, number_site, batch_size, nested)
             conf["dataloader"]=centers_data_loaders
             conf["valid_loader"]=all_valid_loader
+                
             network = Fedem(conf)
             #add number to differentiate replicates
             if exp_name!=None:
@@ -80,4 +82,5 @@ if __name__ == '__main__':
                                                 exp_name="test_astral",
                                                 modality=modality,
                                                 number_site=3,
-                                                batch_size=2)
+                                                batch_size=2,
+                                                nested=False)
