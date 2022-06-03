@@ -33,7 +33,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
             if "scaff" in conf.keys() and conf["scaff"]:
                 network = Scaffold(conf)
-            elif "FedRod" in conf.keys() and conf["fed_rod"]:
+            elif "fedrod" in conf.keys() and conf["fedrod"]:
                 network = FedRod(conf)
             elif 'weighting_scheme' in conf.keys():
                 network = FedAvg(conf)
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     check_dataset(path, number_site, dim=(144,144,42))
 
     fedrod = default.copy()
-    fedrod.update({"FedRod":True})
+    fedrod.update({"fedrod":True})
 
     scaff = default.copy()
     scaff.update({"scaff":True})
