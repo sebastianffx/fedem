@@ -209,7 +209,7 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
                                [i for l in partitions_test_lbls for i in l], transfo['debug'])
     """
     all_test_loader   = torch.utils.data.DataLoader(
-        all_ds_test, batch_size=1, num_workers=0, pin_memory=torch.cuda.is_available()
+        all_ds_test, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available()
     )
 
 
@@ -220,7 +220,7 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
                                 [i for l in partitions_valid_lbls for i in l], transfo['debug'])
     """
     all_valid_loader   = torch.utils.data.DataLoader(
-        all_ds_valid, batch_size=1, num_workers=0, pin_memory=torch.cuda.is_available()
+        all_ds_valid, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available()
     )
 
     return partitions_paths, centers_data_loaders, all_test_loader, all_valid_loader
