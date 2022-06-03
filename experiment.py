@@ -84,9 +84,9 @@ if __name__ == '__main__':
     clients=["center1", "center2", "center3"]
     number_site=len(clients)
 
-    default = {"g_epoch":5,
+    default = {"g_epoch":20,
                "l_epoch":5,
-               "g_lr":1.7,
+               "g_lr":0.01,
                "l_lr":0.00932,
                "K":len(clients),
                "clients":clients,
@@ -96,6 +96,9 @@ if __name__ == '__main__':
                }
 
     check_dataset(path, number_site, dim=(144,144,42))
+
+    fedrod = default.copy()
+    fedrod.update({"FedRod":True})
 
     scaff = default.copy()
     scaff.update({"scaff":True})
@@ -107,7 +110,7 @@ if __name__ == '__main__':
     fedbeta.update({"weighting_scheme":"BETA",
                     "beta_val":0.9})
 
-    networks_config = [scaff, fedavg, fedbeta]
+    networks_config = [fedrod, scaff, fedavg, fedbeta]
 
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=3,
