@@ -70,17 +70,17 @@ def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
     """
     center_ds_train = ArrayDataset(partitions_paths_center[0][0], transfo['debug'], partitions_paths_center[1][0], transfo['debug'])
     center_train_loader = torch.utils.data.DataLoader(
-    	center_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+    	center_ds_train, batch_size=batch_size, num_workers=0, pin_memory=torch.cuda.is_available()
     	)
 
     center_ds_valid = ArrayDataset(partitions_paths_center[0][1], transfo['debug'], partitions_paths_center[1][1], transfo['debug'])
     center_valid_loader = torch.utils.data.DataLoader(
-    	center_ds_valid, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+    	center_ds_valid, batch_size=batch_size, num_workers=0, pin_memory=torch.cuda.is_available()
     	)
 
     center_ds_test = ArrayDataset(partitions_paths_center[0][2], transfo['debug'], partitions_paths_center[1][2], transfo['debug'])
     center_test_loader = torch.utils.data.DataLoader(
-        center_ds_test, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+        center_ds_test, batch_size=batch_size, num_workers=0, pin_memory=torch.cuda.is_available()
     	)
     #print("===========LEN LOADERS==========")
     #print(len(center_train_loader))
@@ -202,18 +202,20 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
     #all_ds_test = ArrayDataset([i for l in partitions_test_imgs for i in l],
     #                            transfo['imtrans'], [i for l in partitions_test_lbls for i in l],
     #                            transfo['segtrans'])
-    all_ds_test = ArrayDataset([i for l in partitions_test_imgs for i in l])
+    all_ds_test = ArrayDataset([i for l in partitions_test_imgs for i in l], transfo['debug'],
+                               [i for l in partitions_test_lbls for i in l], transfo['segtrans'])
     all_test_loader   = torch.utils.data.DataLoader(
-        all_ds_test, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available()
+        all_ds_test, batch_size=1, num_workers=0, pin_memory=torch.cuda.is_available()
     )
 
 
     #all_ds_valid = ArrayDataset([i for l in partitions_valid_imgs for i in l],
     #                            transfo['imtrans'], [i for l in partitions_valid_lbls for i in l],
     #                            transfo['segtrans'])
-    all_ds_valid = ArrayDataset([i for l in partitions_valid_imgs for i in l])
+    all_ds_valid = ArrayDataset([i for l in partitions_valid_imgs for i in l], transfo['debug'],
+                                [i for l in partitions_valid_lbls for i in l], transfo['segtrans'])
     all_valid_loader   = torch.utils.data.DataLoader(
-        all_ds_valid, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available()
+        all_ds_valid, batch_size=1, num_workers=0, pin_memory=torch.cuda.is_available()
     )
 
     return partitions_paths, centers_data_loaders, all_test_loader, all_valid_loader
