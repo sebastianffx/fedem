@@ -24,6 +24,7 @@ class Fedem:
         self.valid_loader = options['valid_loader']
         self.options = options
         print(self.options['suffix'])
+
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
         metric_values = list()
         best_metric = -1
@@ -47,9 +48,8 @@ class Fedem:
             #Evaluation on validation and saving model if needed
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
                 best_metric,best_metric_epoch = self.global_validation_cycle(index,metric_values,cur_epoch,best_metric,best_metric_epoch)
-
-
         return self.nn
+
     def validation(self,index):        
         return NotImplementedError
     
@@ -132,6 +132,9 @@ class Fedem:
             max_intensity = 200
         if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
             max_intensity = 30
+        if self.options['modality'] =='ADC':
+            max_intensity = 4000
+
         for path_test_case, path_test_label in zip(all_valid_paths,all_valid_labels):            
             test_vol = nib.load(path_test_case)
             test_lbl = nib.load(path_test_label)
@@ -193,6 +196,8 @@ class Fedem:
             max_intensity = 200
         if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
             max_intensity = 30
+        if self.options['modality'] =='ADC':
+            max_intensity = 4000
 
         for path_test_case, path_test_label in zip(all_test_paths,all_test_labels):            
             test_vol = nib.load(path_test_case)
@@ -216,6 +221,7 @@ class Fedem:
         print("Global model test DICE for all slices: ")
         print(np.mean(test_dicemetric))
         return(np.mean(test_dicemetric))
+
 class FedAvg(Fedem):
     def __init__(self, options):
         super(FedAvg, self).__init__(options)
