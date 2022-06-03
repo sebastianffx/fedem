@@ -58,19 +58,19 @@ def check_dataset(path, number_site, dim=(144,144,42)):
         for f in files_name:
             tmp_shape = nb.load("./"+path+"center"+str(i)+"/train/"+f).get_fdata().shape
             if tmp_shape != dim:
-                print(path+"train/"+f, tmp_shape)
+                print("./"+path+"center"+str(i)+"/train/"+f+f, tmp_shape)
 
         files_name=os.listdir("./"+path+"center"+str(i)+"/valid/")
         for f in files_name:
             tmp_shape = nb.load("./"+path+"center"+str(i)+"/valid/"+f).get_fdata().shape
             if tmp_shape != dim:
-                print(path+"valid/"+f, tmp_shape)
+                print("./"+path+"center"+str(i)+"/valid/"+f, tmp_shape)
 
         files_name=os.listdir("./"+path+"center"+str(i)+"/test/")
         for f in files_name:
             tmp_shape = nb.load("./"+path+"center"+str(i)+"/test/"+f).get_fdata().shape
             if tmp_shape != dim:
-                print(path+"test/"+f, tmp_shape)
+                print("./"+path+"center"+str(i)+"/test/"+f, tmp_shape)
 
 if __name__ == '__main__':
     path = 'astral_fedem_v2/'
