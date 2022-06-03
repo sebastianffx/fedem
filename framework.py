@@ -288,6 +288,7 @@ class FedAvg(Fedem):
             for batch in dataloader_train:
                 print(batch[0].shape)
                 print(batch[1].shape)
+            print("***")
             for batch_data in dataloader_train:
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 print(inputs.shape, labels.shape)
