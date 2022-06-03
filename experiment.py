@@ -14,7 +14,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             print(f"{networks_name[i]} iteration {rep+1}")
 
             #create new loaders for each repetition
-            _, centers_data_loaders, all_test_loader, all_valid_loader = dataPreprocessing(datapath, modality, number_site, batch_size, nested)
+            _, centers_data_loaders, all_test_loader, all_valid_loader = dataPreprocessing(datapath, modality, number_site, batch_size, size_crop, nested)
             conf["dataloader"]=centers_data_loaders
             conf["valid_loader"]=all_valid_loader
                 
