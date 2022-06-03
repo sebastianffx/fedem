@@ -18,16 +18,17 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             conf["dataloader"]=centers_data_loaders
             conf["valid_loader"]=all_valid_loader
                 
-            network = Fedem(conf)
             #add number to differentiate replicates
             if exp_name!=None:
                 conf["suffix"]="_"+exp_name+"_"+str(rep)
             else:
                 conf["suffix"]="_"+str(rep)
 
+            print("config for experiment", conf.keys)
+
             if "scaff" in conf.keys() and conf["scaff"]:
                 network = Scaffold(conf)
-            if "FedRod" in conf.keys() and conf["fed_rod"]:
+            elif "FedRod" in conf.keys() and conf["fed_rod"]:
                 network = FedRod(conf)
             elif 'weighting_scheme' in conf.keys():
                 network = FedAvg(conf)
