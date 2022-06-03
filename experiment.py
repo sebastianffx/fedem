@@ -52,30 +52,39 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
     return tmp_valid, tmp_test
 
-def check_dataset(path, number_site, dim=(144,144,42)):
+def check_dataset(path, number_site, dim=(144,144,42), delete=True):
+    bad_dim_files = []
     for i in range(1,number_site+1):
         files_name=os.listdir("./"+path+"center"+str(i)+"/train/")
         for f in files_name:
             tmp_shape = nb.load("./"+path+"center"+str(i)+"/train/"+f).get_fdata().shape
             if tmp_shape != dim:
+                bad_dim_files.append("./"+path+"center"+str(i)+"/train/"+f)
                 print("./"+path+"center"+str(i)+"/train/"+f, tmp_shape)
 
         files_name=os.listdir("./"+path+"center"+str(i)+"/valid/")
         for f in files_name:
+            bad_dim_files.append("./"+path+"center"+str(i)+"/valid/"+f)
             tmp_shape = nb.load("./"+path+"center"+str(i)+"/valid/"+f).get_fdata().shape
             if tmp_shape != dim:
                 print("./"+path+"center"+str(i)+"/valid/"+f, tmp_shape)
 
         files_name=os.listdir("./"+path+"center"+str(i)+"/test/")
         for f in files_name:
+            bad_dim_files.append("./"+path+"center"+str(i)+"/test/"+f)
             tmp_shape = nb.load("./"+path+"center"+str(i)+"/test/"+f).get_fdata().shape
             if tmp_shape != dim:
                 print("./"+path+"center"+str(i)+"/test/"+f, tmp_shape)
 
-    ## padd them with zeros? instead of deleting them?
+    if delete:
+        for f in bad_dim_files:
+            os.remove(f)
+    else:
+        print("TBD")
+        # pad them with zeros? instead of deleting them?
 
 if __name__ == '__main__':
-    path = 'astral_fedem_v2/'
+    path = 'astral_fedem_v3/'
     modality="ADC"
     networks_name = ["FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
 
