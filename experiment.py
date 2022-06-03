@@ -15,6 +15,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             #create new loaders for each repetition
             _, centers_data_loaders, all_test_loader, all_valid_loader = dataPreprocessing(datapath, modality, number_site, batch_size)
             conf["dataloader"]=centers_data_loaders
+            conf["valid_loader"]=all_valid_loader
             network = Fedem(conf)
             #add number to differentiate replicates
             if exp_name!=None:
@@ -47,6 +48,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
 if __name__ == '__main__':
     path = 'astral_fedem_v1'
+    modality="ADC"
     networks_name = ["SCAFFOLD", "FEDAVG", "FEDBETA"]
 
     clients=["center1", "center2", "center3"]
@@ -75,6 +77,6 @@ if __name__ == '__main__':
                                                 networks_config=networks_config,
                                                 networks_name=networks_name,
                                                 exp_name="test_astral",
-                                                modality="ADC",
+                                                modality=modality,
                                                 number_site=3,
                                                 batch_size=2)
