@@ -117,5 +117,5 @@ if __name__ == '__main__':
                                                 modality=modality,
                                                 number_site=number_site,
                                                 batch_size=2,
-                                                size_crop=100,
+                                                size_crop=144,
                                                 nested=False)
