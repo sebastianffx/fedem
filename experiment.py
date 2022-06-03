@@ -92,6 +92,7 @@ if __name__ == '__main__':
                "clients":clients,
                "suffix":"exp1",
                "val_interval":2,
+               "modality":modality
                }
 
     check_dataset(path, number_site, dim=(144,144,42))
