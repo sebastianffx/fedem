@@ -77,13 +77,13 @@ def check_dataset(path, number_site, dim=(144,144,42)):
 if __name__ == '__main__':
     path = 'astral_fedem_v2/'
     modality="ADC"
-    networks_name = ["SCAFFOLD", "FEDAVG", "FEDBETA"]
+    networks_name = ["FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
 
     clients=["center1", "center2", "center3"]
     number_site=len(clients)
 
     default = {"g_epoch":20,
-               "l_epoch":5,
+               "l_epoch":10,
                "g_lr":0.01,
                "l_lr":0.00932,
                "K":len(clients),
@@ -111,7 +111,7 @@ if __name__ == '__main__':
     networks_config = [fedrod, scaff, fedavg, fedbeta]
 
     valid_metrics, test_metrics = runExperiment(datapath=path,
-                                                num_repetitions=3,
+                                                num_repetitions=1,
                                                 networks_config=networks_config,
                                                 networks_name=networks_name,
                                                 exp_name="test_astral",
