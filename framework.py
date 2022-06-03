@@ -356,8 +356,8 @@ class Scaffold(Fedem):
         loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
         optimizer = ScaffoldOptimizer(ann.parameters(), lr=local_lr, weight_decay=1e-4)
 
-        #tmp debug
-        loss=0
+        print(local_epoch)
+        print(len(dataloader_train))
 
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
