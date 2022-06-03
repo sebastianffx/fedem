@@ -68,17 +68,17 @@ def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
         center_ds_test, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
     	)
     """
-    center_ds_train = ArrayDataset(partitions_paths_center[0][0], partitions_paths_center[1][0])
+    center_ds_train = ArrayDataset(partitions_paths_center[0][0], transfo['debug'], partitions_paths_center[1][0], transfo['debug'])
     center_train_loader = torch.utils.data.DataLoader(
     	center_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
     	)
 
-    center_ds_valid = ArrayDataset(partitions_paths_center[0][1], partitions_paths_center[1][1])
+    center_ds_valid = ArrayDataset(partitions_paths_center[0][1], transfo['debug'], partitions_paths_center[1][1], transfo['debug'])
     center_valid_loader = torch.utils.data.DataLoader(
     	center_ds_valid, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
     	)
 
-    center_ds_test = ArrayDataset(partitions_paths_center[0][2], partitions_paths_center[1][2])
+    center_ds_test = ArrayDataset(partitions_paths_center[0][2], transfo['debug'], partitions_paths_center[1][2], transfo['debug'])
     center_test_loader = torch.utils.data.DataLoader(
         center_ds_test, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
     	)
@@ -106,6 +106,15 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
         max_intensity = 4000
 
     transfo = {}
+
+    ### debug
+    debug = Compose(
+        [   LoadImage(image_only=True),
+            AddChannel(),
+        ]
+    )
+    transfo['debug']=debug
+    ###
 
     imtrans = Compose(
         [   LoadImage(image_only=True),
@@ -181,7 +190,7 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
     
     centers_data_loaders = []
     for i in range(len(partitions_paths)):#Adding all the centers data loaders
-        centers_data_loaders.append(center_dataloaders(partitions_paths[i], {}, batch_size))
+        centers_data_loaders.append(center_dataloaders(partitions_paths[i], transfo, batch_size))
 
     partitions_test_imgs = [partitions_paths[i][0][2] for i in range(len(partitions_paths))]
     partitions_test_lbls = [partitions_paths[i][1][2] for i in range(len(partitions_paths))]
