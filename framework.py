@@ -133,7 +133,7 @@ class Fedem:
         if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
             max_intensity = 30
         if self.options['modality'] =='ADC':
-            max_intensity = 4000
+            max_intensity = 3000
 
         for path_test_case, path_test_label in zip(all_valid_paths,all_valid_labels):            
             test_vol = nib.load(path_test_case)
@@ -197,7 +197,7 @@ class Fedem:
         if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
             max_intensity = 30
         if self.options['modality'] =='ADC':
-            max_intensity = 4000
+            max_intensity = 3000
 
         for path_test_case, path_test_label in zip(all_test_paths,all_test_labels):            
             test_vol = nib.load(path_test_case)
@@ -680,7 +680,8 @@ class Centralized():
                 optimizer.step()
 
                 epoch_loss += loss.item()
-
+            
+            print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch +1, epoch_loss/self.nn.len))
             self.writer.add_scalar('avg training loss', epoch_loss/self.nn.len, cur_epoch)
 
             #Evaluation on validation and saving model if needed
@@ -741,7 +742,7 @@ class Centralized():
             if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
                 max_intensity = 30
             if self.options['modality'] =='ADC':
-                max_intensity = 4000
+                max_intensity = 3000
 
             for path_test_case, path_test_label in zip(all_valid_paths,all_valid_labels):            
                 test_vol = nib.load(path_test_case)
@@ -771,7 +772,7 @@ class Centralized():
                 torch.save(global_model.state_dict(), self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth')
                 print("saved new best metric model")
             print(
-                "current epoch: {} current mean dice: {:.4f} best mean dice: {:.4f} at epoch {}".format(
+                "current epoch: {} current validation mean dice: {:.4f} best val. mean dice: {:.4f} at epoch {}".format(
                     cur_epoch +1, metric, best_metric, best_metric_epoch
                 )
             )
@@ -805,7 +806,7 @@ class Centralized():
             if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
                 max_intensity = 30
             if self.options['modality'] =='ADC':
-                max_intensity = 4000
+                max_intensity = 3000
 
             for path_test_case, path_test_label in zip(all_test_paths,all_test_labels):            
                 test_vol = nib.load(path_test_case)
