@@ -60,24 +60,39 @@ def check_dataset(path, number_site, dim=(144,144,42), delete=True):
     for i in range(1,number_site+1):
         files_name=os.listdir("./"+path+"center"+str(i)+"/train/")
         for f in files_name:
-            tmp_shape = nb.load("./"+path+"center"+str(i)+"/train/"+f).get_fdata().shape
+            tmp= nb.load("./"+path+"center"+str(i)+"/train/"+f).get_fdata()
+            tmp_shape = tmp.shape
             if tmp_shape != dim:
                 bad_dim_files.append("./"+path+"center"+str(i)+"/train/"+f)
                 print("./"+path+"center"+str(i)+"/train/"+f, tmp_shape)
+            if tmp.min()<-1e-6:
+                print("./"+path+"center"+str(i)+"/train/"+f, "contains negative value")
+            if np.isnan(tmp).sum() > 0:
+                print("./"+path+"center"+str(i)+"/train/"+f, "contains NaN")
 
         files_name=os.listdir("./"+path+"center"+str(i)+"/valid/")
         for f in files_name:
-            tmp_shape = nb.load("./"+path+"center"+str(i)+"/valid/"+f).get_fdata().shape
+            tmp= nb.load("./"+path+"center"+str(i)+"/valid/"+f).get_fdata()
+            tmp_shape = tmp.shape
             if tmp_shape != dim:
                 bad_dim_files.append("./"+path+"center"+str(i)+"/valid/"+f)
                 print("./"+path+"center"+str(i)+"/valid/"+f, tmp_shape)
+            if tmp.min()<-1e-6:
+                print("./"+path+"center"+str(i)+"/valid/"+f, "contains negative value")
+            if np.isnan(tmp).sum() > 0:
+                print("./"+path+"center"+str(i)+"/valid/"+f, "contains NaN")
 
         files_name=os.listdir("./"+path+"center"+str(i)+"/test/")
         for f in files_name:
-            tmp_shape = nb.load("./"+path+"center"+str(i)+"/test/"+f).get_fdata().shape
+            tmp= nb.load("./"+path+"center"+str(i)+"/test/"+f).get_fdata()
+            tmp_shape = tmp.shape
             if tmp_shape != dim:
                 bad_dim_files.append("./"+path+"center"+str(i)+"/test/"+f)
                 print("./"+path+"center"+str(i)+"/test/"+f, tmp_shape)
+            if tmp.min()<-1e-6:
+                print("./"+path+"center"+str(i)+"/test/"+f, "contains negative value")
+            if np.isnan(tmp).sum() > 0:
+                print("./"+path+"center"+str(i)+"/test/"+f, "contains NaN")
 
     if delete:
         for f in bad_dim_files:
