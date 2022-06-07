@@ -31,6 +31,8 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             else:
                 conf["suffix"]="_"+str(rep)
 
+            conf["network_name"] = networks_name[i]
+
             if "scaff" in conf.keys() and conf["scaff"]:
                 network = Scaffold(conf)
             elif "fedrod" in conf.keys() and conf["fedrod"]:
@@ -103,8 +105,8 @@ def check_dataset(path, number_site, dim=(144,144,42), delete=True):
         # pad them with zeros? instead of deleting them?
 
 if __name__ == '__main__':
-    #path = 'astral_fedem_dti/'
-    path = 'astral_fedem_v3/'
+    path = 'astral_fedem_dti/'
+    #path = 'astral_fedem_v3/'
     modality="ADC"
     networks_name = ["CENTRALIZED", "FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
 
@@ -117,7 +119,7 @@ if __name__ == '__main__':
                "l_lr":0.00932,
                "K":len(clients),
                "clients":clients,
-               "suffix":"exp3",
+               "suffix":"exp4",
                "val_interval":2,
                "modality":modality
                }
@@ -149,6 +151,6 @@ if __name__ == '__main__':
                                                 exp_name="test_astral_2",
                                                 modality=modality,
                                                 number_site=number_site,
-                                                batch_size=2,
+                                                batch_size=5,
                                                 size_crop=144,
                                                 nested=False)
