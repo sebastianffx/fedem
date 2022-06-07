@@ -222,7 +222,7 @@ class Fedem:
                 cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
                 
                 pred_holder.append(pred)
-            nib.save(nib.Nifti1Image(np.vstack(pred_holder), vol_affine), os.path.join(".", "output_viz", model_path[:-4], path_test_case.split("/")[-1].replace("adc", "segpred")))
+            nib.save(nib.Nifti1Image(np.vstack(pred_holder), vol_affine), os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4], path_test_case.split("/")[-1].replace("adc", "segpred")))
 
             test_dicemetric.append(dice_metric.aggregate().item())
             # reset the status for next computation round
@@ -852,7 +852,7 @@ class Centralized():
                     cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
                     pred_holder.append(pred)
                 
-                nib.save(nib.Nifti1Image(np.vstack(pred_holder), vol_affine), os.path.join(".", "output_viz", model_path[:-4], path_test_case.split("/")[-1].replace("adc", "segpred")))
+                nib.save(nib.Nifti1Image(np.vstack(pred_holder), vol_affine), os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4], path_test_case.split("/")[-1].replace("adc", "segpred")))
 
                 test_dicemetric.append(dice_metric.aggregate().item())
                 # reset the status for next computation round
