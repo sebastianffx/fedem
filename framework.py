@@ -651,6 +651,7 @@ class Centralized():
         metric_values = list()
         best_metric = -1
         best_metric_epoch = -1
+        index = [0,1,2]
         for cur_epoch in range(global_epoch*local_epoch):
             print("*** epoch:", cur_epoch+1, "***")
 
