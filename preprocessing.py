@@ -106,7 +106,7 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
     elif modality =='Tmax' or modality =='MTT':
         max_intensity = 30
     elif modality == 'ADC':
-        max_intensity = 4000
+        max_intensity = 3000
 
     transfo = {}
 
@@ -201,7 +201,7 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
     all_ds_train = ArrayDataset([i for l in partitions_train_imgs for i in l], transfo['imtrans'],
                                 [i for l in partitions_train_lbls for i in l], transfo['segtrans'])
     all_train_loader   = torch.utils.data.DataLoader(
-        all_ds_train, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available()
+        all_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
     )
 
     partitions_test_imgs = [partitions_paths[i][0][2] for i in range(len(partitions_paths))]

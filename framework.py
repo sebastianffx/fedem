@@ -680,6 +680,16 @@ class Centralized():
                 optimizer.step()
 
                 epoch_loss += loss.item()
+
+            if cur_epoch % 10 == 0:
+                #export/print some outputs
+                print(inputs[0,22,:,:])
+                print(labels[0,22,:,:])
+                print(y_pred_generic[0,22,:,:])
+                print("example of outputs")
+
+                print(labels[0,22,:,:].sum())
+                print(y_pred_generic[0,22,:,:].sum())                
             
             print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch +1, epoch_loss/self.nn.len))
             self.writer.add_scalar('avg training loss', epoch_loss/self.nn.len, cur_epoch)
