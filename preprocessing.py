@@ -106,7 +106,7 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
     elif modality =='Tmax' or modality =='MTT':
         max_intensity = 30
     elif modality == 'ADC':
-        max_intensity = 3000
+        max_intensity = 4000
 
     transfo = {}
 

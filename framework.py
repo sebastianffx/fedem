@@ -133,7 +133,7 @@ class Fedem:
         if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
             max_intensity = 30
         if self.options['modality'] =='ADC':
-            max_intensity = 3000
+            max_intensity = 4000
 
         for path_test_case, path_test_label in zip(all_valid_paths,all_valid_labels):            
             test_vol = nib.load(path_test_case)
@@ -197,7 +197,7 @@ class Fedem:
         if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
             max_intensity = 30
         if self.options['modality'] =='ADC':
-            max_intensity = 3000
+            max_intensity = 4000
 
         for path_test_case, path_test_label in zip(all_test_paths,all_test_labels):            
             test_vol = nib.load(path_test_case)
@@ -754,7 +754,7 @@ class Centralized():
             if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
                 max_intensity = 30
             if self.options['modality'] =='ADC':
-                max_intensity = 3000
+                max_intensity = 4000
 
             for path_test_case, path_test_label in zip(all_valid_paths,all_valid_labels):            
                 test_vol = nib.load(path_test_case)
@@ -818,7 +818,7 @@ class Centralized():
             if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
                 max_intensity = 30
             if self.options['modality'] =='ADC':
-                max_intensity = 3000
+                max_intensity = 4000
 
             for path_test_case, path_test_label in zip(all_test_paths,all_test_labels):            
                 test_vol = nib.load(path_test_case)
