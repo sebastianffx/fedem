@@ -87,6 +87,7 @@ def check_dataset(path, number_site, dim=(144,144,42), delete=True):
         # pad them with zeros? instead of deleting them?
 
 if __name__ == '__main__':
+    #path = 'astral_fedem_dti/'
     path = 'astral_fedem_v3/'
     modality="ADC"
     networks_name = ["CENTRALIZED", "FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
@@ -100,7 +101,7 @@ if __name__ == '__main__':
                "l_lr":0.00932,
                "K":len(clients),
                "clients":clients,
-               "suffix":"exp1",
+               "suffix":"exp3",
                "val_interval":2,
                "modality":modality
                }
@@ -129,7 +130,7 @@ if __name__ == '__main__':
                                                 num_repetitions=1,
                                                 networks_config=networks_config,
                                                 networks_name=networks_name,
-                                                exp_name="test_astral",
+                                                exp_name="test_astral_2",
                                                 modality=modality,
                                                 number_site=number_site,
                                                 batch_size=2,
