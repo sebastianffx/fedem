@@ -655,6 +655,7 @@ class Centralized():
         best_metric = -1
         best_metric_epoch = -1
         index = [0,1,2]
+        #multiply global and local epoch to have similar conditions
         for cur_epoch in range(global_epoch*local_epoch):
             print("*** epoch:", cur_epoch+1, "***")
 
@@ -664,6 +665,8 @@ class Centralized():
             loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
+
+            epoch_loss = 0
 
             for batch_data in self.train_loader:
                 for k, v in self.nn.named_parameters():
@@ -675,6 +678,10 @@ class Centralized():
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+
+                epoch_loss += loss.item()
+
+            self.writer.add_scalar('avg training loss', epoch_loss/self.nn.len, cur_epoch)
 
             #Evaluation on validation and saving model if needed
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
