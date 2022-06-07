@@ -656,12 +656,13 @@ class Centralized():
 
             self.nn.train()
             self.nn.len = len(self.train_loader)
+            print(len(self.train_loader))
                     
             loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
-            for batch_data in train_loader:
+            for batch_data in self.train_loader:
                 for k, v in self.nn.named_parameters():
                     v.requires_grad = True
             
