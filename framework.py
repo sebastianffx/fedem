@@ -1,3 +1,4 @@
+import os
 import copy
 import itertools
 from pandas import options
@@ -184,6 +185,8 @@ class Fedem:
         self.nn.load_state_dict(checkpoint)
         model = self.nn
 
+        os.makedirs(os.path.join(".", "output_viz", model_path[:-3]))
+
         pred = []
         test_dicemetric = []
         y = []
@@ -203,6 +206,8 @@ class Fedem:
             test_vol = nib.load(path_test_case)
             test_lbl = nib.load(path_test_label)
 
+            vol_affine = test_vol.affine
+
             test_vol_pxls = test_vol.get_fdata()
             test_vol_pxls = np.array(test_vol_pxls, dtype = np.float32)
             test_lbl_pxls = test_lbl.get_fdata()
@@ -210,11 +215,16 @@ class Fedem:
 
             test_vol_pxls = (test_vol_pxls - 0) / (max_intensity - 0)
 
+            pred_holder = []
             for slice_selected in range(test_vol_pxls.shape[-1]):
                 out_test = model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
                 out_test = out_test.detach().cpu().numpy()
                 pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
                 cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
+                
+                pred_holder.append(pred)
+            nib.save(nib.Nifti1Image(np.vstack(pred_holder), vol_affine), os.path.join(".", "output_viz", model_path[:-3], path_test_case.split("/")[-1].replace("adc", "segpred")))
+
             test_dicemetric.append(dice_metric.aggregate().item())
             # reset the status for next computation round
             dice_metric.reset()
@@ -805,6 +815,8 @@ class Centralized():
             self.nn.load_state_dict(checkpoint)
             model = self.nn
 
+            os.makedirs(os.path.join(".", "output_viz", model_path[:-3]))
+
             pred = []
             test_dicemetric = []
             y = []
@@ -824,6 +836,8 @@ class Centralized():
                 test_vol = nib.load(path_test_case)
                 test_lbl = nib.load(path_test_label)
 
+                vol_affine = test_vol.affine
+
                 test_vol_pxls = test_vol.get_fdata()
                 test_vol_pxls = np.array(test_vol_pxls, dtype = np.float32)
                 test_lbl_pxls = test_lbl.get_fdata()
@@ -831,11 +845,16 @@ class Centralized():
 
                 test_vol_pxls = (test_vol_pxls - 0) / (max_intensity - 0)
 
+                pred_holder = []
                 for slice_selected in range(test_vol_pxls.shape[-1]):
                     out_test = model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
                     out_test = out_test.detach().cpu().numpy()
                     pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
                     cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
+                    pred_holder.append(pred)
+                
+                nib.save(nib.Nifti1Image(np.vstack(pred_holder), vol_affine), os.path.join(".", "output_viz", model_path[:-3], path_test_case.split("/")[-1].replace("adc", "segpred")))
+
                 test_dicemetric.append(dice_metric.aggregate().item())
                 # reset the status for next computation round
                 dice_metric.reset()
