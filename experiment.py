@@ -1,4 +1,4 @@
-from framework import Scaffold, FedAvg, FedRod, Fedem
+from framework import Scaffold, FedAvg, FedRod, Fedem, Centralized
 from preprocessing import dataPreprocessing
 from numpy import std, mean
 
@@ -17,11 +17,12 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             print(f"{networks_name[i]} iteration {rep+1}")
 
             #create new loaders for each repetition
-            partitions_paths, centers_data_loaders, all_test_loader, all_valid_loader = dataPreprocessing(datapath, modality, number_site, batch_size, size_crop, nested)
+            partitions_paths, centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader = dataPreprocessing(datapath, modality, number_site, batch_size, size_crop, nested)
             conf["partitions_paths"]=partitions_paths
-            conf["dataloader"]=centers_data_loaders
-            conf["valid_loader"]=all_valid_loader
-            conf["test_loader"]=all_test_loader
+            conf["dataloader"]      =centers_data_loaders
+            conf["valid_loader"]    =all_valid_loader
+            conf["test_loader"]     =all_test_loader
+            conf["train_loader"]    =all_train_loader
                 
             #add number to differentiate replicates
             if exp_name!=None:
@@ -35,6 +36,8 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
                 network = FedRod(conf)
             elif 'weighting_scheme' in conf.keys():
                 network = FedAvg(conf)
+            elif "centralized" in conf.keys() and conf["centralized"]:
+                network = Centralized(conf)
             else:
                 print("missing argument for network type")
 
@@ -86,7 +89,7 @@ def check_dataset(path, number_site, dim=(144,144,42), delete=True):
 if __name__ == '__main__':
     path = 'astral_fedem_v3/'
     modality="ADC"
-    networks_name = ["FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
+    networks_name = ["CENTRALIZED", "FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
 
     clients=["center1", "center2", "center3"]
     number_site=len(clients)
@@ -104,6 +107,9 @@ if __name__ == '__main__':
 
     check_dataset(path, number_site, dim=(144,144,42))
 
+    centralized = default.copy()
+    centralized.update({"centralized":True})
+
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
 
@@ -117,7 +123,7 @@ if __name__ == '__main__':
     fedbeta.update({"weighting_scheme":"BETA",
                     "beta_val":0.9})
 
-    networks_config = [fedrod, scaff, fedavg, fedbeta]
+    networks_config = [centralized, fedrod, scaff, fedavg, fedbeta]
 
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,

@@ -540,8 +540,8 @@ class FedRod(Fedem):
         optimizer = torch.optim.Adam(ann.parameters(), lr=local_lr)
         loss_generic = loss_function(torch.tensor(np.zeros((1,10))), torch.tensor(np.zeros((1,10))))
         loss_personalized = loss_function(torch.tensor(np.zeros((1,10))), torch.tensor(np.zeros((1,10))))
-#        for k, v in self.nn.named_parameters():
-#            print(v.requires_grad, v.dtype, v.device, k)
+        # for k, v in self.nn.named_parameters():
+        # print(v.requires_grad, v.dtype, v.device, k)
 
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
@@ -632,7 +632,7 @@ class ScaffoldOptimizer(Optimizer):
                 p.data = p.data - dp.data * group['lr']
 
 class Centralized():
-    def __init__(self):
+    def __init__(self, options):
         self.nn = UNet_custom(spatial_dims=2,
                             in_channels=1,
                             out_channels=1,
@@ -642,25 +642,120 @@ class Centralized():
                             num_res_units=2,
                             name='centralized').to(device)
 
-    def train(self, ann, dataloader_train, local_epoch, local_lr):
-        #First the generic encoder-decoder are updated       
-        ann.train()
-        ann.len = len(dataloader_train)
-                
-        loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
+        self.valid_loader = options['valid_loader']
+        self.train_loader = options['train_loader']
+        self.options = options
+        print(self.options['suffix'])
 
-        optimizer = torch.optim.Adam(ann.parameters(), lr=local_lr)
+    def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
+        metric_values = list()
+        best_metric = -1
+        best_metric_epoch = -1
+        for cur_epoch in range(global_epoch*local_epoch):
+            print("*** epoch:", cur_epoch+1, "***")
 
-        for epoch in range(local_epoch):
-            for batch_data in dataloader_train:
-                for k, v in ann.named_parameters():
+            self.nn.train()
+            self.nn.len = len(self.train_loader)
+                    
+            loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
+
+            optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
+
+            for batch_data in train_loader:
+                for k, v in self.nn.named_parameters():
                     v.requires_grad = True
-                
+            
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
-                y_pred_generic = ann(inputs)
+                y_pred_generic = self.nn(inputs)
                 loss = loss_function(y_pred_generic, labels)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
-        return ann
+            #Evaluation on validation and saving model if needed
+            if (cur_epoch + 1) % self.options['val_interval'] == 0:
+                best_metric,best_metric_epoch = self.global_validation_cycle(index,metric_values,cur_epoch,best_metric,best_metric_epoch)
+        return self.nn
+    
+    def test(self, dataloader_test, test=True, model_path=None):
+        model=self.nn
+
+        if model_path != None:
+            print("Loading model weights: ")
+            print(model_path)
+            checkpoint = torch.load(model_path)
+            model.load_state_dict(checkpoint)
+
+        model.eval()
+        pred = []
+        y = []
+        dice_metric.reset()
+        for test_data in dataloader_test:
+            with torch.no_grad():                
+                #print(test_data[0].shape)
+                test_img, test_label = test_data[0][:,:,:,:,0].to(device), test_data[1][:,:,:,:,0].to(device)
+                test_pred = model(test_img)
+                #what is the purpose of the line below?
+                test_pred = test_pred>0.5 #This assumes one slice in the last dim
+                dice_metric(y_pred=test_pred, y=test_label)
+
+        # aggregate the final mean dice result
+        metric = dice_metric.aggregate().item()
+        print('dice:', metric)
+        if test:
+            self.writer.add_scalar('test dice metric', metric)
+        else:
+            self.writer.add_scalar('validation dice metric', metric)
+        return metric
+
+def global_test_cycle(self):                    
+        partitions_test_imgs = [self.options['partitions_paths'][i][0][2] for i in range(len(self.options['partitions_paths']))]
+        partitions_test_lbls = [self.options['partitions_paths'][i][1][2] for i in range(len(self.options['partitions_paths']))]
+        all_test_paths  = list(itertools.chain.from_iterable(partitions_test_imgs))
+        all_test_labels = list(itertools.chain.from_iterable(partitions_test_lbls))
+        
+
+        print("Loading best validation model weights: ")
+        model_path = self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
+        print(model_path)
+        checkpoint = torch.load(model_path)
+        self.nn.load_state_dict(checkpoint)
+        model = self.nn
+
+        pred = []
+        test_dicemetric = []
+        y = []
+        dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+
+        dice_metric.reset()
+        if self.options['modality'] =='CBF':
+            max_intensity = 1200
+        if self.options['modality'] =='CBV':
+            max_intensity = 200
+        if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
+            max_intensity = 30
+        if self.options['modality'] =='ADC':
+            max_intensity = 4000
+
+        for path_test_case, path_test_label in zip(all_test_paths,all_test_labels):            
+            test_vol = nib.load(path_test_case)
+            test_lbl = nib.load(path_test_label)
+
+            test_vol_pxls = test_vol.get_fdata()
+            test_vol_pxls = np.array(test_vol_pxls, dtype = np.float32)
+            test_lbl_pxls = test_lbl.get_fdata()
+            test_lbl_pxls = np.array(test_lbl_pxls)
+
+            test_vol_pxls = (test_vol_pxls - 0) / (max_intensity - 0)
+
+            for slice_selected in range(test_vol_pxls.shape[-1]):
+                out_test = model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
+                out_test = out_test.detach().cpu().numpy()
+                pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
+                cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
+            test_dicemetric.append(dice_metric.aggregate().item())
+            # reset the status for next computation round
+            dice_metric.reset()
+        print("Global model test DICE for all slices: ")
+        print(np.mean(test_dicemetric))
+        return(np.mean(test_dicemetric))
