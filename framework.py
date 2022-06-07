@@ -647,6 +647,9 @@ class Centralized():
         self.options = options
         print(self.options['suffix'])
 
+        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"Centralized"+options['suffix'])
+
+
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
         metric_values = list()
         best_metric = -1
