@@ -1,6 +1,7 @@
 from framework import Scaffold, FedAvg, FedRod, Fedem, Centralized
 from preprocessing import dataPreprocessing
 from numpy import std, mean
+import numpy as np
 
 import os
 import nibabel as nb
