@@ -671,7 +671,7 @@ class Centralized():
             self.nn.train()
             self.nn.len = len(self.train_loader)
                     
-            loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
+            loss_function = monai.losses.DiceLoss(sigmoid=False,include_background=False)
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
@@ -737,7 +737,7 @@ class Centralized():
             pred = []
             y = []
             dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
-            loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
+            loss_function = monai.losses.DiceLoss(sigmoid=False,include_background=False)
             writer = self.writer
             global_model = self.nn
             metric = 0
