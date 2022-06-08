@@ -139,7 +139,13 @@ if __name__ == '__main__':
     centralized3.update({"l_lr":1e-3})
 
     centralized4 = centralized.copy()
-    centralized4.update({"l_lr":1e-4})
+    centralized4.update({"l_lr":5e-3})
+
+    centralized5 = centralized.copy()
+    centralized5.update({"l_lr":1e-4})
+
+    centralized6 = centralized.copy()
+    centralized6.update({"l_lr":1e-5})
 
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
@@ -157,8 +163,8 @@ if __name__ == '__main__':
     #networks_name = ["CENTRALIZED", "FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
     #networks_config = [centralized, fedrod, scaff, fedavg, fedbeta]
 
-    networks_name = ["CENTRALIZED_lr1e-3", "CENTRALIZED_5r1e-4", "CENTRALIZED_lr1e-4", "CENTRALIZED_lr1e-5"]
-    networks_config = [centralized, centralized2, centralized3, centralized4]
+    networks_name = ["CENTRALIZED_lr1e-2_batch5", "CENTRALIZED_lr5e-2_batch5", "CENTRALIZED_lr1e-3_batch5", "CENTRALIZED_lr5e-3__batch5", "CENTRALIZED_lr1e-4_batch5", "CENTRALIZED_lr1e-5_batch5"]
+    networks_config = [centralized, centralized2, centralized3, centralized4, centralized5, centralized6]
 
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
@@ -167,6 +173,6 @@ if __name__ == '__main__':
                                                 exp_name="test_astral_2",
                                                 modality=modality,
                                                 number_site=number_site,
-                                                batch_size=10,
+                                                batch_size=5,
                                                 size_crop=144,
                                                 nested=False)
