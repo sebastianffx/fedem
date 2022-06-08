@@ -772,7 +772,7 @@ class Centralized():
                         out_test = out_test.detach().cpu().numpy()
                         pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
                         cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
-                        dice_loss_indiv.append(loss_function(pred, test_vol_pxls[:,:,slice_selected]).item())
+                        dice_loss_indiv.append(loss_function(torch.tensor(pred), torch.tensor(test_vol_pxls[:,:,slice_selected])).item())
                     test_dicemetric.append(dice_metric.aggregate().item())
                     dice_loss += np.mean(dice_loss_indiv)
                 # reset the status for next computation round
