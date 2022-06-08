@@ -108,7 +108,6 @@ if __name__ == '__main__':
     path = 'astral_fedem_dti/'
     #path = 'astral_fedem_v3/'
     modality="ADC"
-    networks_name = ["CENTRALIZED", "FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
 
     clients=["center1", "center2", "center3"]
     number_site=len(clients)
@@ -116,10 +115,10 @@ if __name__ == '__main__':
     default = {"g_epoch":20,
                "l_epoch":10,
                "g_lr":0.01,
-               "l_lr":0.00932,
+               "l_lr":0.0001,
                "K":len(clients),
                "clients":clients,
-               "suffix":"exp4",
+               "suffix":"exp5",
                "val_interval":2,
                "modality":modality
                }
@@ -127,7 +126,16 @@ if __name__ == '__main__':
     check_dataset(path, number_site, dim=(144,144,42))
 
     centralized = default.copy()
-    centralized.update({"centralized":True})
+    centralized.update({"centralized":True, "l_lr":1e-3})
+
+    centralized2 = centralized.copy()
+    centralized.update({"l_lr":5e-4})
+
+    centralized3 = centralized.copy()
+    centralized.update({"l_lr":1e-4})
+
+    centralized4 = centralized.copy()
+    centralized.update({"l_lr":1e-5})
 
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
@@ -142,7 +150,11 @@ if __name__ == '__main__':
     fedbeta.update({"weighting_scheme":"BETA",
                     "beta_val":0.9})
 
-    networks_config = [centralized, fedrod, scaff, fedavg, fedbeta]
+    #networks_name = ["CENTRALIZED", "FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
+    #networks_config = [centralized, fedrod, scaff, fedavg, fedbeta]
+
+    networks_name = ["CENTRALIZED_lr1e-3", "CENTRALIZED_5r1e-4", "CENTRALIZED_lr1e-4", "CENTRALIZED_lr1e-5"]
+    networks_config = [centralized, centralized2, centralized3, centralized4]
 
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
@@ -151,6 +163,6 @@ if __name__ == '__main__':
                                                 exp_name="test_astral_2",
                                                 modality=modality,
                                                 number_site=number_site,
-                                                batch_size=5,
+                                                batch_size=10,
                                                 size_crop=144,
                                                 nested=False)

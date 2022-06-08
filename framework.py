@@ -737,6 +737,7 @@ class Centralized():
             pred = []
             y = []
             dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+            loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
             writer = self.writer
             global_model = self.nn
             metric = 0
@@ -753,6 +754,7 @@ class Centralized():
             if self.options['modality'] =='ADC':
                 max_intensity = 4000
 
+            dice_loss = 0
             for path_test_case, path_test_label in zip(all_valid_paths,all_valid_labels):            
                 test_vol = nib.load(path_test_case)
                 test_lbl = nib.load(path_test_label)
@@ -763,16 +765,21 @@ class Centralized():
                 test_lbl_pxls = np.array(test_lbl_pxls)
                 test_vol_pxls = (test_vol_pxls - 0) / (max_intensity - 0) 
                 
-                dices_volume =[]
+                dice_loss_indiv = []
                 with torch.no_grad():
                     for slice_selected in range(test_vol_pxls.shape[-1]):
                         out_test = global_model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
                         out_test = out_test.detach().cpu().numpy()
                         pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
-                        cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))                
+                        cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
+                        dice_loss_indiv.append(loss_function(pred, test_vol_pxls[:,:,slice_selected]).item())
                     test_dicemetric.append(dice_metric.aggregate().item())
+                    dice_loss += np.mean(dice_loss_indiv)
                 # reset the status for next computation round
                 dice_metric.reset()
+
+            self.writer.add_scalar('avg validation loss', dice_loss/len(path_test_label), cur_epoch)
+
             metric = np.mean(test_dicemetric)
             metric_values.append(metric)             
             if metric > best_metric:
