@@ -93,7 +93,7 @@ class Fedem:
                 test_img, test_label = test_data[0][:,:,:,:,0].to(device), test_data[1][:,:,:,:,0].to(device)
                 test_pred = model(test_img)
                 #what is the purpose of the line below?
-                test_pred = test_pred>0.5 #This assumes one slice in the last dim
+                test_pred = test_pred>0.9 #This assumes one slice in the last dim
                 dice_metric(y_pred=test_pred, y=test_label)
 
         # aggregate the final mean dice result
@@ -717,7 +717,7 @@ class Centralized():
                 test_img, test_label = test_data[0][:,:,:,:,0].to(device), test_data[1][:,:,:,:,0].to(device)
                 test_pred = model(test_img)
                 #what is the purpose of the line below?
-                test_pred = test_pred>0.5 #This assumes one slice in the last dim
+                test_pred = test_pred>0.9 #This assumes one slice in the last dim
                 dice_metric(y_pred=test_pred, y=test_label)
 
         # aggregate the final mean dice result
