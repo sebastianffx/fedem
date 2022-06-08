@@ -778,7 +778,8 @@ class Centralized():
                 # reset the status for next computation round
                 dice_metric.reset()
 
-            self.writer.add_scalar('avg validation loss', dice_loss/len(path_test_label), cur_epoch)
+            print("current epoch: {} current validation dice loss : {:.4f}".format(cur_epoch +1, dice_loss/len(path_test_label)))
+            writer.add_scalar('avg validation loss', dice_loss/len(path_test_label), cur_epoch)
 
             metric = np.mean(test_dicemetric)
             metric_values.append(metric)             
@@ -793,6 +794,7 @@ class Centralized():
                 )
             )
             writer.add_scalar("val_mean_dice", metric, cur_epoch)
+
             return best_metric, best_metric_epoch
 
     def global_test_cycle(self):                    

@@ -8,6 +8,9 @@ import nibabel as nb
 
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
                   number_site=3, batch_size=2, size_crop=100, nested=True):
+
+    print("Experiment using the ", datapath, "dataset")
+
     tmp_test = []
     tmp_valid = []
     for i, conf in enumerate(networks_config):
@@ -16,6 +19,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
         valid_dicemetric = []
         for rep in range(num_repetitions):
             print(f"{networks_name[i]} iteration {rep+1}")
+            print(conf)
 
             #create new loaders for each repetition
             partitions_paths, centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader = dataPreprocessing(datapath, modality, number_site, batch_size, size_crop, nested)
