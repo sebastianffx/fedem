@@ -184,7 +184,7 @@ class Fedem:
         self.nn.load_state_dict(checkpoint)
         model = self.nn
 
-        os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4]))
+        os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4]), exist_ok=True)
 
         pred = []
         test_dicemetric = []
@@ -814,7 +814,7 @@ class Centralized():
             self.nn.load_state_dict(checkpoint)
             model = self.nn
 
-            os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4]))
+            os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4]), exist_ok=True)
 
             pred = []
             test_dicemetric = []
