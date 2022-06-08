@@ -133,13 +133,13 @@ if __name__ == '__main__':
     centralized.update({"centralized":True, "l_lr":1e-2})
 
     centralized2 = centralized.copy()
-    centralized.update({"l_lr":5e-2})
+    centralized2.update({"l_lr":5e-2})
 
     centralized3 = centralized.copy()
-    centralized.update({"l_lr":1e-3})
+    centralized3.update({"l_lr":1e-3})
 
     centralized4 = centralized.copy()
-    centralized.update({"l_lr":1e-4})
+    centralized4.update({"l_lr":1e-4})
 
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
