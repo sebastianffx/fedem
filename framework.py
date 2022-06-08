@@ -222,7 +222,7 @@ class Fedem:
                 cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
                 
                 pred_holder.append(pred)
-            nib.save(nib.Nifti1Image(np.stack(pred_holder), vol_affine), os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4], path_test_case.split("/")[-1].replace("adc", "segpred")))
+            nib.save(nib.Nifti1Image(np.stack(pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4], path_test_case.split("/")[-1].replace("adc", "segpred")))
 
             test_dicemetric.append(dice_metric.aggregate().item())
             # reset the status for next computation round
@@ -688,19 +688,7 @@ class Centralized():
                 loss.backward()
                 optimizer.step()
 
-                epoch_loss += loss.item()
-
-            if cur_epoch % 10 == 0:
-                print(inputs.shape)
-                #export/print some outputs
-                print(inputs[0,0,:,:])
-                print(labels[0,0,:,:])
-                print(y_pred_generic[0,0,:,:])
-                print("example of outputs")
-
-                print(inputs[0,0,:,:].mean())
-                print(labels[0,0,:,:].sum())
-                print(y_pred_generic[0,0,:,:].sum())                
+                epoch_loss += loss.item()           
             
             print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch +1, epoch_loss/self.nn.len))
             self.writer.add_scalar('avg training loss', epoch_loss/self.nn.len, cur_epoch)
@@ -852,7 +840,7 @@ class Centralized():
                     cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
                     pred_holder.append(pred)
 
-                nib.save(nib.Nifti1Image(np.stack(pred_holder), vol_affine), os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4], path_test_case.split("/")[-1].replace("adc", "segpred")))
+                nib.save(nib.Nifti1Image(np.stack(pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4], path_test_case.split("/")[-1].replace("adc", "segpred")))
 
                 test_dicemetric.append(dice_metric.aggregate().item())
                 # reset the status for next computation round
