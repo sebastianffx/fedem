@@ -98,7 +98,7 @@ class Fedem:
 
         # aggregate the final mean dice result
         metric = dice_metric.aggregate().item()
-        print('dice:', metric)
+        print('validation set dice score:', metric)
         if test:
             self.writer.add_scalar('test dice metric', metric)
         else:
@@ -659,7 +659,7 @@ class Centralized():
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"Centralized"+options['suffix'])
 
 
-    def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
+    def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False):
         metric_values = list()
         best_metric = -1
         best_metric_epoch = -1
@@ -682,15 +682,19 @@ class Centralized():
                     v.requires_grad = True
             
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                print(inputs.shape, labels.shape)
                 y_pred_generic = self.nn(inputs)
                 loss = loss_function(y_pred_generic, labels)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
-                epoch_loss += loss.item()           
+                epoch_loss += loss.item()
+
+            print("epoch_loss", epoch_loss)
+            print("length train_loader", len(self.train_loader))       
             
-            print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch +1, epoch_loss/self.nn.len))
+            print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch+1, epoch_loss/self.nn.len))
             self.writer.add_scalar('avg training loss', epoch_loss/self.nn.len, cur_epoch)
 
             #Evaluation on validation and saving model if needed

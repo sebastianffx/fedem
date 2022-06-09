@@ -124,7 +124,7 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
             #RandScaleIntensity( factors=0.1, prob=0.5),
             ScaleIntensity(minv=0.0, maxv=max_intensity),
             AddChannel(),
-            RandRotate90( prob=0.5, spatial_axes=[0, 1]),
+            #RandRotate90( prob=0.5, spatial_axes=[0, 1]),
             RandSpatialCrop((size_crop, size_crop, 1), random_size=False),
             EnsureType(),
             #Resized
@@ -135,7 +135,7 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
     segtrans = Compose(
         [   LoadImage(image_only=True),
             AddChannel(),
-            RandRotate90( prob=0.5, spatial_axes=[0, 1]),
+            #RandRotate90( prob=0.5, spatial_axes=[0, 1]),
             RandSpatialCrop((size_crop, size_crop, 1), random_size=False),
             EnsureType(),
             #Resized
