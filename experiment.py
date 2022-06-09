@@ -10,11 +10,9 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
                   number_site=3, batch_size=2, size_crop=100, nested=True):
 
     print("Experiment using the ", datapath, "dataset")
-    tmp_train = []
     tmp_test = []
     tmp_valid = []
     for i, conf in enumerate(networks_config):
-        train_dicemetric = [] #debugging, to check the dice score of the best model on the training data
         test_dicemetric = []
         valid_dicemetric = []
         for rep in range(num_repetitions):
@@ -51,14 +49,11 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'])
 
             valid_dicemetric.append(network.test(all_valid_loader, test=False))
-            train_dicemetric.append(network.test(all_train_loader, test=False))
             test_dicemetric.append(network.global_test_cycle())
-        tmp_train.append(train_dicemetric)
         tmp_valid.append(valid_dicemetric)
         tmp_test.append(test_dicemetric)
 
     for k, (valid_metrics, test_metrics) in enumerate(zip(tmp_valid, tmp_test)):
-        print(f"{networks_name[k]} train avg dice: {mean(train_metrics)} std: {std(train_metrics)}")
         print(f"{networks_name[k]} valid avg dice: {mean(valid_metrics)} std: {std(valid_metrics)}")
         print(f"{networks_name[k]} test avg dice: {mean(test_metrics)} std: {std(test_metrics)}")
 
