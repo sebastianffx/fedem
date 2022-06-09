@@ -675,6 +675,8 @@ class Centralized():
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
             epoch_loss = 0
+            epoch_dicescore = 0
+            dice_metric.reset()
 
             for batch_data in self.train_loader:
                 for k, v in self.nn.named_parameters():
@@ -692,8 +694,12 @@ class Centralized():
                     nib.save(nib.Nifti1Image(y_pred_generic[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_pred.nii.gz"))
                     nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_label.nii.gz"))
 
-                epoch_loss += loss.item()      
+                epoch_loss += loss.item()
+                test_pred = y_pred_generic>0.9 #This assumes one slice in the last dim
+                dice_metric(y_pred=test_pred, y=labels)
             
+            print("current epoch: {} current training dice SCORE : {:.4f}".format(cur_epoch+1, dice_metric.aggregate().item()))
+
             print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch+1, epoch_loss/len(self.train_loader)))
             self.writer.add_scalar('avg training loss', epoch_loss/len(self.train_loader), cur_epoch)
 
