@@ -681,14 +681,13 @@ class Centralized():
                     v.requires_grad = True
             
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
-                print(inputs.max(), inputs.min())
                 y_pred_generic = self.nn(inputs)
                 loss = loss_function(y_pred_generic, labels)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
-                if cur_epoch%5==0 and epoch_loss==0:
+                if cur_epoch%5==0 and labels[0,0,:,:].detach().cpu().numpy().sum() > 0:
                     nib.save(nib.Nifti1Image(inputs[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_adc.nii.gz"))
                     nib.save(nib.Nifti1Image(y_pred_generic[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_pred.nii.gz"))
                     nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_label.nii.gz"))
