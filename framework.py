@@ -669,7 +669,6 @@ class Centralized():
             print("*** epoch:", cur_epoch+1, "***")
 
             self.nn.train()
-            self.nn.len = len(self.train_loader)
                     
             loss_function = monai.losses.DiceLoss(sigmoid=False,include_background=False)
 
@@ -682,16 +681,22 @@ class Centralized():
                     v.requires_grad = True
             
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                print(inputs.max(), input.min())
                 y_pred_generic = self.nn(inputs)
                 loss = loss_function(y_pred_generic, labels)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
+                if cur_epoch%5==0 and epoch_loss==0:
+                    nib.save(nib.Nifti1Image(np.array(inputs[0,0,:,:]), vol_affine), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_adc.nii.gz"))
+                    nib.save(nib.Nifti1Image(np.array(y_pred_generic[0,0,:,:]), vol_affine), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_pred.nii.gz"))
+                    nib.save(nib.Nifti1Image(np.array(labels[0,0,:,:]), vol_affine), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_label.nii.gz"))
+
                 epoch_loss += loss.item()      
             
-            print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch+1, epoch_loss/self.nn.len))
-            self.writer.add_scalar('avg training loss', epoch_loss/self.nn.len, cur_epoch)
+            print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch+1, epoch_loss/len(self.train_loader)))
+            self.writer.add_scalar('avg training loss', epoch_loss/len(self.train_loader), cur_epoch)
 
             #Evaluation on validation and saving model if needed
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
