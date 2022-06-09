@@ -22,7 +22,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             print(conf)
 
             #create new loaders for each repetition
-            partitions_paths, centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader = dataPreprocessing(datapath, modality, number_site, batch_size, size_crop, nested)
+            partitions_paths, centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader = dataPreprocessing(datapath, modality, number_site, conf["batch_size"], size_crop, nested)
             conf["partitions_paths"]=partitions_paths
             conf["dataloader"]      =centers_data_loaders
             conf["valid_loader"]    =all_valid_loader
@@ -124,28 +124,19 @@ if __name__ == '__main__':
                "clients":clients,
                "suffix":"exp5",
                "val_interval":2,
-               "modality":modality
+               "modality":modality,
+               "batch_size":2
                }
 
     check_dataset(path, number_site, dim=(144,144,42))
 
-    centralized = default.copy()
-    centralized.update({"centralized":True, "l_lr":1e-2})
-
-    centralized2 = centralized.copy()
-    centralized2.update({"l_lr":5e-2})
-
-    centralized3 = centralized.copy()
-    centralized3.update({"l_lr":1e-3})
-
-    centralized4 = centralized.copy()
-    centralized4.update({"l_lr":5e-3})
-
-    centralized5 = centralized.copy()
-    centralized5.update({"l_lr":1e-4})
-
-    centralized6 = centralized.copy()
-    centralized6.update({"l_lr":1e-5})
+    networks_config = []
+    networks_name = []
+    for lr in np.logspace(1e-5, 1e-2, 4):
+        tmp = default.copy()
+        tmp.update({"centralized":True, "l_lr":lr})
+        networks_config.append(tmp)
+        networks_name.append(f"CENTRALIZED_lr{lr}_batch{tmp['batch_size']}")
 
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
@@ -163,9 +154,6 @@ if __name__ == '__main__':
     #networks_name = ["CENTRALIZED", "FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
     #networks_config = [centralized, fedrod, scaff, fedavg, fedbeta]
 
-    networks_name = ["CENTRALIZED_lr1e-2_batch5", "CENTRALIZED_lr5e-2_batch5", "CENTRALIZED_lr1e-3_batch5", "CENTRALIZED_lr5e-3__batch5", "CENTRALIZED_lr1e-4_batch5", "CENTRALIZED_lr1e-5_batch5"]
-    networks_config = [centralized, centralized2, centralized3, centralized4, centralized5, centralized6]
-
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
                                                 networks_config=networks_config,
@@ -173,6 +161,6 @@ if __name__ == '__main__':
                                                 exp_name="test_astral_2",
                                                 modality=modality,
                                                 number_site=number_site,
-                                                batch_size=5,
+                                                batch_size=default["batch_size"],
                                                 size_crop=144,
                                                 nested=False)

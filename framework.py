@@ -682,17 +682,13 @@ class Centralized():
                     v.requires_grad = True
             
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
-                print(inputs.shape, labels.shape)
                 y_pred_generic = self.nn(inputs)
                 loss = loss_function(y_pred_generic, labels)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
-                epoch_loss += loss.item()
-
-            print("epoch_loss", epoch_loss)
-            print("length train_loader", len(self.train_loader))       
+                epoch_loss += loss.item()      
             
             print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch+1, epoch_loss/self.nn.len))
             self.writer.add_scalar('avg training loss', epoch_loss/self.nn.len, cur_epoch)
