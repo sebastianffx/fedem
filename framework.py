@@ -681,7 +681,7 @@ class Centralized():
                     v.requires_grad = True
             
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
-                print(inputs.max(), input.min())
+                print(inputs.max(), inputs.min())
                 y_pred_generic = self.nn(inputs)
                 loss = loss_function(y_pred_generic, labels)
                 optimizer.zero_grad()
