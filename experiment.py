@@ -109,7 +109,8 @@ def check_dataset(path, number_site, dim=(144,144,42), delete=True):
         # pad them with zeros? instead of deleting them?
 
 if __name__ == '__main__':
-    path = 'astral_fedem_dti/'
+    path = 'astral_fedem_dti_purged/'
+    #path = 'astral_fedem_dti/'
     #path = 'astral_fedem_v3/'
     modality="ADC"
 
