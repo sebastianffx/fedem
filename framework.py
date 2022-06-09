@@ -689,9 +689,9 @@ class Centralized():
                 optimizer.step()
 
                 if cur_epoch%5==0 and epoch_loss==0:
-                    nib.save(nib.Nifti1Image(inputs[0,0,:,:].cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_adc.nii.gz"))
-                    nib.save(nib.Nifti1Image(y_pred_generic[0,0,:,:].cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_pred.nii.gz"))
-                    nib.save(nib.Nifti1Image(labels[0,0,:,:].cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_label.nii.gz"))
+                    nib.save(nib.Nifti1Image(inputs[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_adc.nii.gz"))
+                    nib.save(nib.Nifti1Image(y_pred_generic[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_pred.nii.gz"))
+                    nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_label.nii.gz"))
 
                 epoch_loss += loss.item()      
             
