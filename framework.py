@@ -23,7 +23,7 @@ from monai.transforms import (
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False, ignore_empty=False)
+dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
 
 print(device)
 
