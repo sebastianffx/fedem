@@ -692,7 +692,6 @@ class Centralized():
             epoch_dicescore = 0
             step = 0
             dice_metric.reset()
-            mean_dice = 0
 
             for batch_data in all_train_loader:
                 for k, v in self.nn.named_parameters():
@@ -717,10 +716,6 @@ class Centralized():
                     nib.save(nib.Nifti1Image(test_pred[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_postpred.nii.gz"))
                     nib.save(nib.Nifti1Image(y_pred_generic[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_rawpred.nii.gz"))
                     nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_label.nii.gz"))
-            
-            ##debug
-            print("current epoch: {} current training dice SCORE (MEANDICE): {:.4f}".format(cur_epoch+1, mean_dice/step))
-            ##
 
             print("current epoch: {} current training dice SCORE : {:.4f}".format(cur_epoch+1, dice_metric.aggregate().item()))
             print("current epoch: {} current training dice LOSS : {:.4f}".format(cur_epoch+1, epoch_loss/step))
