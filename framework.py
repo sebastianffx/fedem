@@ -23,7 +23,7 @@ from monai.transforms import (
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
 
 print(device)
 
@@ -813,12 +813,13 @@ class Centralized():
             print(model_path)
             checkpoint = torch.load(model_path)
             self.nn.load_state_dict(checkpoint)
+
         model = self.nn
+        model.eval()
 
         os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
 
         loss_function = monai.losses.DiceLoss(sigmoid=True)
-        dice_metric.reset()
 
         if self.options['modality'] =='CBF':
             max_intensity = 1200
@@ -831,6 +832,7 @@ class Centralized():
 
         holder_dicemetric = []
         holder_diceloss = []
+        dice_metric.reset()
         for path_case, path_label in zip(all_paths,all_labels):            
             vol = nib.load(path_case)
             lbl = nib.load(path_label)
@@ -861,7 +863,7 @@ class Centralized():
                 #apply sigmoid then activation threshold to obtain a discrete segmentation mask
                 pred = self.post_pred(out)
                 #compute dice score between the processed prediction and the labels
-                cur_dice_metric = dice_metric(pred,torch.tensor(lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
+                dice_metric(pred,torch.tensor(lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
                 #save the prediction slice to rebuild a 3D prediction volume
                 post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
 
@@ -870,13 +872,14 @@ class Centralized():
                 nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred")))
             
             #retain each volume scores (dice loss and dice score)
-            holder_diceloss.append(np.mean(loss_volume))
-            holder_dicemetric.append(dice_metric.aggregate().item())
+            holder_diceloss.append(np.mean(loss_volume)) #average per volume
+            holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
             # reset the status for next computation round
             dice_metric.reset()
 
-        assert(len(all_labels) == len(holder_diceloss) and len(all_labels) == len(holder_dicemetric) )
+        assert(len(all_labels) == len(holder_diceloss) and len(all_labels) == len(holder_dicemetric))
 
+        #print average over all the volumes
         print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
         print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
         return np.mean(holder_dicemetric), np.mean(holder_diceloss)
