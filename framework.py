@@ -671,6 +671,9 @@ class Centralized():
         best_metric = -1
         best_metric_epoch = -1
         index = [0,1,2]
+
+        _, _, _, all_train_loader = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
+
         #multiply global and local epoch to have similar conditions
         for cur_epoch in range(global_epoch*local_epoch):
             print("*** epoch:", cur_epoch+1, "***")
@@ -683,7 +686,7 @@ class Centralized():
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
             #create new loaders for each repetition, to force the sampling of new slices and application of data augmentation
-            _, _, _, all_train_loader = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
+            #_, _, _, all_train_loader = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
 
             epoch_loss = 0
             epoch_dicescore = 0
