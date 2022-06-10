@@ -123,18 +123,18 @@ if __name__ == '__main__':
                "suffix":"exp5",
                "val_interval":2,
                "modality":modality,
-               "batch_size":2
+               "batch_size":8
                }
 
-    check_dataset(path, number_site, dim=(144,144,42))
+    #check_dataset(path, number_site, dim=(144,144,42))
 
     networks_config = []
     networks_name = []
-    for lr in np.linspace(1e-5, 1e-2, 4):
+    for lr in np.linspace(1e-5, 1e-2, 5):
         tmp = default.copy()
-        tmp.update({"centralized":True, "l_lr":lr})
+        tmp.update({"centralized":True, "l_lr":round(lr,4)})
         networks_config.append(tmp)
-        networks_name.append(f"CENTRALIZED_lr{lr}_batch{tmp['batch_size']}")
+        networks_name.append(f"CENTRALIZED_lr{round(lr,4)}_batch{tmp['batch_size']}")
 
     fedrod = default.copy()
     fedrod.update({"fedrod":True})

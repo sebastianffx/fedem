@@ -654,9 +654,8 @@ class Centralized():
         self.valid_loader = options['valid_loader']
         self.train_loader = options['train_loader']
         self.options = options
-        print(self.options['suffix'])
 
-        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"Centralized"+options['suffix'])
+        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 
 
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False):
@@ -697,6 +696,8 @@ class Centralized():
                     nib.save(nib.Nifti1Image(inputs[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_adc.nii.gz"))
                     nib.save(nib.Nifti1Image(y_pred_generic[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_pred.nii.gz"))
                     nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_label.nii.gz"))
+
+                print("batch loss", loss.item())
 
                 epoch_loss += loss.item()
                 test_pred = y_pred_generic>0.9 #This assumes one slice in the last dim
