@@ -704,8 +704,8 @@ class Centralized():
             
             print("current epoch: {} current training dice SCORE : {:.4f}".format(cur_epoch+1, dice_metric.aggregate().item()))
 
-            print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch+1, epoch_loss/(step*self.train_loader.batch_size)))
-            self.writer.add_scalar('avg training loss', epoch_loss/(step*self.train_loader.batch_size), cur_epoch)
+            print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch+1, epoch_loss/step))
+            self.writer.add_scalar('avg training loss', epoch_loss/step, cur_epoch)
 
             #Evaluation on validation and saving model if needed
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
