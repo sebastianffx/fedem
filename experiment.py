@@ -46,10 +46,15 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             else:
                 print("missing argument for network type")
 
+            #train the network, each batch contain one ranodm slice for each subject
             network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'])
 
+            #compute the validation dice metric of single slice
             valid_dicemetric.append(network.test(all_valid_loader, test=False))
+
+            #compute test dice metric of full volume
             test_dicemetric.append(network.global_test_cycle())
+
         tmp_valid.append(valid_dicemetric)
         tmp_test.append(test_dicemetric)
 
