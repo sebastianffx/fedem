@@ -684,10 +684,9 @@ class Centralized():
                     v.requires_grad = True
                 
                 step += 1
-                print(batch_data[0].shape)
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred_generic = self.nn(inputs)
-                loss = loss_function(y_pred_generic, labels)
+                loss = loss_function(input=y_pred_generic, target=labels) #reduction = mean, this is an average over the batch
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -696,8 +695,6 @@ class Centralized():
                     nib.save(nib.Nifti1Image(inputs[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_adc.nii.gz"))
                     nib.save(nib.Nifti1Image(y_pred_generic[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_pred.nii.gz"))
                     nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_label.nii.gz"))
-
-                print("batch loss", loss.item())
 
                 epoch_loss += loss.item()
                 test_pred = y_pred_generic>0.9 #This assumes one slice in the last dim
