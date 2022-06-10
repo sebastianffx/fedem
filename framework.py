@@ -750,7 +750,7 @@ class Centralized():
                 self.writer.add_scalar('avg validation loss', epoch_valid_dice_loss, cur_epoch)
 
         ## DEBUG: save the prediction for the training set
-        self.full_volume_metric(dataset="training", network="self")
+        self.full_volume_metric(dataset="training", network="self", save_pred=True)
         return self.nn
     
     def test(self, dataloader_test, test=True, model_path=None):

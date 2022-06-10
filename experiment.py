@@ -49,10 +49,10 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'])
 
             #compute valid dice metric of full volume
-            valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best")[0])
+            valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best", save_pred=True)[0])
 
             #compute test dice metric of full volume
-            test_dicemetric.append(network.full_volume_metric(dataset="test", network="best")[0])
+            test_dicemetric.append(network.full_volume_metric(dataset="test", network="best", save_pred=True)[0])
 
         tmp_valid.append(valid_dicemetric)
         tmp_test.append(test_dicemetric)
@@ -141,7 +141,7 @@ if __name__ == '__main__':
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr})
         networks_config.append(tmp)
-        networks_name.append(f"CENTRALIZED_lr{lr}_batch{tmp['batch_size']}")
+        networks_name.append(f"CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
 
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
