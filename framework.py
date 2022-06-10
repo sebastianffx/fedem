@@ -710,7 +710,7 @@ class Centralized():
                 test_pred = self.post_pred(y_pred_generic)
                 dice_metric(y_pred=test_pred, y=labels)
 
-                if (cur_epoch+1)%5==0 and labels[0,0,:,:].detach().cpu().numpy().sum() > 0:
+                if save_train_pred and (cur_epoch+1)%5==0 and labels[0,0,:,:].detach().cpu().numpy().sum() > 0:
                     #saving the slice of the first element of each batch during training, with and without prediction post-processing (sigmoid + threshold)
                     nib.save(nib.Nifti1Image(inputs[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_adc.nii.gz"))
                     nib.save(nib.Nifti1Image(test_pred[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_postpred.nii.gz"))
@@ -718,27 +718,28 @@ class Centralized():
                     nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_label.nii.gz"))
 
             print("training dice SCORE : {:.4f}".format(dice_metric.aggregate().item()))
+            self.writer.add_scalar('avg training dice score', dice_metric.aggregate().item(), cur_epoch)
             print("training dice LOSS : {:.4f}".format(epoch_loss/step))
-            self.writer.add_scalar('avg training loss', epoch_loss/step, cur_epoch)
+            self.writer.add_scalar('avg training dice loss', epoch_loss/step, cur_epoch)
 
             #Evaluation on validation and saving model if needed, on full volume
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
                 epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False)
-                if epoch_valid_dice_score > best_metric:
-                    best_metric = epoch_valid_dice_score
+                if epoch_valid_dice_loss > best_metric: #using loss as benchmark value since the dice score is not reliable for the empty label mask
+                    best_metric = epoch_valid_dice_loss
                     best_metric_epoch = cur_epoch+1
 
                     torch.save(self.nn.state_dict(), self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth')
                     print("saved new best metric model")
 
-                print("validation dice SCORE: {:.4f} best val. mean dice: {:.4f} at epoch {}".format(
-                    epoch_valid_dice_score, best_metric, best_metric_epoch)
-                     )
-                self.writer.add_scalar("val_mean_dice", epoch_valid_dice_score, cur_epoch)
-
-                print("validation dice LOSS : {:.4f}".format(
-                    epoch_valid_dice_loss)
+                print("validation dice SCORE : {:.4f}".format(
+                    epoch_valid_dice_score)
                     )
+                self.writer.add_scalar("avg validation dice score", epoch_valid_dice_score, cur_epoch)
+
+                print("validation dice LOSS: {:.4f} best val. mean loss: {:.4f} at epoch {}".format(
+                    epoch_valid_dice_loss, best_metric, best_metric_epoch)
+                     )
                 self.writer.add_scalar('avg validation loss', epoch_valid_dice_loss, cur_epoch)
 
         ## DEBUG: save the prediction for the training set
@@ -805,8 +806,6 @@ class Centralized():
             print(model_path)
             checkpoint = torch.load(model_path)
             self.nn.load_state_dict(checkpoint)
-        else:
-            print("Using current model weights")
         model = self.nn
 
         os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
@@ -871,6 +870,6 @@ class Centralized():
 
         assert(len(all_labels) == len(holder_diceloss) and len(all_labels) == len(holder_dicemetric) )
 
-        print(f"Global model {dataset} DICE SCORE for all sites, all slices: ", np.mean(holder_dicemetric))
-        print(f"Global model {dataset} DICE LOSS for all sites, all slices: ", np.mean(holder_diceloss))
+        print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
+        print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
         return np.mean(holder_dicemetric), np.mean(holder_diceloss)

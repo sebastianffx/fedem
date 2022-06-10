@@ -57,6 +57,8 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
         tmp_valid.append(valid_dicemetric)
         tmp_test.append(test_dicemetric)
 
+    print("*** Summary for the experiment metrics ***")
+
     for k, (valid_metrics, test_metrics) in enumerate(zip(tmp_valid, tmp_test)):
         print(f"{networks_name[k]} valid avg dice: {mean(valid_metrics)} std: {std(valid_metrics)}")
         print(f"{networks_name[k]} test avg dice: {mean(test_metrics)} std: {std(test_metrics)}")
@@ -118,7 +120,7 @@ if __name__ == '__main__':
     clients=["center1", "center2", "center3"]
     number_site=len(clients)
 
-    default = {"g_epoch":20,
+    default = {"g_epoch":50,
                "l_epoch":10,
                "g_lr":0.01,
                "l_lr":0.0001,
@@ -135,7 +137,7 @@ if __name__ == '__main__':
     networks_config = []
     networks_name = []
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    for lr in [0.005, 0.009, 0.01]:
+    for lr in [0.005, 0.009, 0.01, 0.05]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr})
         networks_config.append(tmp)
