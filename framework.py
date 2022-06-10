@@ -775,7 +775,7 @@ class Centralized():
             self.writer.add_scalar('validation dice metric', metric)
         return metric
 
-    def full_volume_metric(dataset, save_pred=False):
+    def full_volume_metric(self, dataset, save_pred=False):
         """ Compute test metric for full volume of the test set
         """
         if dataset=="test":
