@@ -12,20 +12,19 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     print("Experiment using the ", datapath, "dataset")
     tmp_test = []
     tmp_valid = []
+
+    #fetch the files paths, create the data loading/augmentation routines
+    partitions_paths, transfo = dataPreprocessing(datapath, modality, number_site, size_crop, nested)
+
     for i, conf in enumerate(networks_config):
         test_dicemetric = []
         valid_dicemetric = []
         for rep in range(num_repetitions):
             print(f"{networks_name[i]} iteration {rep+1}")
             print(conf)
-
-            #create new loaders for each repetition
-            partitions_paths, centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader = dataPreprocessing(datapath, modality, number_site, conf["batch_size"], size_crop, nested)
+            
+            conf["transfo"] = transfo
             conf["partitions_paths"]=partitions_paths
-            conf["dataloader"]      =centers_data_loaders
-            conf["valid_loader"]    =all_valid_loader
-            conf["test_loader"]     =all_test_loader
-            conf["train_loader"]    =all_train_loader
                 
             #add number to differentiate replicates
             if exp_name!=None:

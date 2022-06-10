@@ -93,7 +93,7 @@ def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
 
     return center_train_loader, center_valid_loader, center_test_loader
 
-def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, nested=True):
+def dataPreprocessing(path, modality, number_site, size_crop=224, nested=True):
 	#creating the dataloader for 10 ISLES volumes using the T_max and the CBF
     #For cbf we are windowing 1-1024
     #For tmax we'll window 0-60
@@ -122,7 +122,7 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
     imtrans = Compose(
         [   LoadImage(image_only=True),
             #RandScaleIntensity( factors=0.1, prob=0.5),
-            ScaleIntensity(minv=0.0, maxv=1),
+            ScaleIntensity(minv=0.0, maxv=1), #indicate the range in which you want the output to be
             AddChannel(),
             #RandRotate90( prob=0.5, spatial_axes=[0, 1]),
             RandSpatialCrop((size_crop, size_crop, 1), random_size=False),
@@ -189,12 +189,20 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
     )
     transfo['segtrans_test']=segtrans_test
 
+    ## TODO: add transformation which doesn't crop just one slice for global validation and global test.
+
     partitions_paths = get_train_valid_test_partitions(path, modality, number_site, nested)
+
+    return partitions_paths, transfo
+
+
+def generate_loaders(partitions_paths, transfo, batch_size):
     
     centers_data_loaders = []
     for i in range(len(partitions_paths)):#Adding all the centers data loaders
         centers_data_loaders.append(center_dataloaders(partitions_paths[i], transfo, batch_size))
 
+    #merging the training/test/validation dataloaders for the centralized model
     partitions_train_imgs = [partitions_paths[i][0][0] for i in range(len(partitions_paths))]
     partitions_train_lbls = [partitions_paths[i][1][0] for i in range(len(partitions_paths))]
 
@@ -223,14 +231,4 @@ def dataPreprocessing(path, modality, number_site, batch_size, size_crop=224, ne
         all_ds_valid, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available()
     )
 
-    
-    """
-    all_ds_test = ArrayDataset([i for l in partitions_test_imgs for i in l], transfo['debug'],
-                               [i for l in partitions_test_lbls for i in l], transfo['debug'])
-    """
-    """
-    all_ds_valid = ArrayDataset([i for l in partitions_valid_imgs for i in l], transfo['debug'],
-                                [i for l in partitions_valid_lbls for i in l], transfo['debug'])
-    """
-
-    return partitions_paths, centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader
+    return centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader

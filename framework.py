@@ -27,9 +27,7 @@ print(device)
 
 class Fedem:
     def __init__(self, options):
-        #save all clients dataloader
-        self.dataloaders = options['dataloader']
-        self.valid_loader = options['valid_loader']
+        self.partitions_paths = options["partitions_paths"]
         self.options = options
 
         self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
@@ -42,9 +40,7 @@ class Fedem:
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
 
-            #skiping center 2 as only 1 scan is available (train_loader sorted)
-
-            #perform sampling here if desired
+            self.dataloaders, _, _, _ = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
 
             # dispatch
             
@@ -660,10 +656,10 @@ class Centralized():
                             num_res_units=2,
                             name='centralized').to(device)
 
-        self.valid_loader = options['valid_loader']
-        self.train_loader = options['train_loader']
+        self.partitions_paths = options["partitions_paths"]
         self.options = options
 
+        #routine to convert U-Net output to segmentation mask
         self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
 
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
@@ -685,12 +681,15 @@ class Centralized():
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
+            #create new loaders for each repetition, to force the sampling of new slices and application of data augmentation
+            _, _, _, all_train_loader = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
+
             epoch_loss = 0
             epoch_dicescore = 0
             step = 0
             dice_metric.reset()
 
-            for batch_data in self.train_loader:
+            for batch_data in all_train_loader:
                 for k, v in self.nn.named_parameters():
                     v.requires_grad = True
                 
