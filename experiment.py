@@ -49,10 +49,10 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'])
 
             #compute valid dice metric of full volume
-            valid_dicemetric.append(network.full_volume_metric(dataset="valid")[0])
+            valid_dicemetric.append(network.full_volume_metric(dataset="valid", network=None)[0])
 
             #compute test dice metric of full volume
-            test_dicemetric.append(network.full_volume_metric(dataset="test")[0])
+            test_dicemetric.append(network.full_volume_metric(dataset="test", network=None)[0])
 
         tmp_valid.append(valid_dicemetric)
         tmp_test.append(test_dicemetric)

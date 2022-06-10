@@ -9,7 +9,7 @@ import numpy as np
 import nibabel as nib
 
 from network import UNet_custom
-from monai.metrics import DiceMetric, compute_meandice
+from monai.metrics import DiceMetric
 from torch.optim import Optimizer, Adam
 from preprocessing import generate_loaders
 from torch.utils.tensorboard import SummaryWriter
@@ -711,9 +711,6 @@ class Centralized():
                 test_pred = self.post_pred(y_pred_generic)
                 dice_metric(y_pred=test_pred, y=labels)
 
-                #trying another function to compute dice
-                mean_dice += compute_meandice(y_pred=test_pred, y=labels, include_background=False, ignore_empty=False).item()
-
                 if (cur_epoch+1)%5==0 and labels[0,0,:,:].detach().cpu().numpy().sum() > 0:
                     #saving the slice of the first element of each batch during training, with and without prediction post-processing (sigmoid + threshold)
                     nib.save(nib.Nifti1Image(inputs[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_adc.nii.gz"))
@@ -785,7 +782,7 @@ class Centralized():
             self.writer.add_scalar('validation dice metric', metric)
         return metric
 
-    def full_volume_metric(self, dataset, network, save_pred=False):
+    def full_volume_metric(self, dataset, network=None, save_pred=False):
         """ Compute test metric for full volume of the test set
         """
         if dataset=="test":
