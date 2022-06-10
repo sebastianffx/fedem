@@ -23,7 +23,7 @@ from monai.transforms import (
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False, ignore_empty=False)
 print(device)
 
 class Fedem:
@@ -681,7 +681,7 @@ class Centralized():
             self.nn.train()
                     
             loss_function = monai.losses.DiceLoss(sigmoid=True, include_background=False)
-            dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+            dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False, ignore_empty=False)
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
@@ -807,7 +807,7 @@ class Centralized():
         os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
 
         loss_function = monai.losses.DiceLoss(sigmoid=True, include_background=False)
-        dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+        dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False, ignore_empty=False)
 
         dice_metric.reset()
         if self.options['modality'] =='CBF':
