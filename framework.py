@@ -14,6 +14,12 @@ from torch.optim import Optimizer, Adam
 from torch.utils.tensorboard import SummaryWriter
 from weighting_schemes import average_weights, average_weights_beta, average_weights_softmax
 
+from monai.transforms import (
+    Activations,
+    AsDiscrete,
+    EnsureType,
+)
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
 print(device)
@@ -24,6 +30,8 @@ class Fedem:
         self.dataloaders = options['dataloader']
         self.valid_loader = options['valid_loader']
         self.options = options
+
+        self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
 
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
         metric_values = list()
@@ -655,6 +663,8 @@ class Centralized():
         self.train_loader = options['train_loader']
         self.options = options
 
+        self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
+
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 
 
@@ -669,7 +679,7 @@ class Centralized():
 
             self.nn.train()
                     
-            loss_function = monai.losses.DiceLoss(sigmoid=False, include_background=False)
+            loss_function = monai.losses.DiceLoss(sigmoid=True, include_background=False)
             dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
@@ -730,7 +740,8 @@ class Centralized():
                 test_img, test_label = test_data[0][:,:,:,:,0].to(device), test_data[1][:,:,:,:,0].to(device)
                 test_pred = model(test_img)
                 #what is the purpose of the line below?
-                test_pred = test_pred>0.9 #This assumes one slice in the last dim
+                #test_pred = test_pred>0.9 #This assumes one slice in the last dim
+                test_pred = self.post_pred(test_pred) #apply sigmoid then activate threshold
                 dice_metric(y_pred=test_pred, y=test_label)
 
         # aggregate the final mean dice result
@@ -750,7 +761,7 @@ class Centralized():
             pred = []
             y = []
             dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
-            loss_function = monai.losses.DiceLoss(sigmoid=False,include_background=False)
+            loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
             writer = self.writer
             global_model = self.nn
             metric = 0
@@ -782,8 +793,9 @@ class Centralized():
                 with torch.no_grad():
                     for slice_selected in range(test_vol_pxls.shape[-1]):
                         out_test = global_model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
-                        out_test = out_test.detach().cpu().numpy()
-                        pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
+                        #out_test = out_test.detach().cpu().numpy()
+                        #pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
+                        pred = self.post_pred(out_test[0,0,:,:]) #apply sigmoid then activate threshold
                         cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
                         dice_loss_indiv.append(loss_function(torch.tensor(pred), torch.tensor(test_vol_pxls[:,:,slice_selected])).item())
                     #average per validation volume
@@ -859,8 +871,9 @@ class Centralized():
                 pred_holder = []
                 for slice_selected in range(test_vol_pxls.shape[-1]):
                     out_test = model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
-                    out_test = out_test.detach().cpu().numpy()
-                    pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
+                    #out_test = out_test.detach().cpu().numpy()
+                    #pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
+                    pred = self.post_pred(out_test[0,0,:,:]) #apply sigmoid then activate threshold
                     cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
                     pred_holder.append(pred)
 
