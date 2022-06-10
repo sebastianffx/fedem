@@ -13,6 +13,7 @@ from monai.transforms import (
     Compose,
     LoadImage,
     RandRotate90,
+    RandRotate,
     RandSpatialCrop,
     ScaleIntensity,
     EnsureType,
