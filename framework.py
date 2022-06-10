@@ -9,7 +9,7 @@ import numpy as np
 import nibabel as nib
 
 from network import UNet_custom
-from monai.metrics import DiceMetric
+from monai.metrics import DiceMetric, compute_meandice
 from torch.optim import Optimizer, Adam
 from preprocessing import generate_loaders
 from torch.utils.tensorboard import SummaryWriter
@@ -24,6 +24,7 @@ from monai.transforms import (
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False, ignore_empty=False)
+
 print(device)
 
 class Fedem:
@@ -681,7 +682,6 @@ class Centralized():
             self.nn.train()
                     
             loss_function = monai.losses.DiceLoss(sigmoid=True, include_background=False)
-            dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False, ignore_empty=False)
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
@@ -692,6 +692,7 @@ class Centralized():
             epoch_dicescore = 0
             step = 0
             dice_metric.reset()
+            mean_dice = 0
 
             for batch_data in all_train_loader:
                 for k, v in self.nn.named_parameters():
@@ -710,6 +711,9 @@ class Centralized():
                 test_pred = self.post_pred(y_pred_generic)
                 dice_metric(y_pred=test_pred, y=labels)
 
+                #trying another function to compute dice
+                mean_dice += compute_meandice(y_pred=test_pred, y=labels, include_background=False, ignore_empty=False).item()
+
                 if (cur_epoch+1)%5==0 and labels[0,0,:,:].detach().cpu().numpy().sum() > 0:
                     #saving the slice of the first element of each batch during training, with and without prediction post-processing (sigmoid + threshold)
                     nib.save(nib.Nifti1Image(inputs[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_adc.nii.gz"))
@@ -717,8 +721,11 @@ class Centralized():
                     nib.save(nib.Nifti1Image(y_pred_generic[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_rawpred.nii.gz"))
                     nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_label.nii.gz"))
             
+            ##debug
+            print("current epoch: {} current training dice SCORE (MEANDICE): {:.4f}".format(cur_epoch+1, mean_dice/step))
+            ##
+
             print("current epoch: {} current training dice SCORE : {:.4f}".format(cur_epoch+1, dice_metric.aggregate().item()))
-            print(epoch_loss, step)
             print("current epoch: {} current training dice LOSS : {:.4f}".format(cur_epoch+1, epoch_loss/step))
             self.writer.add_scalar('avg training loss', epoch_loss/step, cur_epoch)
 
@@ -807,7 +814,6 @@ class Centralized():
         os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
 
         loss_function = monai.losses.DiceLoss(sigmoid=True, include_background=False)
-        dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False, ignore_empty=False)
 
         dice_metric.reset()
         if self.options['modality'] =='CBF':
