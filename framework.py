@@ -681,7 +681,7 @@ class Centralized():
 
             self.nn.train()
                     
-            loss_function = monai.losses.DiceLoss(sigmoid=True, include_background=False)
+            loss_function = monai.losses.DiceLoss(sigmoid=True)
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
