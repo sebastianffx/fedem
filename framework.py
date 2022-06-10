@@ -718,7 +718,7 @@ class Centralized():
                     nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_label.nii.gz"))
             
             print("current epoch: {} current training dice SCORE : {:.4f}".format(cur_epoch+1, dice_metric.aggregate().item()))
-
+            print(epoch_loss, step)
             print("current epoch: {} current training dice LOSS : {:.4f}".format(cur_epoch+1, epoch_loss/step))
             self.writer.add_scalar('avg training loss', epoch_loss/step, cur_epoch)
 
