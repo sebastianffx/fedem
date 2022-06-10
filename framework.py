@@ -721,7 +721,7 @@ class Centralized():
 
             #Evaluation on validation and saving model if needed, on full volume
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
-                epoch_valid_dice_score, epoch_valid_dice_loss = full_volume_metric(dataset="valid", save_pred=False)
+                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", save_pred=False)
                 if epoch_valid_dice_score > best_metric:
                     best_metric = epoch_valid_dice_score
                     best_metric_epoch = cur_epoch+1
