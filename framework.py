@@ -290,7 +290,7 @@ class FedAvg(Fedem):
         ann.train()
         ann.len = len(dataloader_train)
                 
-        loss_function = monai.losses.DiceLoss(sigmoid=True, include_background=False)
+        loss_function = monai.losses.DiceLoss(sigmoid=False, include_background=False)
         optimizer = Adam(ann.parameters(), local_lr)
 
         for epoch in range(local_epoch):
@@ -368,7 +368,7 @@ class Scaffold(Fedem):
         ann.len = len(dataloader_train)
                 
         x = copy.deepcopy(ann)
-        loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
+        loss_function = monai.losses.DiceLoss(sigmoid=False,include_background=False)
         optimizer = ScaffoldOptimizer(ann.parameters(), lr=local_lr, weight_decay=1e-4)
 
         for epoch in range(local_epoch):
@@ -544,7 +544,7 @@ class FedRod(Fedem):
         ann.train()
         ann.len = len(dataloader_train)
                 
-        loss_function = monai.losses.DiceLoss(sigmoid=True,include_background=False)
+        loss_function = monai.losses.DiceLoss(sigmoid=False,include_background=False)
 
         optimizer = torch.optim.Adam(ann.parameters(), lr=local_lr)
         loss_generic = loss_function(torch.tensor(np.zeros((1,10))), torch.tensor(np.zeros((1,10))))
@@ -670,18 +670,22 @@ class Centralized():
 
             self.nn.train()
                     
-            loss_function = monai.losses.DiceLoss(sigmoid=False,include_background=False)
+            loss_function = monai.losses.DiceLoss(sigmoid=False, include_background=False)
+            dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
             epoch_loss = 0
             epoch_dicescore = 0
+            step = 0
             dice_metric.reset()
 
             for batch_data in self.train_loader:
                 for k, v in self.nn.named_parameters():
                     v.requires_grad = True
-            
+                
+                step += 1
+                print(batch_data.shape)
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred_generic = self.nn(inputs)
                 loss = loss_function(y_pred_generic, labels)
@@ -689,10 +693,10 @@ class Centralized():
                 loss.backward()
                 optimizer.step()
 
-                if cur_epoch%5==0 and labels[0,0,:,:].detach().cpu().numpy().sum() > 0:
-                    nib.save(nib.Nifti1Image(inputs[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_adc.nii.gz"))
-                    nib.save(nib.Nifti1Image(y_pred_generic[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_pred.nii.gz"))
-                    nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch)+"_label.nii.gz"))
+                if (cur_epoch+1)%5==0 and labels[0,0,:,:].detach().cpu().numpy().sum() > 0:
+                    nib.save(nib.Nifti1Image(inputs[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_adc.nii.gz"))
+                    nib.save(nib.Nifti1Image(y_pred_generic[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_pred.nii.gz"))
+                    nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_label.nii.gz"))
 
                 epoch_loss += loss.item()
                 test_pred = y_pred_generic>0.9 #This assumes one slice in the last dim
@@ -700,8 +704,8 @@ class Centralized():
             
             print("current epoch: {} current training dice SCORE : {:.4f}".format(cur_epoch+1, dice_metric.aggregate().item()))
 
-            print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch+1, epoch_loss/len(self.train_loader)))
-            self.writer.add_scalar('avg training loss', epoch_loss/len(self.train_loader), cur_epoch)
+            print("current epoch: {} current training dice loss : {:.4f}".format(cur_epoch+1, epoch_loss/(step*self.train_loader.batch_size)))
+            self.writer.add_scalar('avg training loss', epoch_loss/(step*self.train_loader.batch_size), cur_epoch)
 
             #Evaluation on validation and saving model if needed
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
@@ -783,6 +787,7 @@ class Centralized():
                         pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
                         cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
                         dice_loss_indiv.append(loss_function(torch.tensor(pred), torch.tensor(test_vol_pxls[:,:,slice_selected])).item())
+                    #average per validation volume
                     test_dicemetric.append(dice_metric.aggregate().item())
                     dice_loss += np.mean(dice_loss_indiv)
                 # reset the status for next computation round
@@ -791,6 +796,7 @@ class Centralized():
             print("current epoch: {} current validation dice loss : {:.4f}".format(cur_epoch +1, dice_loss/len(path_test_label)))
             writer.add_scalar('avg validation loss', dice_loss/len(path_test_label), cur_epoch)
 
+            #average over the entire validation set
             metric = np.mean(test_dicemetric)
             metric_values.append(metric)             
             if metric > best_metric:
