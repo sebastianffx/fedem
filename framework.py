@@ -785,7 +785,8 @@ class Centralized():
         elif dataset=="train":
             idx_partition = 0
         else:
-            print("invalid dataset type, possible value are train, valid and test")  
+            print("invalid dataset type, possible value are train, valid and test")
+            return -1
 
         partitions_imgs = [self.options['partitions_paths'][i][0][idx_partition] for i in range(len(self.options['partitions_paths']))]
         partitions_lbls = [self.options['partitions_paths'][i][1][idx_partition] for i in range(len(self.options['partitions_paths']))]
