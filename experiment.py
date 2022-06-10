@@ -55,6 +55,9 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             #compute test dice metric of full volume
             test_dicemetric.append(network.global_test_cycle())
 
+            #debug purpose: see how well the networks overfit
+            network.global_train_cycle()
+
         tmp_valid.append(valid_dicemetric)
         tmp_test.append(test_dicemetric)
 

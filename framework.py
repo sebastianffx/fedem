@@ -799,14 +799,17 @@ class Centralized():
             
             dice_loss_indiv = []
             with torch.no_grad():
+                #iterate over all the slices
                 for slice_selected in range(test_vol_pxls.shape[-1]):
                     out_test = global_model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
-                    #out_test = out_test.detach().cpu().numpy()
-                    #pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
-                    #apply sigmoid and threshold, since the loss function apply sigmoid to the output
-                    pred = self.post_pred(out_test[0,0,:,:])
-                    cur_dice_metric = dice_metric(pred[np.newaxis,np.newaxis,:,:],torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
-                    dice_loss_indiv.append(loss_function(pred, torch.tensor(test_vol_pxls[:,:,slice_selected]).to(device)).item())
+                    
+                    #dice loss function computes the sigmoid, compare with the corresponding label slice
+                    dice_loss_indiv.append(loss_function(input=out_test, target=torch.tensor(test_vol_pxls[:,:,slice_selected]).to(device)).item())
+
+                    #apply sigmoid and threshold prior to compute dice score
+                    pred = self.post_pred(out_test)
+                    cur_dice_metric = dice_metric(pred,torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
+                    
                 #average per validation volume
                 test_dicemetric.append(dice_metric.aggregate().item())
                 dice_loss += np.mean(dice_loss_indiv)
@@ -899,5 +902,74 @@ class Centralized():
             # reset the status for next computation round
             dice_metric.reset()
         print("Global model test DICE for all slices: ")
+        print(np.mean(test_dicemetric))
+        return(np.mean(test_dicemetric))
+
+    def global_train_cycle(self):      
+        """ Compute test metric for full volume of the test set
+        """              
+        partitions_test_imgs = [self.options['partitions_paths'][i][0][0] for i in range(len(self.options['partitions_paths']))]
+        partitions_test_lbls = [self.options['partitions_paths'][i][1][0] for i in range(len(self.options['partitions_paths']))]
+        all_test_paths  = list(itertools.chain.from_iterable(partitions_test_imgs))
+        all_test_labels = list(itertools.chain.from_iterable(partitions_test_lbls))
+        
+
+        print("Loading best validation model weights: ")
+        model_path = self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
+        print(model_path)
+        checkpoint = torch.load(model_path)
+        self.nn.load_state_dict(checkpoint)
+        model = self.nn
+
+        os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
+
+        pred = []
+        test_dicemetric = []
+        y = []
+        dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+
+        dice_metric.reset()
+        if self.options['modality'] =='CBF':
+            max_intensity = 1200
+        if self.options['modality'] =='CBV':
+            max_intensity = 200
+        if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
+            max_intensity = 30
+        if self.options['modality'] =='ADC':
+            max_intensity = 4000
+
+        for path_test_case, path_test_label in zip(all_test_paths,all_test_labels):            
+            test_vol = nib.load(path_test_case)
+            test_lbl = nib.load(path_test_label)
+
+            vol_affine = test_vol.affine
+
+            test_vol_pxls = test_vol.get_fdata()
+            test_vol_pxls = np.array(test_vol_pxls, dtype = np.float32)
+            test_lbl_pxls = test_lbl.get_fdata()
+            test_lbl_pxls = np.array(test_lbl_pxls)
+
+            test_vol_pxls = (test_vol_pxls - 0) / (max_intensity - 0)
+
+            raw_pred_holder = []
+            post_pred_holder = []
+            for slice_selected in range(test_vol_pxls.shape[-1]):
+                out_test = model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
+
+                #saving the direct output of the network
+                raw_pred_holder.append(out_test[0,0,:,:].detach().cpu().numpy())
+
+                #apply sigmoid then activation threshold
+                pred = self.post_pred(out_test)
+                cur_dice_metric = dice_metric(pred,torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
+                post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
+
+            nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_test_case.split("/")[-1].replace("adc", "raw_segpred")))
+            nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_test_case.split("/")[-1].replace("adc", "post_segpred")))
+
+            test_dicemetric.append(dice_metric.aggregate().item())
+            # reset the status for next computation round
+            dice_metric.reset()
+        print("Global model train DICE for all slices: ")
         print(np.mean(test_dicemetric))
         return(np.mean(test_dicemetric))
