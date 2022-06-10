@@ -724,7 +724,7 @@ class Centralized():
 
             #Evaluation on validation and saving model if needed, on full volume
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
-                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", save_pred=False)
+                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False)
                 if epoch_valid_dice_score > best_metric:
                     best_metric = epoch_valid_dice_score
                     best_metric_epoch = cur_epoch+1
@@ -778,7 +778,7 @@ class Centralized():
             self.writer.add_scalar('validation dice metric', metric)
         return metric
 
-    def full_volume_metric(self, dataset, save_pred=False):
+    def full_volume_metric(self, dataset, network, save_pred=False):
         """ Compute test metric for full volume of the test set
         """
         if dataset=="test":
@@ -796,11 +796,12 @@ class Centralized():
         all_paths  = list(itertools.chain.from_iterable(partitions_imgs))
         all_labels = list(itertools.chain.from_iterable(partitions_lbls))
 
-        print("Loading best validation model weights: ")
-        model_path = self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
-        print(model_path)
-        checkpoint = torch.load(model_path)
-        self.nn.load_state_dict(checkpoint)
+        if network==None:
+            print("Loading best validation model weights: ")
+            model_path = self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
+            print(model_path)
+            checkpoint = torch.load(model_path)
+            self.nn.load_state_dict(checkpoint)
         model = self.nn
 
         os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
