@@ -722,6 +722,9 @@ class Centralized():
             #Evaluation on validation and saving model if needed, on full volume
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
                 best_metric,best_metric_epoch = self.global_validation_cycle(index,metric_values,cur_epoch,best_metric,best_metric_epoch)
+
+            ## DEBUG: save the prediction for the training set
+            self.global_train_cycle()
         return self.nn
     
     def test(self, dataloader_test, test=True, model_path=None):
@@ -912,13 +915,7 @@ class Centralized():
         partitions_test_lbls = [self.options['partitions_paths'][i][1][0] for i in range(len(self.options['partitions_paths']))]
         all_test_paths  = list(itertools.chain.from_iterable(partitions_test_imgs))
         all_test_labels = list(itertools.chain.from_iterable(partitions_test_lbls))
-        
 
-        print("Loading best validation model weights: ")
-        model_path = self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
-        print(model_path)
-        checkpoint = torch.load(model_path)
-        self.nn.load_state_dict(checkpoint)
         model = self.nn
 
         os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
