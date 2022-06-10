@@ -685,7 +685,7 @@ class Centralized():
                     v.requires_grad = True
                 
                 step += 1
-                print(batch_data.shape)
+                print(batch_data[0].shape)
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred_generic = self.nn(inputs)
                 loss = loss_function(y_pred_generic, labels)
