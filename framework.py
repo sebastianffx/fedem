@@ -731,11 +731,11 @@ class Centralized():
 
                 print("current epoch: {} current validation dice SCORE: {:.4f} best val. mean dice: {:.4f} at epoch {}".format(
                     cur_epoch+1, epoch_valid_dice_score, best_metric, best_metric_epoch))
-                writer.add_scalar("val_mean_dice", metric, cur_epoch)
+                self.writer.add_scalar("val_mean_dice", metric, cur_epoch)
 
                 print("current epoch: {} current validation dice LOSS : {:.4f}".format(
                     cur_epoch+1, epoch_valid_dice_loss))
-                writer.add_scalar('avg validation loss', epoch_valid_dice_loss, cur_epoch)
+                self.writer.add_scalar('avg validation loss', epoch_valid_dice_loss, cur_epoch)
 
         ## DEBUG: save the prediction for the training set
         self.full_volume_metric(dataset="training")
