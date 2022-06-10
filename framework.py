@@ -670,6 +670,7 @@ class Centralized():
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False):
         metric_values = list()
         best_metric = -1
+        best_loss = 1e5
         best_metric_epoch = -1
         index = [0,1,2]
 
@@ -689,7 +690,6 @@ class Centralized():
             _, _, _, all_train_loader = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
 
             epoch_loss = 0
-            epoch_dicescore = 0
             step = 0
             dice_metric.reset()
 
@@ -725,12 +725,19 @@ class Centralized():
             #Evaluation on validation and saving model if needed, on full volume
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
                 epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False)
-                if epoch_valid_dice_loss > best_metric: #using loss as benchmark value since the dice score is not reliable for the empty label mask
-                    best_metric = epoch_valid_dice_loss
+                if epoch_valid_dice_loss < best_loss: #using loss as benchmark value since the dice score is not reliable for the empty label mask
+                    best_loss = epoch_valid_dice_loss
                     best_metric_epoch = cur_epoch+1
 
                     torch.save(self.nn.state_dict(), self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth')
-                    print("saved new best metric model")
+                    print("saved new best metric model (according to DICE LOSS)")
+
+                if epoch_valid_dice_score > best_metric:
+                    best_metric = epoch_valid_dice_score
+                    best_dicescore_epoch = cur_epoch+1
+                    if best_dicescore_epoch != best_metric_epoch:
+                        torch.save(self.nn.state_dict(), self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth')
+                        print("saved new best model (according to DICE SCORE)")
 
                 print("validation dice SCORE : {:.4f}".format(
                     epoch_valid_dice_score)
