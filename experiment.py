@@ -132,9 +132,9 @@ if __name__ == '__main__':
     networks_name = []
     for lr in np.linspace(1e-5, 1e-2, 5):
         tmp = default.copy()
-        tmp.update({"centralized":True, "l_lr":round(lr,4)})
+        tmp.update({"centralized":True, "l_lr":lr})
         networks_config.append(tmp)
-        networks_name.append(f"CENTRALIZED_lr{round(lr,4)}_batch{tmp['batch_size']}")
+        networks_name.append(f"CENTRALIZED_lr{lr}_batch{tmp['batch_size']}")
 
     fedrod = default.copy()
     fedrod.update({"fedrod":True})

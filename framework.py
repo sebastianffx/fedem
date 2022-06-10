@@ -686,6 +686,7 @@ class Centralized():
                 step += 1
                 inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred_generic = self.nn(inputs)
+                print(y_pred_generic.min())
                 loss = loss_function(input=y_pred_generic, target=labels) #reduction = mean, this is an average over the batch
                 optimizer.zero_grad()
                 loss.backward()
