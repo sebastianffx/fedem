@@ -807,7 +807,7 @@ class Centralized():
                     out_test = global_model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
                     
                     #dice loss function computes the sigmoid, compare with the corresponding label slice
-                    dice_loss_indiv.append(loss_function(input=out_test, target=torch.tensor(test_vol_pxls[:,:,slice_selected]).to(device)).item())
+                    dice_loss_indiv.append(loss_function(input=out_test[0,0,:,:], target=torch.tensor(test_vol_pxls[:,:,slice_selected]).to(device)).item())
 
                     #apply sigmoid and threshold prior to compute dice score
                     pred = self.post_pred(out_test)
