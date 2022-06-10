@@ -135,7 +135,8 @@ if __name__ == '__main__':
 
     networks_config = []
     networks_name = []
-    for lr in np.linspace(1e-5, 1e-2, 5):
+    #for lr in np.linspace(1e-5, 1e-2, 5):
+    for lr in [0.005, 0.009, 0.01]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr})
         networks_config.append(tmp)
