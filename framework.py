@@ -781,7 +781,7 @@ class Centralized():
         if dataset=="test":
             idx_partition = 2
         elif dataset=="valid":
-            idx_partitions = 1
+            idx_partition = 1
         elif dataset=="train":
             idx_partition = 0
         else:
