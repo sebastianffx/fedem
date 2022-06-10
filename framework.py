@@ -15,6 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from weighting_schemes import average_weights, average_weights_beta, average_weights_softmax
 
 from monai.transforms import (
+    Compose,
     Activations,
     AsDiscrete,
     EnsureType,
