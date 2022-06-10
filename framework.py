@@ -796,9 +796,9 @@ class Centralized():
                         out_test = global_model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
                         #out_test = out_test.detach().cpu().numpy()
                         #pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
-                        pred = self.post_pred(out_test[0,0,:,:]) #apply sigmoid then activate threshold
+                        pred = self.post_pred(out_test[0,0,:,:]).to(device) #apply sigmoid then activate threshold
                         cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
-                        dice_loss_indiv.append(loss_function(torch.tensor(pred), torch.tensor(test_vol_pxls[:,:,slice_selected])).item())
+                        dice_loss_indiv.append(loss_function(torch.tensor(pred), torch.tensor(test_vol_pxls[:,:,slice_selected]).to(device)).item())
                     #average per validation volume
                     test_dicemetric.append(dice_metric.aggregate().item())
                     dice_loss += np.mean(dice_loss_indiv)
@@ -874,8 +874,8 @@ class Centralized():
                     out_test = model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
                     #out_test = out_test.detach().cpu().numpy()
                     #pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
-                    pred = self.post_pred(out_test[0,0,:,:]) #apply sigmoid then activate threshold
-                    cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
+                    pred = self.post_pred(out_test[0,0,:,:]).to(device) #apply sigmoid then activate threshold
+                    cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]).to(device),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
                     pred_holder.append(pred)
 
                 nib.save(nib.Nifti1Image(np.stack(pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4], path_test_case.split("/")[-1].replace("adc", "segpred")))
