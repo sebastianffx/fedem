@@ -112,8 +112,8 @@ def check_dataset(path, number_site, dim=(144,144,42), delete=True):
         # pad them with zeros? instead of deleting them?
 
 if __name__ == '__main__':
-    path = 'astral_fedem_dti_purged/'
-    #path = 'astral_fedem_dti/'
+    #path = 'astral_fedem_dti_purged/'
+    path = 'astral_fedem_dti/'
     #path = 'astral_fedem_v3/'
     modality="ADC"
 
@@ -121,7 +121,7 @@ if __name__ == '__main__':
     number_site=len(clients)
 
     default = {"g_epoch":50,
-               "l_epoch":10,
+               "l_epoch":20,
                "g_lr":0.01,
                "l_lr":0.0001,
                "K":len(clients),
@@ -137,7 +137,7 @@ if __name__ == '__main__':
     networks_config = []
     networks_name = []
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    for lr in [0.005, 0.009, 0.01, 0.05]:
+    for lr in [0.00001, 0.0001,0.0005, 0.001, 0.005, 0.01]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr})
         networks_config.append(tmp)
