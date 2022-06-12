@@ -125,7 +125,7 @@ def dataPreprocessing(path, modality, number_site, size_crop=224, nested=True):
             ScaleIntensity(minv=0.0, maxv=1), #indicate the range in which you want the output to be
             AddChannel(),
             #RandRotate90(prob=0.5, spatial_axes=[0, 1]), this rotation is too extreme, does not reflect natural situations
-            RandRotate(range_x=0.4, prob=0.2, padding_mode="zeros"),
+            RandRotate(range_x=0.4, prob=0.2, padding_mode="zeros", mode="nearest"), #bilinear interpolation go keep things smooths
             RandSpatialCrop((size_crop, size_crop, 1), random_size=False), #used to sample a single slice
             EnsureType(),
             #Resized
@@ -137,7 +137,7 @@ def dataPreprocessing(path, modality, number_site, size_crop=224, nested=True):
         [   LoadImage(image_only=True),
             AddChannel(),
             #RandRotate90(prob=0.5, spatial_axes=[0, 1]),
-            RandRotate(range_x=0.4, prob=0.2, padding_mode="zeros"),
+            RandRotate(range_x=0.4, prob=0.2, padding_mode="zeros", mode="nearest"), #nearest to make sure the labels remain dicrete
             RandSpatialCrop((size_crop, size_crop, 1), random_size=False),
             EnsureType(),
             #Resized
