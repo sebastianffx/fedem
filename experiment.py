@@ -96,7 +96,7 @@ def check_volume(path, dim, thres_neg_val=-1e-6, thres_lesion_vol=10):
             print(path+f, "contains NaN")
 
         #check segmentation labels
-        if "mask." in f:
+        if "msk." in f:
             if tmp.sum() < thres_lesion_vol:
                 print(path+f, "lesion volume is smaller than 10")
                 bad_files.append(path+f)
