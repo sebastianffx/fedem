@@ -1,5 +1,7 @@
-from glob import glob
+import os
 import torch
+import nibabel as nb
+from glob import glob
 from monai.data import (
     ArrayDataset,
     GridPatchDataset,
@@ -226,3 +228,48 @@ def generate_loaders(partitions_paths, transfo, batch_size):
     )
 
     return centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader
+
+def check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=10):
+    bad_dim_files = []
+    for i in range(1,number_site+1):
+        
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/train/", dim, thres_neg_val=thres_neg_val, thres_lesion_vol=thres_lesion_vol)
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/valid/", dim, thres_neg_val=thres_neg_val, thres_lesion_vol=thres_lesion_vol)
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/test/", dim, thres_neg_val=thres_neg_val, thres_lesion_vol=thres_lesion_vol)
+
+    if delete:
+        #remove duplicates
+        for f in list(set(bad_dim_files)):
+            os.remove(f)
+    else:
+        print("TBD")
+        # pad them with zeros? instead of deleting them?
+
+def check_volume(path, dim, thres_neg_val=-1e-6, thres_lesion_vol=10):
+    bad_files = []
+    files_name=os.listdir(path)
+    for f in files_name:
+        tmp= nb.load(path+f).get_fdata()
+        #check dimensions
+        tmp_shape = tmp.shape
+        if tmp_shape != dim:
+            bad_files.append(path+f)
+            print(path+f, tmp_shape)
+        #check the negatives values
+        if tmp.min()<thres_neg_val:
+            print(path+f, "contains negative value")
+        #check nans
+        if np.isnan(tmp).sum() > 0:
+            print(path+f, "contains NaN")
+
+        #check segmentation labels
+        if "msk." in f:
+            if tmp.sum() < thres_lesion_vol:
+                print(path+f, f"lesion volume is smaller than {thres_lesion_vol}")
+                #remove the mask
+                bad_files.append(path+f)
+                #remove the associated map
+                bad_files.append(path+f.replace("msk.", "adc."))
+        #TODO: count the number of connected components?
+
+    return bad_files
