@@ -1,5 +1,6 @@
 import os
 import torch
+import numpy as np
 import nibabel as nb
 from glob import glob
 from monai.data import (
