@@ -69,9 +69,9 @@ def check_dataset(path, number_site, dim=(144,144,42), delete=True):
     bad_dim_files = []
     for i in range(1,number_site+1):
         
-        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/train/", dim, threshold=1e-6)
-        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/valid/", dim, threshold=1e-6)
-        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/test/", dim, threshold=1e-6)
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/train/", dim, thres_neg_val=-1e-6, thres_lesion_vol=10)
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/valid/", dim, thres_neg_val=-1e-6, thres_lesion_vol=10)
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/test/", dim, thres_neg_val=-1e-6, thres_lesion_vol=10)
 
     if delete:
         for f in bad_dim_files:
@@ -80,7 +80,7 @@ def check_dataset(path, number_site, dim=(144,144,42), delete=True):
         print("TBD")
         # pad them with zeros? instead of deleting them?
 
-def check_volume(path, dim, threshold=1e-6):
+def check_volume(path, dim, thres_neg_val=-1e-6, thres_lesion_vol=10):
     bad_files = []
     files_name=os.listdir(path)
     for f in files_name:
@@ -91,7 +91,7 @@ def check_volume(path, dim, threshold=1e-6):
             bad_files.append(path+f)
             print(path+f, tmp_shape)
         #check the negatives values
-        if tmp.min()<-1e-6:
+        if tmp.min()<thres_neg_val:
             print(path+f, "contains negative value")
         #check nans
         if np.isnan(tmp).sum() > 0:
@@ -99,9 +99,9 @@ def check_volume(path, dim, threshold=1e-6):
 
         #check segmentation labels
         if "mask." in f:
-            if tmp.sum() < 10:
+            if tmp.sum() < thres_lesion_vol:
                 print(path+f, "lesion volume is smaller than 10")
-            #TODO: count the number of connected components?
+        #TODO: count the number of connected components?
 
     return bad_files
 
