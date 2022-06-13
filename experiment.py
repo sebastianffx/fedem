@@ -63,13 +63,13 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
     return tmp_valid, tmp_test
 
-def check_dataset(path, number_site, dim=(144,144,42), delete=True):
+def check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=10):
     bad_dim_files = []
     for i in range(1,number_site+1):
         
-        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/train/", dim, thres_neg_val=-1e-6, thres_lesion_vol=10)
-        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/valid/", dim, thres_neg_val=-1e-6, thres_lesion_vol=10)
-        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/test/", dim, thres_neg_val=-1e-6, thres_lesion_vol=10)
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/train/", dim, thres_neg_val=thres_neg_val, thres_lesion_vol=thres_lesion_vol)
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/valid/", dim, thres_neg_val=thres_neg_val, thres_lesion_vol=thres_lesion_vol)
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/test/", dim, thres_neg_val=thres_neg_val, thres_lesion_vol=thres_lesion_vol)
 
     if delete:
         for f in bad_dim_files:
@@ -99,6 +99,7 @@ def check_volume(path, dim, thres_neg_val=-1e-6, thres_lesion_vol=10):
         if "mask." in f:
             if tmp.sum() < thres_lesion_vol:
                 print(path+f, "lesion volume is smaller than 10")
+                bad_files.append(path+f)
         #TODO: count the number of connected components?
 
     return bad_files

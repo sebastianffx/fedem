@@ -686,7 +686,8 @@ class Centralized(Fedem):
                     nib.save(nib.Nifti1Image(test_pred[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_postpred.nii.gz"))
                     nib.save(nib.Nifti1Image(y_pred_generic[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_rawpred.nii.gz"))
                     nib.save(nib.Nifti1Image(labels[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_label.nii.gz"))
-
+            
+            #aggregate makes the average of the values, nan are ignored.
             print("training dice SCORE : {:.4f}".format(dice_metric.aggregate().item()))
             self.writer.add_scalar('avg training dice score', dice_metric.aggregate().item(), cur_epoch)
             print("training dice LOSS : {:.4f}".format(epoch_loss/step))
@@ -720,7 +721,7 @@ class Centralized(Fedem):
                 self.writer.add_scalar('avg validation loss', epoch_valid_dice_loss, cur_epoch)
 
         ## DEBUG: save the prediction for the training set
-        self.full_volume_metric(dataset="training", network="self", save_pred=True)
+        #self.full_volume_metric(dataset="training", network="self", save_pred=True)
         return self.nn
 
 #optimizer
