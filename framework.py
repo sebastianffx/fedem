@@ -716,7 +716,7 @@ class Centralized(Fedem):
                 self.writer.add_scalar("avg validation dice score", epoch_valid_dice_score, cur_epoch)
 
                 print("validation dice LOSS: {:.4f} best val. mean loss: {:.4f} at epoch {}".format(
-                    epoch_valid_dice_loss, best_metric, best_metric_epoch)
+                    epoch_valid_dice_loss, best_loss, best_metric_epoch)
                      )
                 self.writer.add_scalar('avg validation loss', epoch_valid_dice_loss, cur_epoch)
 
