@@ -155,8 +155,13 @@ class Fedem:
             checkpoint = torch.load(model_path)
             #deep copy of the model, prevent overwritting of the current model model
             model = copy.deepcopy(self.nn).load_state_dict(checkpoint)
-        else:
+        elif network=="self":
             model = self.nn
+        else:
+            print("network weights to load are unclear")
+            model = None
+            return None
+
         model.eval()
 
         os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
