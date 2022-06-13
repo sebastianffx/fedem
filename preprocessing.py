@@ -56,17 +56,20 @@ def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
     #print(len(partitions_paths_center[0][2]))
     #print(len(partitions_paths_center[1][2]))
     
-    center_ds_train = ArrayDataset(partitions_paths_center[0][0], transfo['imtrans'], partitions_paths_center[1][0], transfo['segtrans'])
+    center_ds_train = ArrayDataset(partitions_paths_center[0][0], transfo['imtrans'],
+                                   partitions_paths_center[1][0], transfo['segtrans'])
     center_train_loader = torch.utils.data.DataLoader(
     	center_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
     	)
 
-    center_ds_valid = ArrayDataset(partitions_paths_center[0][1], transfo['imtrans'], partitions_paths_center[1][1], transfo['segtrans'])
+    center_ds_valid = ArrayDataset(partitions_paths_center[0][1], transfo['imtrans'],
+                                   partitions_paths_center[1][1], transfo['segtrans'])
     center_valid_loader = torch.utils.data.DataLoader(
     	center_ds_valid, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
     	)
 
-    center_ds_test = ArrayDataset(partitions_paths_center[0][2], transfo['imtrans_test'], partitions_paths_center[1][2], transfo['segtrans_test'])
+    center_ds_test = ArrayDataset(partitions_paths_center[0][2], transfo['imtrans_test'],
+                                  partitions_paths_center[1][2], transfo['segtrans_test'])
     center_test_loader = torch.utils.data.DataLoader(
         center_ds_test, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
     	)
@@ -120,7 +123,7 @@ def dataPreprocessing(path, modality, number_site, size_crop=224, nested=True):
     transfo['debug']=debug
     ###
 
-    imtrans = Compose(
+    transfo['imtrans']= Compose(
         [   LoadImage(image_only=True),
             ScaleIntensity(minv=0.0, maxv=1), #indicate the range in which you want the output to be
             AddChannel(),
@@ -131,9 +134,8 @@ def dataPreprocessing(path, modality, number_site, size_crop=224, nested=True):
             #Resized
         ]
     )
-    transfo['imtrans']=imtrans
 
-    segtrans = Compose(
+    transfo['segtrans']= Compose(
         [   LoadImage(image_only=True),
             AddChannel(),
             #RandRotate90(prob=0.5, spatial_axes=[0, 1]),
@@ -143,14 +145,11 @@ def dataPreprocessing(path, modality, number_site, size_crop=224, nested=True):
             #Resized
         ]
     )
-    transfo['segtrans']=segtrans
 
-
-
-    imtrans_neutral = Compose(
+    transfo['imtrans_neutral']= Compose(
         [   LoadImage(image_only=True),
             #RandScaleIntensity( factors=0.1, prob=0.5),
-            ScaleIntensity(minv=0.0, maxv=max_intensity),
+            ScaleIntensity(minv=0.0, maxv=1),
             AddChannel(),
             RandSpatialCrop((size_crop, size_crop,1), random_size=False),
             EnsureType(),
@@ -158,9 +157,7 @@ def dataPreprocessing(path, modality, number_site, size_crop=224, nested=True):
         ]
     )
 
-    transfo['imtrans_neutral']=imtrans_neutral
-
-    segtrans_neutral = Compose(
+    transfo['segtrans_neutral']= Compose(
         [   LoadImage(image_only=True),
             AddChannel(),
             RandSpatialCrop((size_crop, size_crop,1), random_size=False),
@@ -168,20 +165,18 @@ def dataPreprocessing(path, modality, number_site, size_crop=224, nested=True):
             #Resized
         ]
     )
-    transfo['segtrans_neutral']=segtrans_neutral
 
-    imtrans_test = Compose(
+    transfo['imtrans_test']= Compose(
         [   LoadImage(image_only=True),
-            ScaleIntensity(minv=0.0, maxv=max_intensity),
+            ScaleIntensity(minv=0.0, maxv=1),
             AddChannel(),
             #RandSpatialCrop((size_crop, size_crop,1), random_size=False), In test we would like to process ALL slices
             EnsureType(),
             #Resized
         ]
     )
-    transfo['imtrans_test']=imtrans_test
 
-    segtrans_test = Compose(
+    transfo['segtrans_test']= Compose(
         [   LoadImage(image_only=True),
             AddChannel(),
             #RandSpatialCrop((size_crop, size_crop,1), random_size=False),
@@ -189,9 +184,6 @@ def dataPreprocessing(path, modality, number_site, size_crop=224, nested=True):
             #Resized
         ]
     )
-    transfo['segtrans_test']=segtrans_test
-
-    ## TODO: add transformation which doesn't crop just one slice for global validation and global test.
 
     partitions_paths = get_train_valid_test_partitions(path, modality, number_site, nested)
 
@@ -218,7 +210,7 @@ def generate_loaders(partitions_paths, transfo, batch_size):
     partitions_test_lbls = [partitions_paths[i][1][2] for i in range(len(partitions_paths))]
 
     #For selecting the model and testing in the heldout partition we collect the valid and test data from ALL centers
-    all_ds_test = ArrayDataset([i for l in partitions_test_imgs for i in l], transfo['imtrans'],
+    all_ds_test = ArrayDataset([i for l in partitions_test_imgs for i in l], transfo['imtrans'], #in the future, should use imtrans_test
                                [i for l in partitions_test_lbls for i in l], transfo['segtrans'])
     all_test_loader   = torch.utils.data.DataLoader(
         all_ds_test, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available()
@@ -227,7 +219,7 @@ def generate_loaders(partitions_paths, transfo, batch_size):
     partitions_valid_imgs = [partitions_paths[i][0][1] for i in range(len(partitions_paths))]
     partitions_valid_lbls = [partitions_paths[i][1][1] for i in range(len(partitions_paths))]
 
-    all_ds_valid = ArrayDataset([i for l in partitions_valid_imgs for i in l], transfo['imtrans'],
+    all_ds_valid = ArrayDataset([i for l in partitions_valid_imgs for i in l], transfo['imtrans'], #in the future, should use imtrans_test
                                 [i for l in partitions_valid_lbls for i in l], transfo['segtrans'])
     all_valid_loader   = torch.utils.data.DataLoader(
         all_ds_valid, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available()
