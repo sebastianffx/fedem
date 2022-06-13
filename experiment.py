@@ -99,14 +99,18 @@ def check_volume(path, dim, thres_neg_val=-1e-6, thres_lesion_vol=10):
         if "msk." in f:
             if tmp.sum() < thres_lesion_vol:
                 print(path+f, "lesion volume is smaller than 10")
+                #remove the mask
                 bad_files.append(path+f)
+                #remove the associated map
+                bad_files.append(path+f.replace("msk.", "adc."))
         #TODO: count the number of connected components?
 
     return bad_files
 
 if __name__ == '__main__':
     #path = 'astral_fedem_dti_purged/'
-    path = 'astral_fedem_dti/'
+    #path = 'astral_fedem_dti/'
+    path = 'astral_fedem_dti_noempty/'
     #path = 'astral_fedem_v3/'
     modality="ADC"
 
@@ -130,7 +134,7 @@ if __name__ == '__main__':
     networks_config = []
     networks_name = []
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    for lr in [0.00001, 0.0001,0.0005, 0.001, 0.005, 0.01]:
+    for lr in [0.0001, 0.001]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr})
         networks_config.append(tmp)
@@ -156,7 +160,7 @@ if __name__ == '__main__':
                                                 num_repetitions=1,
                                                 networks_config=networks_config,
                                                 networks_name=networks_name,
-                                                exp_name="test_astral_2",
+                                                exp_name="astral_no_empty_mask",
                                                 modality=modality,
                                                 number_site=number_site,
                                                 batch_size=default["batch_size"],
