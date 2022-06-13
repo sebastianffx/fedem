@@ -129,7 +129,7 @@ if __name__ == '__main__':
                "batch_size":8
                }
 
-    #check_dataset(path, number_site, dim=(144,144,42))
+    check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=5)
 
     networks_config = []
     networks_name = []
