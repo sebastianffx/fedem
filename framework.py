@@ -631,9 +631,6 @@ class Centralized(Fedem):
                             num_res_units=2,
                             name='centralized').to(device)
 
-        self.partitions_paths = options["partitions_paths"]
-        self.options = options
-
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 
     #overwrite the superclass method since there are no client models
