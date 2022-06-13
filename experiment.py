@@ -72,7 +72,8 @@ def check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_va
         bad_dim_files += check_volume("./"+path+"center"+str(i)+"/test/", dim, thres_neg_val=thres_neg_val, thres_lesion_vol=thres_lesion_vol)
 
     if delete:
-        for f in bad_dim_files:
+        #remove duplicates
+        for f in list(set(bad_dim_files)):
             os.remove(f)
     else:
         print("TBD")
