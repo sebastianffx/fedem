@@ -48,10 +48,8 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             #train the network, each batch contain one ranodm slice for each subject
             network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'])
 
-            #compute valid dice metric of full volume
+            # compute validation and test dice loss/score using full volume (instead of slice-wise) and the best possible model
             valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best", save_pred=True)[0])
-
-            #compute test dice metric of full volume
             test_dicemetric.append(network.full_volume_metric(dataset="test", network="best", save_pred=True)[0])
 
         tmp_valid.append(valid_dicemetric)
