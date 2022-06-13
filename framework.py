@@ -132,6 +132,9 @@ class Fedem:
 
             network : if "best", the best model (dice loss on validation set) will be loaded and overwrite the current model
         """
+        if save_pred:
+            os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
+
         if dataset=="test":
             idx_partition = 2
         elif dataset=="valid":
@@ -163,8 +166,6 @@ class Fedem:
             return None
 
         model.eval()
-
-        os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
 
         loss_function = monai.losses.DiceLoss(sigmoid=True)
 
