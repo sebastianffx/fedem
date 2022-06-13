@@ -65,6 +65,8 @@ if __name__ == '__main__':
     #path = 'astral_fedem_dti/'
     path = 'astral_fedem_dti_noempty/'
     #path = 'astral_fedem_v3/'
+
+    experience_name = "astral_no_empty_mask"
     modality="ADC"
 
     clients=["center1", "center2", "center3"]
@@ -91,7 +93,7 @@ if __name__ == '__main__':
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr})
         networks_config.append(tmp)
-        networks_name.append(f"CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
+        networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
 
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
@@ -113,7 +115,7 @@ if __name__ == '__main__':
                                                 num_repetitions=1,
                                                 networks_config=networks_config,
                                                 networks_name=networks_name,
-                                                exp_name="astral_no_empty_mask",
+                                                exp_name=experience_name,
                                                 modality=modality,
                                                 number_site=number_site,
                                                 batch_size=default["batch_size"],
