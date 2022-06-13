@@ -68,41 +68,10 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 def check_dataset(path, number_site, dim=(144,144,42), delete=True):
     bad_dim_files = []
     for i in range(1,number_site+1):
-        files_name=os.listdir("./"+path+"center"+str(i)+"/train/")
-        for f in files_name:
-            tmp= nb.load("./"+path+"center"+str(i)+"/train/"+f).get_fdata()
-            tmp_shape = tmp.shape
-            if tmp_shape != dim:
-                bad_dim_files.append("./"+path+"center"+str(i)+"/train/"+f)
-                print("./"+path+"center"+str(i)+"/train/"+f, tmp_shape)
-            if tmp.min()<-1e-6:
-                print("./"+path+"center"+str(i)+"/train/"+f, "contains negative value")
-            if np.isnan(tmp).sum() > 0:
-                print("./"+path+"center"+str(i)+"/train/"+f, "contains NaN")
-
-        files_name=os.listdir("./"+path+"center"+str(i)+"/valid/")
-        for f in files_name:
-            tmp= nb.load("./"+path+"center"+str(i)+"/valid/"+f).get_fdata()
-            tmp_shape = tmp.shape
-            if tmp_shape != dim:
-                bad_dim_files.append("./"+path+"center"+str(i)+"/valid/"+f)
-                print("./"+path+"center"+str(i)+"/valid/"+f, tmp_shape)
-            if tmp.min()<-1e-6:
-                print("./"+path+"center"+str(i)+"/valid/"+f, "contains negative value")
-            if np.isnan(tmp).sum() > 0:
-                print("./"+path+"center"+str(i)+"/valid/"+f, "contains NaN")
-
-        files_name=os.listdir("./"+path+"center"+str(i)+"/test/")
-        for f in files_name:
-            tmp= nb.load("./"+path+"center"+str(i)+"/test/"+f).get_fdata()
-            tmp_shape = tmp.shape
-            if tmp_shape != dim:
-                bad_dim_files.append("./"+path+"center"+str(i)+"/test/"+f)
-                print("./"+path+"center"+str(i)+"/test/"+f, tmp_shape)
-            if tmp.min()<-1e-6:
-                print("./"+path+"center"+str(i)+"/test/"+f, "contains negative value")
-            if np.isnan(tmp).sum() > 0:
-                print("./"+path+"center"+str(i)+"/test/"+f, "contains NaN")
+        
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/train/", dim, threshold=1e-6)
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/valid/", dim, threshold=1e-6)
+        bad_dim_files += check_volume("./"+path+"center"+str(i)+"/test/", dim, threshold=1e-6)
 
     if delete:
         for f in bad_dim_files:
@@ -110,6 +79,31 @@ def check_dataset(path, number_site, dim=(144,144,42), delete=True):
     else:
         print("TBD")
         # pad them with zeros? instead of deleting them?
+
+def check_volume(path, dim, threshold=1e-6):
+    bad_files = []
+    files_name=os.listdir(path)
+    for f in files_name:
+        tmp= nb.load(path+f).get_fdata()
+        #check dimensions
+        tmp_shape = tmp.shape
+        if tmp_shape != dim:
+            bad_files.append(path+f)
+            print(path+f, tmp_shape)
+        #check the negatives values
+        if tmp.min()<-1e-6:
+            print(path+f, "contains negative value")
+        #check nans
+        if np.isnan(tmp).sum() > 0:
+            print(path+f, "contains NaN")
+
+        #check segmentation labels
+        if "mask." in f:
+            if tmp.sum() < 10:
+                print(path+f, "lesion volume is smaller than 10")
+            #TODO: count the number of connected components?
+
+    return bad_files
 
 if __name__ == '__main__':
     #path = 'astral_fedem_dti_purged/'
