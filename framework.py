@@ -25,36 +25,44 @@ from monai.transforms import (
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
 
-print(device)
+print(f"Using {device} as backend")
 
 class Fedem:
     def __init__(self, options):
         self.partitions_paths = options["partitions_paths"]
         self.options = options
 
+        #routine to convert U-Net output to segmentation mask
         self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
 
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
         metric_values = list()
         best_metric = -1
+        best_loss = 1e5
         best_metric_epoch = -1
         index = [0,1,2]
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
 
+            #recreate the dataloader at each epoch to resample the slices and apply the data augmentation
             self.dataloaders, _, _, _ = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
 
             # dispatch
-            
             self.dispatch(index)
             # local updating
             self.client_update(index, local_epoch, local_lr, cur_epoch)
             # aggregation
             self.aggregation(index, global_lr)
 
-            #Evaluation on validation and saving model if needed
+            #Evaluation on validation (full volume) and saving model if needed
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
-                best_metric,best_metric_epoch = self.global_validation_cycle(index,metric_values,cur_epoch,best_metric,best_metric_epoch)
+                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False)
+                if epoch_valid_dice_loss < best_loss: #using loss as benchmark value since the dice score is not reliable for the empty label mask
+                    best_loss = epoch_valid_dice_loss
+                    best_metric_epoch = cur_epoch+1
+
+                    torch.save(self.nn.state_dict(), self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth')
+                    print("saved new best metric model (according to DICE LOSS)")
         return self.nn
 
     def validation(self,index):        
@@ -88,6 +96,7 @@ class Fedem:
             print("Loading model weights: ")
             print(model_path)
             checkpoint = torch.load(model_path)
+            #carefull, this overwrite the current model
             model.load_state_dict(checkpoint)
 
         model.eval()
@@ -99,8 +108,8 @@ class Fedem:
                 #print(test_data[0].shape)
                 test_img, test_label = test_data[0][:,:,:,:,0].to(device), test_data[1][:,:,:,:,0].to(device)
                 test_pred = model(test_img)
-                #what is the purpose of the line below?
-                test_pred = test_pred>0.9 #This assumes one slice in the last dim
+                #apply sigmoid and thresholding to convert U-Net output to segmentation mask
+                test_pred = self.post_pred(test_pred) #This assumes one slice in the last dim
                 dice_metric(y_pred=test_pred, y=test_label)
 
         # aggregate the final mean dice result
@@ -118,87 +127,42 @@ class Fedem:
     def train():
         raise NotImplementedError
     
-    def global_validation_cycle(self,index,metric_values,cur_epoch, best_metric,best_metric_epoch):
-        partitions_valid_imgs = [self.options['partitions_paths'][i][0][1] for i in range(len(self.options['partitions_paths']))]
-        partitions_valid_lbls = [self.options['partitions_paths'][i][1][1] for i in range(len(self.options['partitions_paths']))]
-        all_valid_paths  = list(itertools.chain.from_iterable(partitions_valid_imgs))
-        all_valid_labels = list(itertools.chain.from_iterable(partitions_valid_lbls))
-        pred = []
-        y = []
-        dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
-        writer = self.writer
-        global_model = self.nn
-        metric = 0
-        global_model.eval()
-        test_dicemetric = []
+    def full_volume_metric(self, dataset, network="best", save_pred=False):
+        """ Compute test metric for full volume of the test set
 
-        dice_metric.reset()
-        if self.options['modality'] =='CBF':
-            max_intensity = 1200
-        if self.options['modality'] =='CBV':
-            max_intensity = 200
-        if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
-            max_intensity = 30
-        if self.options['modality'] =='ADC':
-            max_intensity = 4000
+            network : if "best", the best model (dice loss on validation set) will be loaded and overwrite the current model
+        """
+        if dataset=="test":
+            idx_partition = 2
+        elif dataset=="valid":
+            idx_partition = 1
+        elif dataset=="train":
+            idx_partition = 0
+        else:
+            print("invalid dataset type, possible value are train, valid and test")
+            return -1
 
-        for path_test_case, path_test_label in zip(all_valid_paths,all_valid_labels):            
-            test_vol = nib.load(path_test_case)
-            test_lbl = nib.load(path_test_label)
+        #aggregate the images accross the sites
+        partitions_imgs = [self.options['partitions_paths'][i][0][idx_partition] for i in range(len(self.options['partitions_paths']))]
+        partitions_lbls = [self.options['partitions_paths'][i][1][idx_partition] for i in range(len(self.options['partitions_paths']))]
+        all_paths  = list(itertools.chain.from_iterable(partitions_imgs))
+        all_labels = list(itertools.chain.from_iterable(partitions_lbls))
 
-            test_vol_pxls = test_vol.get_fdata()
-            test_vol_pxls = np.array(test_vol_pxls, dtype = np.float32)
-            test_lbl_pxls = test_lbl.get_fdata()
-            test_lbl_pxls = np.array(test_lbl_pxls)
-            test_vol_pxls = (test_vol_pxls - 0) / (max_intensity - 0) 
-            
-            dices_volume =[]
-            with torch.no_grad():
-                for slice_selected in range(test_vol_pxls.shape[-1]):
-                    out_test = global_model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
-                    out_test = out_test.detach().cpu().numpy()
-                    pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
-                    cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))                
-                test_dicemetric.append(dice_metric.aggregate().item())
-            # reset the status for next computation round
-            dice_metric.reset()
-        metric = np.mean(test_dicemetric)
-        metric_values.append(metric)             
-        if metric > best_metric:
-            best_metric = metric
-            best_metric_epoch = cur_epoch
-            torch.save(global_model.state_dict(), self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth')
-            print("saved new best metric model")
-        print(
-            "current epoch: {} current mean dice: {:.4f} best mean dice: {:.4f} at epoch {}".format(
-                cur_epoch +1, metric, best_metric, best_metric_epoch
-            )
-        )
-        writer.add_scalar("val_mean_dice", metric, cur_epoch)
-        return best_metric, best_metric_epoch
-
-    def global_test_cycle(self):                    
-        partitions_test_imgs = [self.options['partitions_paths'][i][0][2] for i in range(len(self.options['partitions_paths']))]
-        partitions_test_lbls = [self.options['partitions_paths'][i][1][2] for i in range(len(self.options['partitions_paths']))]
-        all_test_paths  = list(itertools.chain.from_iterable(partitions_test_imgs))
-        all_test_labels = list(itertools.chain.from_iterable(partitions_test_lbls))
-        
-
-        print("Loading best validation model weights: ")
-        model_path = self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
-        print(model_path)
-        checkpoint = torch.load(model_path)
-        self.nn.load_state_dict(checkpoint)
-        model = self.nn
+        if network=="best":
+            print("Loading best validation model weights: ")
+            model_path = self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
+            print(model_path)
+            checkpoint = torch.load(model_path)
+            #deep copy of the model, prevent overwritting of the current model model
+            model = copy.deepcopy(self.nn).load_state_dict(checkpoint)
+        else:
+            model = self.nn
+        model.eval()
 
         os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
 
-        pred = []
-        test_dicemetric = []
-        y = []
-        dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+        loss_function = monai.losses.DiceLoss(sigmoid=True)
 
-        dice_metric.reset()
         if self.options['modality'] =='CBF':
             max_intensity = 1200
         if self.options['modality'] =='CBV':
@@ -208,35 +172,59 @@ class Fedem:
         if self.options['modality'] =='ADC':
             max_intensity = 4000
 
-        for path_test_case, path_test_label in zip(all_test_paths,all_test_labels):            
-            test_vol = nib.load(path_test_case)
-            test_lbl = nib.load(path_test_label)
+        holder_dicemetric = []
+        holder_diceloss = []
+        dice_metric.reset()
+        for path_case, path_label in zip(all_paths,all_labels): #should be improved by using the dataloader      
+            vol = nib.load(path_case)
+            lbl = nib.load(path_label)
 
-            vol_affine = test_vol.affine
+            vol_affine = vol.affine
 
-            test_vol_pxls = test_vol.get_fdata()
-            test_vol_pxls = np.array(test_vol_pxls, dtype = np.float32)
-            test_lbl_pxls = test_lbl.get_fdata()
-            test_lbl_pxls = np.array(test_lbl_pxls)
+            vol_pxls = vol.get_fdata()
+            vol_pxls = np.array(vol_pxls, dtype = np.float32)
+            lbl_pxls = lbl.get_fdata()
+            lbl_pxls = np.array(lbl_pxls)
 
-            test_vol_pxls = (test_vol_pxls - 0) / (max_intensity - 0)
+            vol_pxls = (vol_pxls - 0) / (max_intensity - 0)
 
-            pred_holder = []
-            for slice_selected in range(test_vol_pxls.shape[-1]):
-                out_test = model(torch.tensor(test_vol_pxls[np.newaxis, np.newaxis, :,:,slice_selected]).to(device))
-                out_test = out_test.detach().cpu().numpy()
-                pred = np.array(out_test[0,0,:,:]>0.9, dtype='uint8')
-                cur_dice_metric = dice_metric(torch.tensor(pred[np.newaxis,np.newaxis,:,:]),torch.tensor(test_lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]))
-                
-                pred_holder.append(pred)
-            nib.save(nib.Nifti1Image(np.stack(pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"]+"_"+model_path[:-4], path_test_case.split("/")[-1].replace("adc", "segpred")))
+            raw_pred_holder = []
+            post_pred_holder = []
+            loss_volume= []
+            for slice_selected in range(vol_pxls.shape[-1]):
+                out = model(torch.tensor(vol_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
 
-            test_dicemetric.append(dice_metric.aggregate().item())
+                #compute loss between output and label (loss function applies the sigmoid function itself)
+                loss_volume.append(loss_function(input=out,
+                                                 target=torch.tensor(lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device)
+                                                ).item()
+                                  )
+
+                #saving the raw output of the network
+                raw_pred_holder.append(out[0,0,:,:].detach().cpu().numpy())
+                #apply sigmoid then activation threshold to obtain a discrete segmentation mask
+                pred = self.post_pred(out)
+                #compute dice score between the processed prediction and the labels
+                dice_metric(pred,torch.tensor(lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
+                #save the prediction slice to rebuild a 3D prediction volume
+                post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
+
+            if save_pred:
+                nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "raw_segpred")))
+                nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred")))
+            
+            #retain each volume scores (dice loss and dice score)
+            holder_diceloss.append(np.mean(loss_volume)) #average per volume
+            holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
             # reset the status for next computation round
             dice_metric.reset()
-        print("Global model test DICE for all slices: ")
-        print(np.mean(test_dicemetric))
-        return(np.mean(test_dicemetric))
+
+        assert(len(all_labels) == len(holder_diceloss) and len(all_labels) == len(holder_dicemetric))
+
+        #print average over all the volumes
+        print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
+        print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
+        return np.mean(holder_dicemetric), np.mean(holder_diceloss)
 
 class FedAvg(Fedem):
     def __init__(self, options):
@@ -297,7 +285,7 @@ class FedAvg(Fedem):
         ann.train()
         ann.len = len(dataloader_train)
                 
-        loss_function = monai.losses.DiceLoss(sigmoid=False, include_background=False)
+        loss_function = monai.losses.DiceLoss(sigmoid=True)
         optimizer = Adam(ann.parameters(), local_lr)
 
         for epoch in range(local_epoch):
@@ -375,7 +363,7 @@ class Scaffold(Fedem):
         ann.len = len(dataloader_train)
                 
         x = copy.deepcopy(ann)
-        loss_function = monai.losses.DiceLoss(sigmoid=False,include_background=False)
+        loss_function = monai.losses.DiceLoss(sigmoid=True)
         optimizer = ScaffoldOptimizer(ann.parameters(), lr=local_lr, weight_decay=1e-4)
 
         for epoch in range(local_epoch):
@@ -551,7 +539,7 @@ class FedRod(Fedem):
         ann.train()
         ann.len = len(dataloader_train)
                 
-        loss_function = monai.losses.DiceLoss(sigmoid=False,include_background=False)
+        loss_function = monai.losses.DiceLoss(sigmoid=True)
 
         optimizer = torch.optim.Adam(ann.parameters(), lr=local_lr)
         loss_generic = loss_function(torch.tensor(np.zeros((1,10))), torch.tensor(np.zeros((1,10))))
@@ -631,24 +619,9 @@ class FedRod(Fedem):
         print("testing on all the data")
         test(model, aggreg_dataloader_test)
         
-
-#optimizer
-class ScaffoldOptimizer(Optimizer):
-    def __init__(self, params, lr, weight_decay):
-        defaults = dict(lr=lr, weight_decay=weight_decay)
-        super(ScaffoldOptimizer, self).__init__(params, defaults)
-
-    def step(self, server_controls, client_controls, closure=None):
-        for group in self.param_groups:
-            for p, c, ci in zip(group['params'], server_controls.values(), client_controls.values()):
-                if p.grad is None:
-                    continue
-                dp = p.grad.data + c.data - ci.data
-                #local learning rate
-                p.data = p.data - dp.data * group['lr']
-
-class Centralized():
+class Centralized(Fedem):
     def __init__(self, options):
+        super(Centralized, self).__init__(options)
         self.nn = UNet_custom(spatial_dims=2,
                             in_channels=1,
                             out_channels=1,
@@ -661,20 +634,15 @@ class Centralized():
         self.partitions_paths = options["partitions_paths"]
         self.options = options
 
-        #routine to convert U-Net output to segmentation mask
-        self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
-
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 
-
+    #overwrite the superclass method since there are no client models
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False):
         metric_values = list()
         best_metric = -1
         best_loss = 1e5
         best_metric_epoch = -1
         index = [0,1,2]
-
-        #_, _, _, all_train_loader = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
 
         #multiply global and local epoch to have similar conditions
         for cur_epoch in range(global_epoch*local_epoch):
@@ -752,134 +720,18 @@ class Centralized():
         ## DEBUG: save the prediction for the training set
         self.full_volume_metric(dataset="training", network="self", save_pred=True)
         return self.nn
-    
-    def test(self, dataloader_test, test=True, model_path=None):
-        """Compute Dice Score for single slice of the test set
-        """
-        model=self.nn
 
-        if model_path != None:
-            print("Loading model weights: ")
-            print(model_path)
-            checkpoint = torch.load(model_path)
-            model.load_state_dict(checkpoint)
+#optimizer
+class ScaffoldOptimizer(Optimizer):
+    def __init__(self, params, lr, weight_decay):
+        defaults = dict(lr=lr, weight_decay=weight_decay)
+        super(ScaffoldOptimizer, self).__init__(params, defaults)
 
-        model.eval()
-        pred = []
-        y = []
-        dice_metric.reset()
-        for test_data in dataloader_test:
-            with torch.no_grad():                
-                #print(test_data[0].shape)
-                test_img, test_label = test_data[0][:,:,:,:,0].to(device), test_data[1][:,:,:,:,0].to(device)
-                test_pred = model(test_img)
-
-                #apply sigmoid and threshold, since the loss function apply sigmoid to the output
-                test_pred = self.post_pred(test_pred)
-                dice_metric(y_pred=test_pred, y=test_label)
-
-        # aggregate the final mean dice result
-        metric = dice_metric.aggregate().item()
-        print('dice:', metric)
-        if test:
-            self.writer.add_scalar('test dice metric', metric)
-        else:
-            self.writer.add_scalar('validation dice metric', metric)
-        return metric
-
-    def full_volume_metric(self, dataset, network="best", save_pred=False):
-        """ Compute test metric for full volume of the test set
-
-            network : if None, the best model (dice score on validation set) will be loaded.
-        """
-        if dataset=="test":
-            idx_partition = 2
-        elif dataset=="valid":
-            idx_partition = 1
-        elif dataset=="train":
-            idx_partition = 0
-        else:
-            print("invalid dataset type, possible value are train, valid and test")
-            return -1
-
-        partitions_imgs = [self.options['partitions_paths'][i][0][idx_partition] for i in range(len(self.options['partitions_paths']))]
-        partitions_lbls = [self.options['partitions_paths'][i][1][idx_partition] for i in range(len(self.options['partitions_paths']))]
-        all_paths  = list(itertools.chain.from_iterable(partitions_imgs))
-        all_labels = list(itertools.chain.from_iterable(partitions_lbls))
-
-        if network=="best":
-            print("Loading best validation model weights: ")
-            model_path = self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
-            print(model_path)
-            checkpoint = torch.load(model_path)
-            self.nn.load_state_dict(checkpoint)
-
-        model = self.nn
-        model.eval()
-
-        os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
-
-        loss_function = monai.losses.DiceLoss(sigmoid=True)
-
-        if self.options['modality'] =='CBF':
-            max_intensity = 1200
-        if self.options['modality'] =='CBV':
-            max_intensity = 200
-        if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
-            max_intensity = 30
-        if self.options['modality'] =='ADC':
-            max_intensity = 4000
-
-        holder_dicemetric = []
-        holder_diceloss = []
-        dice_metric.reset()
-        for path_case, path_label in zip(all_paths,all_labels):            
-            vol = nib.load(path_case)
-            lbl = nib.load(path_label)
-
-            vol_affine = vol.affine
-
-            vol_pxls = vol.get_fdata()
-            vol_pxls = np.array(vol_pxls, dtype = np.float32)
-            lbl_pxls = lbl.get_fdata()
-            lbl_pxls = np.array(lbl_pxls)
-
-            vol_pxls = (vol_pxls - 0) / (max_intensity - 0)
-
-            raw_pred_holder = []
-            post_pred_holder = []
-            loss_volume= []
-            for slice_selected in range(vol_pxls.shape[-1]):
-                out = model(torch.tensor(vol_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
-
-                #compute loss between output and label (loss function applies the sigmoid function itself)
-                loss_volume.append(loss_function(input=out,
-                                                 target=torch.tensor(lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device)
-                                                ).item()
-                                  )
-
-                #saving the raw output of the network
-                raw_pred_holder.append(out[0,0,:,:].detach().cpu().numpy())
-                #apply sigmoid then activation threshold to obtain a discrete segmentation mask
-                pred = self.post_pred(out)
-                #compute dice score between the processed prediction and the labels
-                dice_metric(pred,torch.tensor(lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
-                #save the prediction slice to rebuild a 3D prediction volume
-                post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
-
-            if save_pred:
-                nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "raw_segpred")))
-                nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred")))
-            
-            #retain each volume scores (dice loss and dice score)
-            holder_diceloss.append(np.mean(loss_volume)) #average per volume
-            holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
-            # reset the status for next computation round
-            dice_metric.reset()
-
-        assert(len(all_labels) == len(holder_diceloss) and len(all_labels) == len(holder_dicemetric))
-
-        #print average over all the volumes
-        print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
-        print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
-        return np.mean(holder_dicemetric), np.mean(holder_diceloss)
+    def step(self, server_controls, client_controls, closure=None):
+        for group in self.param_groups:
+            for p, c, ci in zip(group['params'], server_controls.values(), client_controls.values()):
+                if p.grad is None:
+                    continue
+                dp = p.grad.data + c.data - ci.data
+                #local learning rate
+                p.data = p.data - dp.data * group['lr']
