@@ -151,18 +151,17 @@ class Fedem:
         all_paths  = list(itertools.chain.from_iterable(partitions_imgs))
         all_labels = list(itertools.chain.from_iterable(partitions_lbls))
 
+        model = self.nn
         if network=="best":
             print("Loading best validation model weights: ")
             model_path = self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
             print(model_path)
             checkpoint = torch.load(model_path)
-            #deep copy of the model, prevent overwritting of the current model model
-            model = copy.deepcopy(self.nn).load_state_dict(checkpoint)
+            model.load_state_dict(checkpoint)
         elif network=="self":
-            model = self.nn
+            print("Using current network weights")
         else:
-            print("network weights to load are unclear")
-            model = None
+            print("Network weights to load are unclear")
             return None
 
         model.eval()
