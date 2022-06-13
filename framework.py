@@ -701,7 +701,7 @@ class Centralized(Fedem):
                     best_metric_epoch = cur_epoch+1
 
                     torch.save(self.nn.state_dict(), self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth')
-                    print("saved new best metric model (according to DICE LOSS)")
+                    print("saved new best model (according to DICE LOSS)")
 
                 if epoch_valid_dice_score > best_metric:
                     best_metric = epoch_valid_dice_score
@@ -710,12 +710,12 @@ class Centralized(Fedem):
                         torch.save(self.nn.state_dict(), self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth')
                         print("saved new best model (according to DICE SCORE)")
 
-                print("validation dice SCORE : {:.4f}".format(
-                    epoch_valid_dice_score)
-                    )
+                print("validation dice SCORE : {:.4f}, best valid. dice SCORE: {:.4f} at epoch {}".format(
+                    epoch_valid_dice_score, best_metric, best_dicescore_epoch)
+                     )
                 self.writer.add_scalar("avg validation dice score", epoch_valid_dice_score, cur_epoch)
 
-                print("validation dice LOSS: {:.4f} best val. mean loss: {:.4f} at epoch {}".format(
+                print("validation dice LOSS: {:.4f} best valid. dice LOSS: {:.4f} at epoch {}".format(
                     epoch_valid_dice_loss, best_loss, best_metric_epoch)
                      )
                 self.writer.add_scalar('avg validation loss', epoch_valid_dice_loss, cur_epoch)
