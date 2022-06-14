@@ -143,6 +143,7 @@ if __name__ == '__main__':
                "clamp_min":0,
                "clamp_max":4000,
                "patch_size":(128,128,1),
+               "padding":(64,64,0),
                "max_queue_length":16,
                "patches_per_volume":4,
                }
