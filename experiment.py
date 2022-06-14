@@ -3,6 +3,10 @@ from preprocessing import dataPreprocessing, check_dataset
 from numpy import std, mean
 import numpy as np
 
+#hide the warnings from torchio, because affine matrices are different for each sample
+import warnings
+warnings.filterwarnings("ignore")
+
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
                   number_site=3, size_crop=100, nested=True):
 
