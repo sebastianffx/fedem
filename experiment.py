@@ -70,7 +70,6 @@ def benchmark_models(datapath, num_repetitions, networks_config, networks_name, 
         test_dicemetric = []
         valid_dicemetric = []
         print(f"{networks_name[i]}")
-        print(conf)
         rep=0    
         conf["transfo"] = transfo
         conf["partitions_paths"]=partitions_paths
@@ -132,8 +131,9 @@ if __name__ == '__main__':
                "clients":clients,
                "suffix":"exp5",
                "val_interval":2,
-               "modality":modality,
-               "batch_size":8
+               "modality":modality.lower(),
+               "batch_size":8,
+               "use_torchio":False
                }
 
     check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=0)
@@ -172,7 +172,8 @@ if __name__ == '__main__':
                                                 modality=modality,
                                                 number_site=number_site,
                                                 size_crop=144,
-                                                nested=False)
+                                                nested=False,
+                                                using_torchio=False)
      
     benchmark_models(datapath=path,
                      num_repetitions=1,

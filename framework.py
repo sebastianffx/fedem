@@ -658,6 +658,11 @@ class Centralized(Fedem):
         early_stop_val = 0
         early_stop_count = 0
 
+        if options["use_torchio"]:
+            _, _, _, all_train_loader = TORCHIO_generate_loaders(partitions_paths=self.partitions_paths, batch_size=self.options["batch_size"],
+                                                                 clamp_min=0, clamp_max=4000, padding=(50,50,1), patch_size=(110,110,1),
+                                                                 max_queue_length=16, patches_per_volume=4)
+
         #multiply global and local epoch to have similar conditions
         for cur_epoch in range(global_epoch*local_epoch):
             print("*** epoch:", cur_epoch+1, "***")
@@ -669,9 +674,10 @@ class Centralized(Fedem):
             #loss_function = monai.losses.DiceCELoss(include_background=True, sigmoid=True, reduction='mean', batch=True, ce_weight=None, lambda_dice=1.0, lambda_ce=1.0)
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
-
-            #create new loaders for each repetition, to force the sampling of new slices and application of data augmentation
-            _, _, _, all_train_loader = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
+            
+            if not options["use_torchio"]:
+                #create new loaders for each repetition, to force the sampling of new slices and application of data augmentation
+                _, _, _, all_train_loader = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
 
             epoch_loss = 0
             step = 0
@@ -682,7 +688,11 @@ class Centralized(Fedem):
                     v.requires_grad = True
                 
                 step += 1
-                inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                if self.options["use_torchio"]:
+                    inputs, labels = batch_data[options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                else:
+                    inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+
                 y_pred_generic = self.nn(inputs)
                 loss = loss_function(input=y_pred_generic, target=labels) #average over the batch
                 optimizer.zero_grad()
