@@ -61,7 +61,7 @@ class Fedem:
                     best_loss = epoch_valid_dice_loss
                     best_metric_epoch = cur_epoch+1
 
-                    torch.save(self.nn.state_dict(), self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth')
+                    torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'))
                     print("saved new best metric model (according to DICE LOSS)")
         return self.nn
 
@@ -154,9 +154,9 @@ class Fedem:
         model = self.nn
         if network=="best":
             if benchmark_metric == "diceloss":
-                model_path = self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
+                model_path = os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth')
             elif benchmark_metric == "dicescore":
-                model_path = self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth'
+                model_path = os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth')
             else:
                 model_path = ""
                 print("option for benhmarking metric is not valid")
@@ -711,14 +711,14 @@ class Centralized(Fedem):
                     best_loss = epoch_valid_dice_loss
                     best_metric_epoch = cur_epoch+1
 
-                    torch.save(self.nn.state_dict(), self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth')
+                    torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'))
                     print("saved new best model (according to DICE LOSS)")
 
                 if epoch_valid_dice_score > best_metric:
                     best_metric = epoch_valid_dice_score
                     best_dicescore_epoch = cur_epoch+1
                     if best_dicescore_epoch != best_metric_epoch:
-                        torch.save(self.nn.state_dict(), self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth')
+                        torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth'))
                         print("saved new best model (according to DICE SCORE)")
 
                 print("validation dice SCORE : {:.4f}, best valid. dice SCORE: {:.4f} at epoch {}".format(
