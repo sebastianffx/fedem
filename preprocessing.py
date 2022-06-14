@@ -270,14 +270,14 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
 
     centers_data_loaders = []
     for i in range(len(partitions_paths)):#one dataset list per site [train, validation, test]
-        centers_data_loaders.append([tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[0][0],
-                                                                                      partitions_paths[1][0]),
+        centers_data_loaders.append([tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][0],
+                                                                                      partitions_paths[i][1][0]),
                                                                                       transform=transform),
-                                     tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[0][1],
-                                                                                      partitions_paths[1][1]),
+                                     tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][1],
+                                                                                      partitions_paths[i][1][1]),
                                                                                       transform=transform_valid),
-                                     tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[0][2],
-                                                                                      partitions_paths[1][2]),
+                                     tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][2],
+                                                                                      partitions_paths[i][1][2]),
                                                                                       transform=transform_valid),
                                     ])
 
