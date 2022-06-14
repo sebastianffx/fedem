@@ -127,7 +127,7 @@ class Fedem:
     def train():
         raise NotImplementedError
     
-    def full_volume_metric(self, dataset, network="best", benchmark_metric="diceloss", save_pred=False):
+    def full_volume_metric(self, dataset, network="best", benchmark_metric="diceloss", save_pred=False, verbose=True):
         """ Compute test metric for full volume of the test set
 
             network : if "best", the best model (dice loss on validation set) will be loaded and overwrite the current model
@@ -232,8 +232,9 @@ class Fedem:
 
         assert(len(all_labels) == len(holder_diceloss) and len(all_labels) == len(holder_dicemetric))
         #print average over all the volumes
-        print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
-        print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
+        if verbose:
+            print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
+            print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
         return np.mean(holder_dicemetric), np.mean(holder_diceloss)
 
 class FedAvg(Fedem):
