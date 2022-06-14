@@ -4,7 +4,7 @@ from numpy import std, mean
 import numpy as np
 
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
-                  number_site=3, batch_size=2, size_crop=100, nested=True):
+                  number_site=3, size_crop=100, nested=True):
 
     print("Experiment using the ", datapath, "dataset")
     tmp_test = []
@@ -60,6 +60,55 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
     return tmp_valid, tmp_test
 
+def benchmark_models(datapath, networks_config, networks_name, exp_name=None, modality="ADC",
+                  number_site=3, size_crop=100, nested=True):
+
+    #fetch the files paths, create the data loading/augmentation routines
+    partitions_paths, transfo = dataPreprocessing(datapath, modality, number_site, size_crop, nested)
+
+    for i, conf in enumerate(networks_config):
+        test_dicemetric = []
+        valid_dicemetric = []
+        print(f"{networks_name[i]}")
+        print(conf)
+        
+        conf["transfo"] = transfo
+        conf["partitions_paths"]=partitions_paths
+            
+        #add number to differentiate replicates
+        if exp_name!=None:
+            conf["suffix"]="_"+exp_name+"_"+str(rep)
+        else:
+            conf["suffix"]="_"+str(rep)
+
+        conf["network_name"] = networks_name[i]
+
+        if "scaff" in conf.keys() and conf["scaff"]:
+            network = Scaffold(conf)
+        elif "fedrod" in conf.keys() and conf["fedrod"]:
+            network = FedRod(conf)
+        elif 'weighting_scheme' in conf.keys():
+            network = FedAvg(conf)
+        elif "centralized" in conf.keys() and conf["centralized"]:
+            network = Centralized(conf)
+        else:
+            print("missing argument for network type")
+
+        # compute validation and test dice score using the model with the smallest dice loss
+        valid_dicemetric_benchLOSS = network.full_volume_metric(dataset="valid", network="best", benchmark_metric="diceloss", save_pred=True)[0]
+        test_dicemetric_benchLOSS = network.full_volume_metric(dataset="test", network="best",  benchmark_metric="diceloss", save_pred=True)[0]
+
+        print(f"{networks_name[k]} valid avg dice: {valid_dicemetric_benchLOSS}")
+        print(f"{networks_name[k]} test avg dice: {test_dicemetric_benchLOSS}")
+
+        # compute validation and test dice score using the model with the largest dice score
+        valid_dicemetric_benchSCORE = network.full_volume_metric(dataset="valid", network="best", benchmark_metric="dicescore", save_pred=True)[0]
+        test_dicemetric_benchSCORE = network.full_volume_metric(dataset="test", network="best", benchmark_metric="dicescore", save_pred=True)[0]
+
+        print(f"{networks_name[k]} valid avg dice: {valid_dicemetric_benchSCORE}")
+        print(f"{networks_name[k]} test avg dice: {test_dicemetric_benchSCORE}")
+
+
 if __name__ == '__main__':
     #path = 'astral_fedem_dti_purged/'
     #path = 'astral_fedem_dti/'
@@ -111,6 +160,7 @@ if __name__ == '__main__':
     #networks_name = ["CENTRALIZED", "FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
     #networks_config = [centralized, fedrod, scaff, fedavg, fedbeta]
 
+    """
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
                                                 networks_config=networks_config,
@@ -118,6 +168,15 @@ if __name__ == '__main__':
                                                 exp_name=experience_name,
                                                 modality=modality,
                                                 number_site=number_site,
-                                                batch_size=default["batch_size"],
                                                 size_crop=144,
                                                 nested=False)
+    """
+
+    benchmark_models(datapath=path,
+                  networks_config=networks_config,
+                  networks_name=networks_name,
+                  exp_name=experience_name,
+                  modality=modality,
+                  number_site=number_site,
+                  size_crop=144,
+                  nested=False)

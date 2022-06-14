@@ -127,7 +127,7 @@ class Fedem:
     def train():
         raise NotImplementedError
     
-    def full_volume_metric(self, dataset, network="best", save_pred=False):
+    def full_volume_metric(self, dataset, network="best", benchmark_metric="diceloss", save_pred=False):
         """ Compute test metric for full volume of the test set
 
             network : if "best", the best model (dice loss on validation set) will be loaded and overwrite the current model
@@ -154,7 +154,13 @@ class Fedem:
         model = self.nn
         if network=="best":
             print("Loading best validation model weights: ")
-            model_path = self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
+            if benchmark_metric == "diceloss":
+                model_path = self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
+            elif benchmark_metric == "dicescore":
+                model_path = self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth'
+            else:
+                model_path = ""
+                print("option for benhmarking metric is not valid")
             print(model_path)
             checkpoint = torch.load(model_path)
             model.load_state_dict(checkpoint)
@@ -215,17 +221,16 @@ class Fedem:
                 post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
 
             if save_pred:
-                nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "raw_segpred")))
-                nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred")))
+                nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "raw_segpred_"+benchmark_metric)))
+                nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred_"+benchmark_metric)))
             
             #retain each volume scores (dice loss and dice score)
-            holder_diceloss.append(np.mean(loss_volume)) #average per volume
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
+            holder_diceloss.append(np.mean(loss_volume)) #average per volume
             # reset the status for next computation round
             dice_metric.reset()
 
         assert(len(all_labels) == len(holder_diceloss) and len(all_labels) == len(holder_dicemetric))
-
         #print average over all the volumes
         print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
         print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
@@ -653,6 +658,8 @@ class Centralized(Fedem):
             self.nn.train()
                     
             loss_function = monai.losses.DiceLoss(sigmoid=True)
+            #what weights should I use for the cross entropy since we have such a class imbalance between the background and the lesions?
+            #loss_function = monai.losses.DiceCELoss(include_background=True, sigmoid=True, reduction='mean', batch=True, ce_weight=None, lambda_dice=1.0, lambda_ce=1.0)
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
