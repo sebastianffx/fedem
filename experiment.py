@@ -127,7 +127,7 @@ if __name__ == '__main__':
     clients=["center1", "center2", "center3"]
     number_site=len(clients)
 
-    default = {"g_epoch":50,
+    default = {"g_epoch":10,
                "l_epoch":20,
                "g_lr":0.01,
                "l_lr":0.0001,
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     networks_config = []
     networks_name = []
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    for lr in [0.005985, 0.001694, 0.00994, 0.01164]:
+    for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr})
         networks_config.append(tmp)
