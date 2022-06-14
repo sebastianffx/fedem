@@ -60,7 +60,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
     return tmp_valid, tmp_test
 
-def benchmark_models(datapath, networks_config, networks_name, exp_name=None, modality="ADC",
+def benchmark_models(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
                   number_site=3, size_crop=100, nested=True):
 
     #fetch the files paths, create the data loading/augmentation routines
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     networks_config = []
     networks_name = []
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    for lr in [0.0001, 0.001]:
+    for lr in [0.0001, 0.005, 0.001]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr})
         networks_config.append(tmp)
@@ -173,10 +173,11 @@ if __name__ == '__main__':
     """
 
     benchmark_models(datapath=path,
-                  networks_config=networks_config,
-                  networks_name=networks_name,
-                  exp_name=experience_name,
-                  modality=modality,
-                  number_site=number_site,
-                  size_crop=144,
-                  nested=False)
+                     num_repetitions=1,
+                     networks_config=networks_config,
+                     networks_name=networks_name,
+                     exp_name=experience_name,
+                     modality=modality,
+                     number_site=number_site,
+                     size_crop=144,
+                     nested=False)
