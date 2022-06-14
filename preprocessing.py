@@ -252,10 +252,11 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size):
             p=0.75,
         )
     rotation = tio.RandomAffine(degrees=360)
-    toCanon = tio.ToCanonical()
+    padding = tio.Pad(padding=padding)
+    toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
 
     #removed the resampler_dwi since it's not used for the ASTRAL dataset
-    transforms = [clamp, toCanon, rescale, spatial, tio.RandomFlip(), rotation]
+    transforms = [clamp, toCanon, rescale, spatial, tio.RandomFlip(), padding, rotation]
     transform = tio.Compose(transforms)
 
     transform_valid = tio.Compose([clamp, rescale, toCanon])
