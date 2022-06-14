@@ -283,10 +283,12 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                     ])
 
     #aggreate for centralized model and validation/testing across sites
-    all_train_loader = tio.SubjectsDataset(torchio_get_loader_partition([partitions_paths[i][0][0] for i in range(len(partitions_paths))],
-                                                                        [partitions_paths[i][1][0] for i in range(len(partitions_paths))]),
+    partitions_train_imgs = [partitions_paths[i][0][0] for i in range(len(partitions_paths))]
+    partitions_train_lbls = [partitions_paths[i][1][0] for i in range(len(partitions_paths))]
+    all_train_loader = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_train_imgs for i in l],
+                                                                        [i for l in partitions_train_lbls for i in l]),
                                                                         transform=transform)
-
+    """
     all_valid_loader = tio.SubjectsDataset(torchio_get_loader_partition([partitions_paths[i][0][1] for i in range(len(partitions_paths))],
                                                                         [partitions_paths[i][1][1] for i in range(len(partitions_paths))]),
                                                                         transform=transform_valid)
@@ -294,6 +296,9 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
     all_test_loader = tio.SubjectsDataset(torchio_get_loader_partition([partitions_paths[i][0][2] for i in range(len(partitions_paths))],
                                                                        [partitions_paths[i][1][2] for i in range(len(partitions_paths))]),
                                                                        transform=transform_valid)
+    """
+    all_valid_loader = []
+    all_test_loader = []
 
     #at least 60% of the label must contain 1?
     labels_probabilities = {0: 0.3, 1: 0.7}
