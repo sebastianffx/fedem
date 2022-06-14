@@ -662,7 +662,7 @@ class Centralized(Fedem):
         if self.options["use_torchio"]:
             _, _, _, all_train_loader = torchio_generate_loaders(partitions_paths=self.partitions_paths, batch_size=self.options["batch_size"],
                                                                  clamp_min=self.options["clamp_min"], clamp_max=self.options["clamp_max"],
-                                                                 padding=(0,0,0), patch_size=self.options["patch_size"],
+                                                                 padding=self.options["padding"], patch_size=self.options["patch_size"],
                                                                  max_queue_length=self.options["max_queue_length"],
                                                                  patches_per_volume=self.options["patches_per_volume"])
 
