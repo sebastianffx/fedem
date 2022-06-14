@@ -116,12 +116,12 @@ def benchmark_models(datapath, num_repetitions, networks_config, networks_name, 
 
 if __name__ == '__main__':
     #path = 'astral_fedem_dti_purged/'
-    path = 'astral_fedem_dti/'
-    #path = 'astral_fedem_dti_noempty/'
+    #path = 'astral_fedem_dti/'
+    path = 'astral_fedem_dti_noempty/'
     #path = 'astral_fedem_v3/'
 
     #experience_name = "astral_no_empty_mask"
-    experience_name = "full_dataset_torchio"
+    experience_name = "no_empty_torchio"
     modality="ADC"
 
     clients=["center1", "center2", "center3"]
@@ -139,7 +139,7 @@ if __name__ == '__main__':
                "batch_size":8,
                'early_stop_limit':20,
                #all the parameters required to use the "new" torchio dataloader, a lot more of data augmentation
-               "use_torchio":False,
+               "use_torchio":True,
                "clamp_min":0,
                "clamp_max":4000,
                "patch_size":(128,128,1),
@@ -149,7 +149,7 @@ if __name__ == '__main__':
                }
 
     #thres_lesion_vol indicate the minimum number of 1 label in the mask required to avoid elimination from the dataset
-    check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=0)
+    check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=5)
 
     networks_config = []
     networks_name = []
