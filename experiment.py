@@ -113,11 +113,12 @@ def benchmark_models(datapath, num_repetitions, networks_config, networks_name, 
 
 if __name__ == '__main__':
     #path = 'astral_fedem_dti_purged/'
-    #path = 'astral_fedem_dti/'
-    path = 'astral_fedem_dti_noempty/'
+    path = 'astral_fedem_dti/'
+    #path = 'astral_fedem_dti_noempty/'
     #path = 'astral_fedem_v3/'
 
-    experience_name = "astral_no_empty_mask"
+    #experience_name = "astral_no_empty_mask"
+    experience_name = "full_dataset"
     modality="ADC"
 
     clients=["center1", "center2", "center3"]
@@ -135,12 +136,12 @@ if __name__ == '__main__':
                "batch_size":8
                }
 
-    check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=5)
+    check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=0)
 
     networks_config = []
     networks_name = []
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    for lr in [0.0001, 0.005, 0.001]:
+    for lr in [0.00001, 0.0001, 0.001]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr})
         networks_config.append(tmp)
@@ -162,7 +163,7 @@ if __name__ == '__main__':
     #networks_name = ["CENTRALIZED", "FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
     #networks_config = [centralized, fedrod, scaff, fedavg, fedbeta]
 
-    
+     
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
                                                 networks_config=networks_config,
@@ -172,7 +173,7 @@ if __name__ == '__main__':
                                                 number_site=number_site,
                                                 size_crop=144,
                                                 nested=False)
-    
+     
     benchmark_models(datapath=path,
                      num_repetitions=1,
                      networks_config=networks_config,
