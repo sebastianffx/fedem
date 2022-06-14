@@ -660,8 +660,10 @@ class Centralized(Fedem):
 
         if options["use_torchio"]:
             _, _, _, all_train_loader = TORCHIO_generate_loaders(partitions_paths=self.partitions_paths, batch_size=self.options["batch_size"],
-                                                                 clamp_min=0, clamp_max=4000, padding=(50,50,1), patch_size=(110,110,1),
-                                                                 max_queue_length=16, patches_per_volume=4)
+                                                                 clamp_min=self.options["clamp_min"], clamp_max=self.options["clamp_max"],
+                                                                 padding=(0,0,0), patch_size=self.options["patch_size"],
+                                                                 max_queue_length=self.options["max_queue_length"],
+                                                                 patches_per_volume=self.options["patches_per_volume"])
 
         #multiply global and local epoch to have similar conditions
         for cur_epoch in range(global_epoch*local_epoch):
@@ -694,7 +696,7 @@ class Centralized(Fedem):
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
 
                 y_pred_generic = self.nn(inputs)
-                loss = loss_function(input=y_pred_generic, target=labels) #average over the batch
+                loss = loss_function(input=y_pred_generic, target=labels) #average over the batch after computing it for each slice
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -720,13 +722,14 @@ class Centralized(Fedem):
             #Evaluation on validation and saving model if needed, on full volume
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
                 epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False)
-                if epoch_valid_dice_loss < best_loss: #using loss as benchmark value since the dice score is not reliable for the empty label mask
+                #using dice loss to save best model
+                if epoch_valid_dice_loss < best_loss:
                     best_loss = epoch_valid_dice_loss
                     best_metric_epoch = cur_epoch+1
 
                     torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'))
                     print("saved new best model (according to DICE LOSS)")
-
+                #using dice score to save alternative best model
                 if epoch_valid_dice_score > best_metric:
                     best_metric = epoch_valid_dice_score
                     best_dicescore_epoch = cur_epoch+1

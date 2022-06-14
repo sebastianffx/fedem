@@ -134,9 +134,16 @@ if __name__ == '__main__':
                "modality":modality.lower(),
                "batch_size":8,
                'early_stop_limit':20,
-               "use_torchio":False
+               #all the parameters required to use the "new" torchio dataloader, a lot more of data augmentation
+               "use_torchio":False,
+               "clamp_min":0,
+               "clamp_max":4000,
+               "patch_size":(128,128,1),
+               "max_queue_length":16,
+               "patches_per_volume":4,
                }
 
+    #thres_lesion_vol indicate the minimum number of 1 label in the mask required to avoid elimination from the dataset
     check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=0)
 
     networks_config = []
