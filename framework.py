@@ -153,7 +153,6 @@ class Fedem:
 
         model = self.nn
         if network=="best":
-            print("Loading best validation model weights: ")
             if benchmark_metric == "diceloss":
                 model_path = self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'
             elif benchmark_metric == "dicescore":
@@ -161,7 +160,11 @@ class Fedem:
             else:
                 model_path = ""
                 print("option for benhmarking metric is not valid")
-            print(model_path)
+
+            if verbose:
+                print("Loading best validation model weights: ")
+                print(model_path)
+
             checkpoint = torch.load(model_path)
             model.load_state_dict(checkpoint)
         elif network=="self":

@@ -94,6 +94,7 @@ def benchmark_models(datapath, num_repetitions, networks_config, networks_name, 
         else:
             print("missing argument for network type")
 
+        print("Score for model minimizing dice loss during training over validation set")
         # compute validation and test dice score using the model with the smallest dice loss
         valid_dicemetric_benchLOSS = network.full_volume_metric(dataset="valid", network="best", benchmark_metric="diceloss", save_pred=True, verbose=False)[0]
         test_dicemetric_benchLOSS = network.full_volume_metric(dataset="test", network="best",  benchmark_metric="diceloss", save_pred=True, verbose=False)[0]
@@ -101,6 +102,7 @@ def benchmark_models(datapath, num_repetitions, networks_config, networks_name, 
         print(f"{networks_name[k]} valid avg dice: {valid_dicemetric_benchLOSS}")
         print(f"{networks_name[k]} test avg dice: {test_dicemetric_benchLOSS}")
 
+        print("Score for model maximizing dice score during training over validation set")
         # compute validation and test dice score using the model with the largest dice score
         valid_dicemetric_benchSCORE = network.full_volume_metric(dataset="valid", network="best", benchmark_metric="dicescore", save_pred=True, verbose=False)[0]
         test_dicemetric_benchSCORE = network.full_volume_metric(dataset="test", network="best", benchmark_metric="dicescore", save_pred=True, verbose=False)[0]
@@ -160,7 +162,7 @@ if __name__ == '__main__':
     #networks_name = ["CENTRALIZED", "FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
     #networks_config = [centralized, fedrod, scaff, fedavg, fedbeta]
 
-    """
+    
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
                                                 networks_config=networks_config,
@@ -170,8 +172,7 @@ if __name__ == '__main__':
                                                 number_site=number_site,
                                                 size_crop=144,
                                                 nested=False)
-    """
-
+    
     benchmark_models(datapath=path,
                      num_repetitions=1,
                      networks_config=networks_config,
