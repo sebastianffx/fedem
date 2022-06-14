@@ -11,7 +11,7 @@ import nibabel as nib
 from network import UNet_custom
 from monai.metrics import DiceMetric
 from torch.optim import Optimizer, Adam
-from preprocessing import generate_loaders
+from preprocessing import generate_loaders, torchio_generate_loaders
 from torch.utils.tensorboard import SummaryWriter
 from weighting_schemes import average_weights, average_weights_beta, average_weights_softmax
 
@@ -660,7 +660,7 @@ class Centralized(Fedem):
         early_stop_count = 0
 
         if self.options["use_torchio"]:
-            _, _, _, all_train_loader = TORCHIO_generate_loaders(partitions_paths=self.partitions_paths, batch_size=self.options["batch_size"],
+            _, _, _, all_train_loader = torchio_generate_loaders(partitions_paths=self.partitions_paths, batch_size=self.options["batch_size"],
                                                                  clamp_min=self.options["clamp_min"], clamp_max=self.options["clamp_max"],
                                                                  padding=(0,0,0), patch_size=self.options["patch_size"],
                                                                  max_queue_length=self.options["max_queue_length"],
