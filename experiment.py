@@ -149,7 +149,7 @@ if __name__ == '__main__':
     networks_config = []
     networks_name = []
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    for lr in [0.00001, 0.0001, 0.001]:
+    for lr in [0.005985, 0.001694, 0.00994, 0.01164]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr})
         networks_config.append(tmp)
@@ -180,8 +180,7 @@ if __name__ == '__main__':
                                                 modality=modality,
                                                 number_site=number_site,
                                                 size_crop=144,
-                                                nested=False,
-                                                using_torchio=False)
+                                                nested=False)
      
     benchmark_models(datapath=path,
                      num_repetitions=1,

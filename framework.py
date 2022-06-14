@@ -659,7 +659,7 @@ class Centralized(Fedem):
         early_stop_val = 0
         early_stop_count = 0
 
-        if options["use_torchio"]:
+        if self.options["use_torchio"]:
             _, _, _, all_train_loader = TORCHIO_generate_loaders(partitions_paths=self.partitions_paths, batch_size=self.options["batch_size"],
                                                                  clamp_min=self.options["clamp_min"], clamp_max=self.options["clamp_max"],
                                                                  padding=(0,0,0), patch_size=self.options["patch_size"],
@@ -678,7 +678,7 @@ class Centralized(Fedem):
 
             optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
             
-            if not options["use_torchio"]:
+            if not self.options["use_torchio"]:
                 #create new loaders for each repetition, to force the sampling of new slices and application of data augmentation
                 _, _, _, all_train_loader = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
 
