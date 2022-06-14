@@ -648,12 +648,15 @@ class Centralized(Fedem):
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 
     #overwrite the superclass method since there are no client models
-    def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False):
+    def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False, early_stopping_limit=-1):
         metric_values = list()
         best_metric = -1
         best_loss = 1e5
         best_metric_epoch = -1
         index = [0,1,2]
+
+        early_stop_val = 0
+        early_stop_count = 0
 
         #multiply global and local epoch to have similar conditions
         for cur_epoch in range(global_epoch*local_epoch):
@@ -690,6 +693,17 @@ class Centralized(Fedem):
                 #apply sigmoid and threshold, since the loss function apply sigmoid to the output
                 test_pred = self.post_pred(y_pred_generic)
                 dice_metric(y_pred=test_pred, y=labels)
+
+                #early stopping implementation; if the loss does not improve on several consecutive round, stop the training
+                if early_stopping_limit > 0:
+                    if early_stop_val - loss.item() < 1e-4:
+                        early_stop_count += 1
+                        if early_stop_count >= early_stop_limit:
+                            print(f"Early stopping, the model has converged and the loss is constant for the last {early_stop_limit} epochs")
+                            return self.nn
+                    else:
+                        early_stop_val = loss.item()
+                        early_stop_count = 0
 
                 if save_train_pred and (cur_epoch+1)%5==0 and labels[0,0,:,:].detach().cpu().numpy().sum() > 0:
                     #saving the slice of the first element of each batch during training, with and without prediction post-processing (sigmoid + threshold)
