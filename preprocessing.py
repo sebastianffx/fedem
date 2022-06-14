@@ -311,11 +311,13 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
     queue = tio.Queue(all_train_loader, max_queue_length, patches_per_volume, sampler_weighted_probs)
     all_train_loader = torch.utils.data.DataLoader(queue, batch_size=batch_size)
 
+    """
     queue = tio.Queue(all_valid_loader, max_queue_length, patches_per_volume, sampler_weighted_probs)
     all_valid_loader = torch.utils.data.DataLoader(queue, batch_size=1)
 
     queue = tio.Queue(all_test_loader, max_queue_length, patches_per_volume, sampler_weighted_probs)
     all_test_loader = torch.utils.data.DataLoader(queue, batch_size=1)
+    """
 
     #TODO: also convert each dataset for each site into queue and dataloader
 
