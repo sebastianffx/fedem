@@ -264,6 +264,8 @@ def TORCHIO_create_transfo(clamp_min, clamp_max, padding, patch_size):
 def TORCHIO_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_max=4000, padding=(50,50,1), patch_size=(128,128,1),
                              max_queue_length=16, patches_per_volume=4):
 
+    print("Using TORCHIO dataloader")
+
     transform, transform_valid = TORCHIO_create_transfo(clamp_min=clamp_min, clamp_max=clamp_max, padding=padding, patch_size=patch_size)
 
     centers_data_loaders = []

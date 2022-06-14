@@ -117,7 +117,7 @@ if __name__ == '__main__':
     #path = 'astral_fedem_v3/'
 
     #experience_name = "astral_no_empty_mask"
-    experience_name = "full_dataset"
+    experience_name = "full_dataset_torchio"
     modality="ADC"
 
     clients=["center1", "center2", "center3"]
