@@ -653,6 +653,7 @@ class Centralized(Fedem):
         best_metric = -1
         best_loss = 1e5
         best_metric_epoch = -1
+        best_dicescore_epoch = -1
         index = [0,1,2]
 
         early_stop_val = 0
