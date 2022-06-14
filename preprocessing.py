@@ -248,16 +248,17 @@ def TORCHIO_create_transfo(clamp_min, clamp_max, padding, patch_size):
             tio.RandomAffine(): 0.6,
             tio.RandomElasticDeformation(): 0.2,        
             tio.RandomAffine(degrees=180): 0.2
-        },
-        p=0.75,
-    )
+            },
+            p=0.75,
+        )
     rotation = tio.RandomAffine(degrees=360)
     pad = tio.Pad(padding=padding)
 
     toCanon = tio.ToCanonical()
-    resampler_dwi = tio.Resample('dwi')
+    #resampler_dwi = tio.Resample('dwi')
 
-    transforms = [clamp, toCanon,resampler_dwi, rescale, spatial, tio.RandomFlip(),  rotation]
+    #removed the resampler_dwi since it's not used for the ASTRAL dataset
+    transforms = [clamp, toCanon, rescale, spatial, tio.RandomFlip(), rotation]
     transform = tio.Compose(transforms)
     return transform
 

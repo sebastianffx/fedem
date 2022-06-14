@@ -177,13 +177,13 @@ class Fedem:
 
         loss_function = monai.losses.DiceLoss(sigmoid=True)
 
-        if self.options['modality'] =='CBF':
+        if self.options['modality'] =='cbf':
             max_intensity = 1200
-        if self.options['modality'] =='CBV':
+        if self.options['modality'] =='cbv':
             max_intensity = 200
-        if self.options['modality'] =='Tmax' or self.options['modality'] =='MTT':
+        if self.options['modality'] =='tmax' or self.options['modality'] =='mtt':
             max_intensity = 30
-        if self.options['modality'] =='ADC':
+        if self.options['modality'] =='adc':
             max_intensity = 4000
 
         holder_dicemetric = []
@@ -648,7 +648,7 @@ class Centralized(Fedem):
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 
     #overwrite the superclass method since there are no client models
-    def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False, early_stopping_limit=-1):
+    def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False, early_stop_limit=-1):
         metric_values = list()
         best_metric = -1
         best_loss = 1e5
@@ -730,9 +730,9 @@ class Centralized(Fedem):
                 if epoch_valid_dice_score > best_metric:
                     best_metric = epoch_valid_dice_score
                     best_dicescore_epoch = cur_epoch+1
-                    if best_dicescore_epoch != best_metric_epoch:
-                        torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth'))
-                        print("saved new best model (according to DICE SCORE)")
+
+                    torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth'))
+                    print("saved new best model (according to DICE SCORE)")
 
                 print("validation dice SCORE : {:.4f}, best valid. dice SCORE: {:.4f} at epoch {}".format(
                     epoch_valid_dice_score, best_metric, best_dicescore_epoch)
@@ -744,9 +744,9 @@ class Centralized(Fedem):
                      )
                 self.writer.add_scalar('avg validation loss', epoch_valid_dice_loss, cur_epoch)
 
-                #early stopping implementation; if the loss on the validation set does not improve on several consecutive round, stop the training
-                if early_stopping_limit > 0:
-                    if early_stop_val - epoch_valid_dice_loss < 1e-5:
+                #early stopping implementation; if the validation dice score don't change after X consecutive round, stop the training
+                if early_stop_limit > 0:
+                    if np.abs(early_stop_val - epoch_valid_dice_loss) < 1e-5:
                         early_stop_count += 1
                         if early_stop_count >= early_stop_limit:
                             print(f"Early stopping, the model has converged/diverged and the loss is constant for the last {early_stop_limit} epochs")

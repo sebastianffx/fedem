@@ -43,7 +43,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
                 print("missing argument for network type")
 
             #train the network, each batch contain one ranodm slice for each subject
-            network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'])
+            network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'], early_stopping_limit=conf['early_stop_limit'])
 
             # compute validation and test dice loss/score using full volume (instead of slice-wise) and the best possible model
             valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best", save_pred=True)[0])
@@ -133,6 +133,7 @@ if __name__ == '__main__':
                "val_interval":2,
                "modality":modality.lower(),
                "batch_size":8,
+               'early_stop_limit':20,
                "use_torchio":False
                }
 
