@@ -694,17 +694,6 @@ class Centralized(Fedem):
                 test_pred = self.post_pred(y_pred_generic)
                 dice_metric(y_pred=test_pred, y=labels)
 
-                #early stopping implementation; if the loss does not improve on several consecutive round, stop the training
-                if early_stopping_limit > 0:
-                    if early_stop_val - loss.item() < 1e-4:
-                        early_stop_count += 1
-                        if early_stop_count >= early_stop_limit:
-                            print(f"Early stopping, the model has converged and the loss is constant for the last {early_stop_limit} epochs")
-                            return self.nn
-                    else:
-                        early_stop_val = loss.item()
-                        early_stop_count = 0
-
                 if save_train_pred and (cur_epoch+1)%5==0 and labels[0,0,:,:].detach().cpu().numpy().sum() > 0:
                     #saving the slice of the first element of each batch during training, with and without prediction post-processing (sigmoid + threshold)
                     nib.save(nib.Nifti1Image(inputs[0,0,:,:].detach().cpu().numpy(), None), os.path.join(".", "output_viz", "viz_input_epoch"+str(cur_epoch+1)+"_adc.nii.gz"))
@@ -744,6 +733,17 @@ class Centralized(Fedem):
                     epoch_valid_dice_loss, best_loss, best_metric_epoch)
                      )
                 self.writer.add_scalar('avg validation loss', epoch_valid_dice_loss, cur_epoch)
+
+                #early stopping implementation; if the loss on the validation set does not improve on several consecutive round, stop the training
+                if early_stopping_limit > 0:
+                    if early_stop_val - epoch_valid_dice_loss < 1e-5:
+                        early_stop_count += 1
+                        if early_stop_count >= early_stop_limit:
+                            print(f"Early stopping, the model has converged/diverged and the loss is constant for the last {early_stop_limit} epochs")
+                            return self.nn
+                    else:
+                        early_stop_val = epoch_valid_dice_loss
+                        early_stop_count = 0
 
         ## DEBUG: save the prediction for the training set
         #self.full_volume_metric(dataset="training", network="self", save_pred=True)
