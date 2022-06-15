@@ -97,14 +97,6 @@ def benchmark_models(datapath, num_repetitions, networks_config, networks_name, 
         else:
             print("missing argument for network type")
 
-        print("Score for model minimizing dice loss during training over validation set")
-        # compute validation and test dice score using the model with the smallest dice loss
-        valid_dicemetric_benchLOSS = network.full_volume_metric(dataset="valid", network="best", benchmark_metric="diceloss", save_pred=True, verbose=False)[0]
-        test_dicemetric_benchLOSS = network.full_volume_metric(dataset="test", network="best",  benchmark_metric="diceloss", save_pred=True, verbose=False)[0]
-
-        print(f"{networks_name[i]} valid avg dice: {valid_dicemetric_benchLOSS}")
-        print(f"{networks_name[i]} test avg dice: {test_dicemetric_benchLOSS}")
-
         print("Score for model maximizing dice score during training over validation set")
         # compute validation and test dice score using the model with the largest dice score
         valid_dicemetric_benchSCORE = network.full_volume_metric(dataset="valid", network="best", benchmark_metric="dicescore", save_pred=True, verbose=False)[0]

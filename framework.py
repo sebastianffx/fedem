@@ -127,7 +127,7 @@ class Fedem:
     def train():
         raise NotImplementedError
     
-    def full_volume_metric(self, dataset, network="best", benchmark_metric="diceloss", save_pred=False, verbose=True):
+    def full_volume_metric(self, dataset, network="best", benchmark_metric="dicescore", save_pred=False, verbose=True):
         """ Compute test metric for full volume of the test set
 
             network : if "best", the best model (dice loss on validation set) will be loaded and overwrite the current model
@@ -651,10 +651,7 @@ class Centralized(Fedem):
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False, early_stop_limit=-1):
         metric_values = list()
         best_metric = -1
-        best_loss = 1e5
         best_metric_epoch = -1
-        best_dicescore_epoch = -1
-        index = [0,1,2]
 
         early_stop_val = 0
         early_stop_count = 0
@@ -726,28 +723,22 @@ class Centralized(Fedem):
             #Evaluation on validation and saving model if needed, on full volume
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
                 epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False)
-                #using dice loss to save best model
-                if epoch_valid_dice_loss < best_loss:
-                    best_loss = epoch_valid_dice_loss
-                    best_metric_epoch = cur_epoch+1
 
-                    torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'))
-                    print("saved new best model (according to DICE LOSS)")
-                #using dice score to save alternative best model
+                #using dice score to save best model
                 if epoch_valid_dice_score > best_metric:
                     best_metric = epoch_valid_dice_score
-                    best_dicescore_epoch = cur_epoch+1
+                    best_metric_epoch = cur_epoch+1
 
                     torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth'))
                     print("saved new best model (according to DICE SCORE)")
 
                 print("validation dice SCORE : {:.4f}, best valid. dice SCORE: {:.4f} at epoch {}".format(
-                    epoch_valid_dice_score, best_metric, best_dicescore_epoch)
+                    epoch_valid_dice_score, best_metric, best_metric_epoch)
                      )
                 self.writer.add_scalar("avg validation dice score", epoch_valid_dice_score, cur_epoch)
 
-                print("validation dice LOSS: {:.4f} best valid. dice LOSS: {:.4f} at epoch {}".format(
-                    epoch_valid_dice_loss, best_loss, best_metric_epoch)
+                print("validation dice LOSS: {:.4f}".format(
+                    epoch_valid_dice_loss)
                      )
                 self.writer.add_scalar('avg validation loss', epoch_valid_dice_loss, cur_epoch)
 
