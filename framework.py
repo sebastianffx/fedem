@@ -241,10 +241,8 @@ class Fedem:
                 if self.options["use_test_augm"]:
                     augm_preds = []
                     augm_preds2 = []
-                    batch_data.add_image()
                     for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
                         augm_out = model(augmented_test_img[None,:,:,:,slice_selected])
-                        #reverse transform when augmentation allows, linear interpolation because output is not discrete
                         #augm_out_inv = inverse_augm(augm_out.detach().cpu().numpy()) #happens on cpu
                         augm_out_inv = inverse_augm(augm_out)
 
