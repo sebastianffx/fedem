@@ -203,7 +203,8 @@ class Fedem:
         holder_dicemetric_augm2 = []
         ### END TMP
 
-        for batch in dataset_loader: 
+        #during validation and testing, the batch_data size should be 1
+        for batch_data in dataset_loader: 
             inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
 
             print(inputs.shape, labels.shape)
