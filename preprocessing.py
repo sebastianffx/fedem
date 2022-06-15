@@ -259,8 +259,35 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size):
     transforms = [clamp, toCanon, rescale, spatial, tio.RandomFlip(), padding, rotation]
     transform = tio.Compose(transforms)
 
+    #normalization only, no spatial transformation or data augmentation
     transform_valid = tio.Compose([clamp, rescale, toCanon])
     return transform, transform_valid
+
+def torchio_create_test_transfo():
+    """ Transform for test-time augmentation, the transformation should have been seen during the training.
+        Here, we consider the 90, 180 and 270 rotation to be covered by the randomAffine(degrees=360)
+    """
+    #lossless
+    h_flip = tio.RandomFlip(axis=0,flip_probability=1)
+    v_flip = tio.RandomFlip(axis=1,flip_probability=1)
+
+    #lossly, tio.Affine was found directly in the source code
+    rotation90 = tio.Affine(scales=0.1, degrees=90, translation=0)
+    rotation180 = tio.Affine(scales=0.1, degrees=180, translation=0)
+    rotation270 = tio.Affine(scales=0.1, degrees=270, translation=0)
+
+    gaussian = tio.RandomNoise()
+    gamma = tio.RandomGamma()
+
+    #non-invertible : blurring
+
+    #no need to compose, they will be applied indepently
+    #return [h_flip, v_flip, rotation90, rotation180, rotation270, gaussian, gamma]
+
+    #proof of work without the noise adding function, which
+    return [h_flip, v_flip, rotation90, rotation180, rotation270]
+    
+
 
 def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_max=4000, padding=(50,50,1), patch_size=(128,128,1),
                              max_queue_length=16, patches_per_volume=4):

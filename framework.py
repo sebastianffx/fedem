@@ -11,7 +11,7 @@ import nibabel as nib
 from network import UNet_custom
 from monai.metrics import DiceMetric
 from torch.optim import Optimizer, Adam
-from preprocessing import generate_loaders, torchio_generate_loaders
+from preprocessing import generate_loaders, torchio_generate_loaders, torchio_create_test_transfo
 from torch.utils.tensorboard import SummaryWriter
 from weighting_schemes import average_weights, average_weights_beta, average_weights_softmax
 
@@ -29,8 +29,8 @@ print(f"Using {device} as backend")
 
 class Fedem:
     def __init__(self, options):
-        self.partitions_paths = options["partitions_paths"]
         self.options = options
+        self.partitions_paths = options["partitions_paths"]        
 
         #routine to convert U-Net output to segmentation mask
         self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
@@ -45,6 +45,9 @@ class Fedem:
                                                                                                                             max_queue_length=self.options["max_queue_length"],
                                                                                                                             patches_per_volume=self.options["patches_per_volume"]
                                                                                                                             )
+
+        if self.options["use_test_augm"]:
+            self.options["test_time_augm"] = torchio_create_test_transfo()
 
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
         metric_values = list()
@@ -200,6 +203,14 @@ class Fedem:
         holder_dicemetric = []
         holder_diceloss = []
         dice_metric.reset()
+
+        #### TMP : used to test the best approach to average the output
+        dice_metric_augm = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+        dice_metric_augm2 = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+        holder_dicemetric_augm = []
+        holder_dicemetric_augm2 = []
+        ### END TMP
+
         for path_case, path_label in zip(all_paths,all_labels): #should be improved by using the dataloader      
             vol = nib.load(path_case)
             vol_affine = vol.affine
@@ -211,6 +222,8 @@ class Fedem:
 
             raw_pred_holder = []
             post_pred_holder = []
+            augm_pred_holder = []
+            augm_pred_holder2 = []
             loss_volume= []
             for slice_selected in range(vol_pxls.shape[-1]):
                 out = model(vol_pxls[:,:,:,:,slice_selected])
@@ -225,15 +238,54 @@ class Fedem:
                 raw_pred_holder.append(out[0,0,:,:].detach().cpu().numpy())
                 #apply sigmoid then activation threshold to obtain a discrete segmentation mask
                 pred = self.post_pred(out)
-                #compute dice score between the processed prediction and the labels
+                #compute dice score between the processed prediction and the labels (single slice)
                 dice_metric(pred,lbl_pxls[:,:,:,:,slice_selected])
                 #save the prediction slice to rebuild a 3D prediction volume
                 post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
 
+                #the augmentation affecting the voxel values should probably have been seen/used during training
+                if self.options["use_test_augm"]:
+                    augm_preds = []
+                    augm_preds2 = []
+                    for augm in self.options["test_time_augm"]:
+                        #applying the augmentation to the input slice
+                        augm_input = augm(vol_pxls[:,:,:,:,slice_selected].clone())
+                        augm_out = model(augm_input)
+
+                        #reverse transform when augmentation allows (lossless or lossy transform)
+                        augm_out_inv = augm_out.apply_inverse_transform(image_interpolation='linear')
+                        
+                        #apply segmoid and threshold AFTER averaging
+                        augm_preds2.append(augm_out_inv)
+                        #apply segmoid and threshold BEFORE averaging
+                        augm_preds.append(self.post_pred(augm_out_inv))
+
+                    #average must discretized, using a simple threshold at 0.5
+                    avg_augm_pred = torch.mean(torch.stack(augm_preds))
+                    avg_augm_pred = avg_augm_pred > 0.5
+
+                    #average is discretized by the sigmoid and threshold
+                    avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2)))
+
+                    dice_metric_augm(pred,avg_augm_pred)
+                    dice_metric_augm2(pred,avg_augm_pred2)
+
+                    augm_pred_holder.append(avg_augm_pred[0,0,:,:].cpu().numpy())
+                    augm_pred_holder2.append(avg_augm_pred2[0,0,:,:].cpu().numpy())
+
             if save_pred:
-                nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "raw_segpred_"+benchmark_metric)))
+                #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "raw_segpred_"+benchmark_metric)))
                 nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred_"+benchmark_metric)))
-            
+                if self.options["use_test_augm"]:
+                    nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred_"+benchmark_metric)))
+                    nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred_"+benchmark_metric)))
+
+            if self.options["use_test_augm"]:
+                holder_dicemetric_augm2.append(dice_metric_augm2.aggregate().item())
+                holder_dicemetric_augm.append(dice_metric_augm.aggregate().item())
+                dice_metric_augm2.reset()
+                dice_metric_augm.reset()
+
             #retain each volume scores (dice loss and dice score)
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
             holder_diceloss.append(np.mean(loss_volume)) #average per volume
@@ -245,6 +297,9 @@ class Fedem:
         if verbose:
             print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
             print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
+            if "test_time_augm" in self.options.keys():
+                print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm):", np.round(np.mean(holder_dicemetric_augm),4))
+                print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm 2):", np.round(np.mean(holder_dicemetric_augm2),4))
         return np.mean(holder_dicemetric), np.mean(holder_diceloss)
 
 class FedAvg(Fedem):

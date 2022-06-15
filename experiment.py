@@ -116,15 +116,6 @@ if __name__ == '__main__':
     experience_name = "no_empty_torchio_DLCE"
     modality="ADC"
 
-    if modality =='cbf':
-            max_intensity = 1200
-    if modality =='cbv':
-            max_intensity = 200
-    if modality =='tmax' or self.options['modality'] =='mtt':
-            max_intensity = 30
-    if modality =='adc':
-            max_intensity = 4000
-
     clients=["center1", "center2", "center3"]
     number_site=len(clients)
 
@@ -148,6 +139,8 @@ if __name__ == '__main__':
                "max_queue_length":16,
                "patches_per_volume":4,
                "loss_fun":"dicelossCE", #diceloss_CE
+               #test time augmentation
+               "use_test_augm":True
                }
 
     #thres_lesion_vol indicate the minimum number of 1 label in the mask required to avoid elimination from the dataset
