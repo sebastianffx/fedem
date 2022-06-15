@@ -271,8 +271,8 @@ def torchio_create_test_transfo():
         Here, we consider the 90, 180 and 270 rotation to be covered by the randomAffine(degrees=360)
     """
     #lossless
-    h_flip = tio.RandomFlip(axis=0,flip_probability=1)
-    v_flip = tio.RandomFlip(axis=1,flip_probability=1)
+    h_flip = tio.RandomFlip(axes=0,flip_probability=1)
+    v_flip = tio.RandomFlip(axes=1,flip_probability=1)
 
     #lossly, tio.Affine was found directly in the source code
     rotation90 = tio.Affine(scales=0.1, degrees=90, translation=0)
