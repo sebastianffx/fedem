@@ -203,11 +203,9 @@ class Fedem:
         holder_dicemetric_augm2 = []
         ### END TMP
 
-        #during validation and testing, the batch_data size should be 1
+        #during validation and testing, the batch_data size should be 1, last dimension is number of slice in original volume
         for batch_data in dataset_loader: 
             inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:].to(device)
-
-            print(inputs.shape, labels.shape)
 
             #raw_pred_holder = []
             post_pred_holder = []
@@ -240,10 +238,10 @@ class Fedem:
                     for augm in self.options["test_time_augm"]:
                         #applying the augmentation to the input slice, use cloning to prevent modifying the origin image?
                         augm_input = augm(inputs[:,:,:,:,slice_selected].clone().cpu()) #augment happens on cpu
+                        inverse_augm = augm_input.get_inverse_transform()
                         augm_out = model(augm_input.to(device))
-
                         #reverse transform when augmentation allows, linear interpolation because output is not discrete
-                        augm_out_inv = augm_out.detach().cpu().numpy().apply_inverse_transform(image_interpolation='linear') #happens on cpu
+                        augm_out_inv = inverse_augm(augm_out.detach().cpu().numpy()) #happens on cpu
                         
                         #apply segmoid and threshold AFTER averaging
                         augm_preds2.append(augm_out_inv)
