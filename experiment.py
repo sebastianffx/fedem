@@ -152,9 +152,10 @@ if __name__ == '__main__':
     networks_name = []
     #for lr in np.linspace(1e-5, 1e-2, 5):
     #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
+    lr = 0.001694
     for weight_comb in [[0.2, 0.8], [0.3, 0.7], [0.5, 0.5], [0.7, 0.3], [0.8, 0.2]]:
         tmp = default.copy()
-        tmp.update({"centralized":True, "l_lr":0.001694, "hybrid_loss_weights":weight_comb})
+        tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
         networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
 
