@@ -116,6 +116,15 @@ if __name__ == '__main__':
     experience_name = "no_empty_torchio_DLCE"
     modality="ADC"
 
+    if modality =='cbf':
+            max_intensity = 1200
+    if modality =='cbv':
+            max_intensity = 200
+    if modality =='tmax' or self.options['modality'] =='mtt':
+            max_intensity = 30
+    if modality =='adc':
+            max_intensity = 4000
+
     clients=["center1", "center2", "center3"]
     number_site=len(clients)
 
@@ -135,7 +144,7 @@ if __name__ == '__main__':
                "clamp_min":0,
                "clamp_max":4000,
                "patch_size":(128,128,1),
-               "padding":(64,64,0),
+               "padding":(64,64,0), #typically half the dimensions of the patch_size
                "max_queue_length":16,
                "patches_per_volume":4,
                "loss_fun":"dicelossCE", #diceloss_CE

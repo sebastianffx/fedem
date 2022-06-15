@@ -252,7 +252,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size):
             p=0.75,
         )
     rotation = tio.RandomAffine(degrees=360)
-    padding = tio.Pad(padding=padding)
+    padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
     toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
 
     #removed the resampler_dwi since it's not used for the ASTRAL dataset
@@ -270,37 +270,59 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
     transform, transform_valid = torchio_create_transfo(clamp_min=clamp_min, clamp_max=clamp_max, padding=padding, patch_size=patch_size)
 
     centers_data_loaders = []
-    for i in range(len(partitions_paths)):#one dataset list per site [train, validation, test]
-        centers_data_loaders.append([tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][0],
-                                                                                      partitions_paths[i][1][0]),
-                                                                                      transform=transform),
-                                     tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][1],
-                                                                                      partitions_paths[i][1][1]),
-                                                                                      transform=transform_valid),
-                                     tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][2],
-                                                                                      partitions_paths[i][1][2]),
-                                                                                      transform=transform_valid),
+    #create 3 dataloader per site [train, validation, test]
+    for i in range(len(partitions_paths)):
+        # get the subject, create subject datatset, feed it to a queue for the path creation, then converted to a dataloader
+        centers_data_loaders.append([torch.utils.data.DataLoader(tio.Queue(tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][0],
+                                                                                                                            partitions_paths[i][1][0]
+                                                                                                                            ),
+                                                                                               transform=transform
+                                                                                               ),
+                                                                          max_queue_length,
+                                                                          patches_per_volume,
+                                                                          sampler_weighted_probs
+                                                                          ),
+                                                                 batch_size=batch_size
+                                                                 ),
+                                     #validation and test don't need the patch sampler (hence no queue)
+                                     torch.utils.data.DataLoader(tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][1],
+                                                                                                                  partitions_paths[i][1][1]
+                                                                                                                  ),
+                                                                                     transform=transform_valid
+                                                                                     ),
+                                                        
+                                                                 batch_size=batch_size
+                                                                 ),
+                                     torch.utils.data.DataLoader(tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][2],
+                                                                                                                  partitions_paths[i][1][2]
+                                                                                                                  ),
+                                                                                     transform=transform_valid
+                                                                                     ),
+                                                        
+                                                                 batch_size=batch_size
+                                                                 ),
                                     ])
 
     #aggreate for centralized model and validation/testing across sites
     partitions_train_imgs = [partitions_paths[i][0][0] for i in range(len(partitions_paths))]
     partitions_train_lbls = [partitions_paths[i][1][0] for i in range(len(partitions_paths))]
-    all_train_loader = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_train_imgs for i in l],
-                                                                        [i for l in partitions_train_lbls for i in l]),
-                                                                        transform=transform)
-    """
-    all_valid_loader = tio.SubjectsDataset(torchio_get_loader_partition([partitions_paths[i][0][1] for i in range(len(partitions_paths))],
-                                                                        [partitions_paths[i][1][1] for i in range(len(partitions_paths))]),
-                                                                        transform=transform_valid)
+    all_train_subjects = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_train_imgs for i in l],
+                                                                          [i for l in partitions_train_lbls for i in l]),
+                                                                          transform=transform)
+    
+    partitions_valid_imgs = [partitions_paths[i][0][1] for i in range(len(partitions_paths))]
+    partitions_valid_lbls = [partitions_paths[i][1][1] for i in range(len(partitions_paths))]
+    all_valid_subjects = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_valid_imgs for i in l],
+                                                                          [i for l in partitions_valid_lbls for i in l]),
+                                                                          transform=transform_valid)
 
-    all_test_loader = tio.SubjectsDataset(torchio_get_loader_partition([partitions_paths[i][0][2] for i in range(len(partitions_paths))],
-                                                                       [partitions_paths[i][1][2] for i in range(len(partitions_paths))]),
-                                                                       transform=transform_valid)
-    """
-    all_valid_loader = []
-    all_test_loader = []
+    partitions_test_imgs = [partitions_paths[i][0][2] for i in range(len(partitions_paths))]
+    partitions_test_lbls = [partitions_paths[i][1][2] for i in range(len(partitions_paths))]
+    all_test_subjects = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_test_imgs for i in l],
+                                                                         [i for l in partitions_test_lbls for i in l]),
+                                                                         transform=transform_valid)
 
-    #at least 60% of the label must contain 1?
+    #at least 70% of the label must contain 1?
     labels_probabilities = {0: 0.3, 1: 0.7}
     sampler_weighted_probs = tio.data.LabelSampler(
         patch_size=patch_size,
@@ -308,19 +330,13 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
         label_probabilities=labels_probabilities,
     )
 
-    queue = tio.Queue(all_train_loader, max_queue_length, patches_per_volume, sampler_weighted_probs)
-    all_train_loader = torch.utils.data.DataLoader(queue, batch_size=batch_size)
+    queue_train = tio.Queue(all_train_subjects, max_queue_length, patches_per_volume, sampler_weighted_probs)
+    all_train_loader = torch.utils.data.DataLoader(queue_train, batch_size=batch_size)
 
-    """
-    queue = tio.Queue(all_valid_loader, max_queue_length, patches_per_volume, sampler_weighted_probs)
-    all_valid_loader = torch.utils.data.DataLoader(queue, batch_size=1)
-
-    queue = tio.Queue(all_test_loader, max_queue_length, patches_per_volume, sampler_weighted_probs)
-    all_test_loader = torch.utils.data.DataLoader(queue, batch_size=1)
-    """
-
-    #TODO: also convert each dataset for each site into queue and dataloader
-
+    #validation and test don't need the patch sampler
+    all_valid_loader = torch.utils.data.DataLoader(all_valid_subjects, batch_size=1)
+    all_test_loader = torch.utils.data.DataLoader(all_test_subjects, batch_size=1)
+    
     return centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader 
 
 def check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=10):

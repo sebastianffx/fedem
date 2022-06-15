@@ -35,17 +35,28 @@ class Fedem:
         #routine to convert U-Net output to segmentation mask
         self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
 
+        if self.options["use_torchio"]:
+            self.dataloaders, self.all_test_loader, self.all_valid_loader, self.all_train_loader = torchio_generate_loaders(partitions_paths=self.partitions_paths,
+                                                                                                                            batch_size=self.options["batch_size"],
+                                                                                                                            clamp_min=self.options["clamp_min"],
+                                                                                                                            clamp_max=self.options["clamp_max"],
+                                                                                                                            padding=self.options["padding"],
+                                                                                                                            patch_size=self.options["patch_size"],
+                                                                                                                            max_queue_length=self.options["max_queue_length"],
+                                                                                                                            patches_per_volume=self.options["patches_per_volume"]
+                                                                                                                            )
+
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
         metric_values = list()
         best_metric = -1
-        best_loss = 1e5
         best_metric_epoch = -1
         index = [0,1,2]
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
 
-            #recreate the dataloader at each epoch to resample the slices and apply the data augmentation
-            self.dataloaders, _, _, _ = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
+            if not self.options["use_torchio"]:
+                #recreate the dataloader at each epoch to resample the slices and apply the data augmentation
+                self.dataloaders, _, _, _ = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
 
             # dispatch
             self.dispatch(index)
@@ -57,12 +68,12 @@ class Fedem:
             #Evaluation on validation (full volume) and saving model if needed
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
                 epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False)
-                if epoch_valid_dice_loss < best_loss: #using loss as benchmark value since the dice score is not reliable for the empty label mask
-                    best_loss = epoch_valid_dice_loss
+                if epoch_valid_dice_score > best_metric:
+                    best_metric = epoch_valid_dice_score
                     best_metric_epoch = cur_epoch+1
 
                     torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'))
-                    print("saved new best metric model (according to DICE LOSS)")
+                    print("saved new best metric model (according to DICE SCORE)")
         return self.nn
 
     def validation(self,index):        
@@ -159,14 +170,14 @@ class Fedem:
                 model_path = os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth')
             else:
                 model_path = ""
-                print("option for benhmarking metric is not valid")
+                print("option for benchmarking metric is not valid")
+            checkpoint = torch.load(model_path)
+            model.load_state_dict(checkpoint)
 
             if verbose:
                 print("Loading best validation model weights: ")
                 print(model_path)
 
-            checkpoint = torch.load(model_path)
-            model.load_state_dict(checkpoint)
         elif network=="self":
             print("Using current network weights")
         else:
@@ -191,26 +202,22 @@ class Fedem:
         dice_metric.reset()
         for path_case, path_label in zip(all_paths,all_labels): #should be improved by using the dataloader      
             vol = nib.load(path_case)
-            lbl = nib.load(path_label)
-
             vol_affine = vol.affine
-
             vol_pxls = vol.get_fdata()
             vol_pxls = np.array(vol_pxls, dtype = np.float32)
-            lbl_pxls = lbl.get_fdata()
-            lbl_pxls = np.array(lbl_pxls)
-
             vol_pxls = (vol_pxls - 0) / (max_intensity - 0)
+            vol_pxls = torch.tensor(vol_pxls[np.newaxis,np.newaxis,:,:,:]).to(device)
+            lbl_pxls = torch.tensor(nib.load(path_label).get_fdata()[np.newaxis,np.newaxis,:,:,:]).to(device)
 
             raw_pred_holder = []
             post_pred_holder = []
             loss_volume= []
             for slice_selected in range(vol_pxls.shape[-1]):
-                out = model(torch.tensor(vol_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
+                out = model(vol_pxls[:,:,:,:,slice_selected])
 
                 #compute loss between output and label (loss function applies the sigmoid function itself)
                 loss_volume.append(loss_function(input=out,
-                                                 target=torch.tensor(lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device)
+                                                 target=lbl_pxls[:,:,:,:,slice_selected]
                                                 ).item()
                                   )
 
@@ -219,7 +226,7 @@ class Fedem:
                 #apply sigmoid then activation threshold to obtain a discrete segmentation mask
                 pred = self.post_pred(out)
                 #compute dice score between the processed prediction and the labels
-                dice_metric(pred,torch.tensor(lbl_pxls[np.newaxis,np.newaxis,:,:,slice_selected]).to(device))
+                dice_metric(pred,lbl_pxls[:,:,:,:,slice_selected])
                 #save the prediction slice to rebuild a 3D prediction volume
                 post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
 
@@ -304,7 +311,10 @@ class FedAvg(Fedem):
 
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
-                inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                if self.options["use_torchio"]:
+                    inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                else:
+                    inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred = ann(inputs)
                 loss = loss_function(y_pred, labels)
                 optimizer.zero_grad()        
@@ -382,7 +392,10 @@ class Scaffold(Fedem):
 
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
-                inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                if self.options["use_torchio"]:
+                    inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                else:
+                    inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred = ann(inputs)
                 loss = loss_function(y_pred, labels)
                 optimizer.zero_grad()
@@ -567,7 +580,10 @@ class FedRod(Fedem):
                 for k, v in ann.named_parameters(): #Transfering data from the generic head is done in dispatch()
                     v.requires_grad = True #deriving gradients to all the generic layers
                 
-                inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                if self.options["use_torchio"]:
+                    inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                else:
+                    inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred_generic = ann(inputs)
                 loss_generic   = loss_function(y_pred_generic, labels)
                 optimizer.zero_grad()
@@ -665,13 +681,6 @@ class Centralized(Fedem):
 
         optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
-        if self.options["use_torchio"]:
-            _, _, _, all_train_loader = torchio_generate_loaders(partitions_paths=self.partitions_paths, batch_size=self.options["batch_size"],
-                                                                 clamp_min=self.options["clamp_min"], clamp_max=self.options["clamp_max"],
-                                                                 padding=self.options["padding"], patch_size=self.options["patch_size"],
-                                                                 max_queue_length=self.options["max_queue_length"],
-                                                                 patches_per_volume=self.options["patches_per_volume"])
-
         #multiply global and local epoch to have similar conditions
         for cur_epoch in range(global_epoch*local_epoch):
             print("*** epoch:", cur_epoch+1, "***")
@@ -680,13 +689,13 @@ class Centralized(Fedem):
             
             if not self.options["use_torchio"]:
                 #create new loaders for each repetition, to force the sampling of new slices and application of data augmentation
-                _, _, _, all_train_loader = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
+                _, _, _, self.all_train_loader = generate_loaders(self.partitions_paths, self.options["transfo"], self.options["batch_size"])
 
             epoch_loss = 0
             step = 0
             dice_metric.reset()
 
-            for batch_data in all_train_loader:
+            for batch_data in self.all_train_loader:
                 for k, v in self.nn.named_parameters():
                     v.requires_grad = True
                 
