@@ -209,8 +209,8 @@ class Fedem:
 
             print(type(batch_data))
             if self.options["use_test_augm"]:
-                #apply the transformation on the full volume, to avoid transfer between cpu and gpu for each slice
-                test_time_images = [augm(inputs.clone().cpu()).to(device) for augm in self.options["test_time_augm"]]
+                #apply the transformation on the entire 3D volume, to avoid transfer between cpu and gpu for each slice
+                test_time_images = [augm(inputs.clone().cpu()[0,:,:,:,:]).to(device) for augm in self.options["test_time_augm"]]
                 inverse_test_augm = [augm.inverse() for augm in self.options["test_time_augm"]]
 
             #raw_pred_holder = []
@@ -243,11 +243,11 @@ class Fedem:
                     augm_preds2 = []
                     batch_data.add_image()
                     for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
-                        augm_out = model(augmented_test_img[:,:,:,:,slice_selected])
+                        augm_out = model(augmented_test_img[None,:,:,:,slice_selected])
                         #reverse transform when augmentation allows, linear interpolation because output is not discrete
                         #augm_out_inv = inverse_augm(augm_out.detach().cpu().numpy()) #happens on cpu
                         augm_out_inv = inverse_augm(augm_out)
-                        
+
                         #apply segmoid and threshold AFTER averaging
                         augm_preds2.append(augm_out_inv)
                         #apply segmoid and threshold BEFORE averaging
