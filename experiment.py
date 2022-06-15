@@ -140,7 +140,7 @@ if __name__ == '__main__':
                "patches_per_volume":4,
                "loss_fun":"dicelossCE", #diceloss_CE
                #test time augmentation
-               "use_test_augm":True
+               "use_test_augm":False
                }
 
     #thres_lesion_vol indicate the minimum number of 1 label in the mask required to avoid elimination from the dataset

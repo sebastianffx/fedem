@@ -150,20 +150,14 @@ class Fedem:
             os.makedirs(os.path.join(".", "output_viz", self.options["network_name"]), exist_ok=True)
 
         if dataset=="test":
-            idx_partition = 2
+            dataset_loader = self.all_test_loader
         elif dataset=="valid":
-            idx_partition = 1
+            dataset_loader = self.all_valid_loader
         elif dataset=="train":
-            idx_partition = 0
+            dataset_loader = self.all_train_loader
         else:
             print("invalid dataset type, possible value are train, valid and test")
             return -1
-
-        #aggregate the images accross the sites
-        partitions_imgs = [self.options['partitions_paths'][i][0][idx_partition] for i in range(len(self.options['partitions_paths']))]
-        partitions_lbls = [self.options['partitions_paths'][i][1][idx_partition] for i in range(len(self.options['partitions_paths']))]
-        all_paths  = list(itertools.chain.from_iterable(partitions_imgs))
-        all_labels = list(itertools.chain.from_iterable(partitions_lbls))
 
         model = self.nn
         if network=="best":
@@ -211,35 +205,32 @@ class Fedem:
         holder_dicemetric_augm2 = []
         ### END TMP
 
-        for path_case, path_label in zip(all_paths,all_labels): #should be improved by using the dataloader      
-            vol = nib.load(path_case)
-            vol_affine = vol.affine
-            vol_pxls = vol.get_fdata()
-            vol_pxls = np.array(vol_pxls, dtype = np.float32)
-            vol_pxls = (vol_pxls - 0) / (max_intensity - 0)
-            vol_pxls = torch.tensor(vol_pxls[np.newaxis,np.newaxis,:,:,:]).to(device)
-            lbl_pxls = torch.tensor(nib.load(path_label).get_fdata()[np.newaxis,np.newaxis,:,:,:]).to(device)
+        for batch in dataset_loader: 
+            inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
 
-            raw_pred_holder = []
+            print(inputs.shape, labels.shape)
+
+            #raw_pred_holder = []
             post_pred_holder = []
             augm_pred_holder = []
             augm_pred_holder2 = []
             loss_volume= []
-            for slice_selected in range(vol_pxls.shape[-1]):
-                out = model(vol_pxls[:,:,:,:,slice_selected])
-
+            #iterate over all the slices present in the volume
+            for slice_selected in range(inputs.shape[-1]):
+                out = model(inputs[:,:,:,:,slice_selected])
+                
                 #compute loss between output and label (loss function applies the sigmoid function itself)
                 loss_volume.append(loss_function(input=out,
-                                                 target=lbl_pxls[:,:,:,:,slice_selected]
+                                                 target=labels[:,:,:,:,slice_selected]
                                                 ).item()
                                   )
 
                 #saving the raw output of the network
-                raw_pred_holder.append(out[0,0,:,:].detach().cpu().numpy())
+                #raw_pred_holder.append(out[0,0,:,:].detach().cpu().numpy())
                 #apply sigmoid then activation threshold to obtain a discrete segmentation mask
                 pred = self.post_pred(out)
                 #compute dice score between the processed prediction and the labels (single slice)
-                dice_metric(pred,lbl_pxls[:,:,:,:,slice_selected])
+                dice_metric(pred,labels[:,:,:,:,slice_selected])
                 #save the prediction slice to rebuild a 3D prediction volume
                 post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
 
@@ -248,11 +239,11 @@ class Fedem:
                     augm_preds = []
                     augm_preds2 = []
                     for augm in self.options["test_time_augm"]:
-                        #applying the augmentation to the input slice
-                        augm_input = augm(vol_pxls[:,:,:,:,slice_selected].clone())
+                        #applying the augmentation to the input slice, use cloning to prevent modifying the origin image?
+                        augm_input = augm(inputs[:,:,:,:,slice_selected].clone())
                         augm_out = model(augm_input)
 
-                        #reverse transform when augmentation allows (lossless or lossy transform)
+                        #reverse transform when augmentation allows (lossless or lossy transform), linear interpolation because output is not discrete
                         augm_out_inv = augm_out.apply_inverse_transform(image_interpolation='linear')
                         
                         #apply segmoid and threshold AFTER averaging
@@ -267,8 +258,8 @@ class Fedem:
                     #average is discretized by the sigmoid and threshold
                     avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2)))
 
-                    dice_metric_augm(pred,avg_augm_pred)
-                    dice_metric_augm2(pred,avg_augm_pred2)
+                    dice_metric_augm(avg_augm_pred, labels[:,:,:,:,slice_selected])
+                    dice_metric_augm2(avg_augm_pred2, labels[:,:,:,:,slice_selected])
 
                     augm_pred_holder.append(avg_augm_pred[0,0,:,:].cpu().numpy())
                     augm_pred_holder2.append(avg_augm_pred2[0,0,:,:].cpu().numpy())
@@ -277,8 +268,8 @@ class Fedem:
                 #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "raw_segpred_"+benchmark_metric)))
                 nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred_"+benchmark_metric)))
                 if self.options["use_test_augm"]:
-                    nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred_"+benchmark_metric)))
-                    nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred_"+benchmark_metric)))
+                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "augm_segpred_"+benchmark_metric)))
+                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder2, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "augm2_segpred_"+benchmark_metric)))
 
             if self.options["use_test_augm"]:
                 holder_dicemetric_augm2.append(dice_metric_augm2.aggregate().item())
