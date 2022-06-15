@@ -207,7 +207,7 @@ class Fedem:
         for batch_data in dataset_loader: 
             inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:].to(device)
 
-            if self.options["use_test_augm"]:
+            if self.options["use_test_augm"] and dataset=="test":
                 #apply the transformation on the entire 3D volume, to avoid transfer between cpu and gpu for each slice
                 #computationnaly faster, might just require more memory but since bact size is equal to 1, should be ok
                 test_time_images = [augm(inputs.clone().cpu()[0,:,:,:,:]).to(device) for augm in self.options["test_time_augm"]]
@@ -238,9 +238,10 @@ class Fedem:
                 post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
 
                 #perform test-time augmentation slice-wise
-                if self.options["use_test_augm"]:
-                    augm_preds = []
-                    augm_preds2 = []
+                if self.options["use_test_augm"] and dataset=="test":
+                    #initialized with the original image output (before/after post_pred routine)
+                    augm_preds = [pred]
+                    augm_preds2 = [out]
                     for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
                         augm_out = model(augmented_test_img[None,:,:,:,slice_selected])
                         augm_out_inv = inverse_augm(augm_out.detach().cpu()) #happens on cpu
@@ -266,7 +267,7 @@ class Fedem:
             if save_pred:
                 #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "raw_segpred_"+benchmark_metric)))
                 nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred_"+benchmark_metric)))
-                if self.options["use_test_augm"]:
+                if self.options["use_test_augm"] and dataset=="test":
                     nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "augm_segpred_"+benchmark_metric)))
                     nib.save(nib.Nifti1Image(np.stack(augm_pred_holder2, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "augm2_segpred_"+benchmark_metric)))
 
@@ -276,7 +277,7 @@ class Fedem:
             # reset the status for next computation round
             dice_metric.reset()
 
-            if self.options["use_test_augm"]:
+            if self.options["use_test_augm"] and dataset=="test":
                 holder_dicemetric_augm2.append(dice_metric_augm2.aggregate().item())
                 holder_dicemetric_augm.append(dice_metric_augm.aggregate().item())
                 dice_metric_augm2.reset()
@@ -286,7 +287,7 @@ class Fedem:
         if verbose:
             print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
             print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
-            if "test_time_augm" in self.options.keys():
+            if self.options["use_test_augm"] and dataset=="test":
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm):", np.round(np.mean(holder_dicemetric_augm),4))
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm 2):", np.round(np.mean(holder_dicemetric_augm2),4))
         return np.mean(holder_dicemetric), np.mean(holder_diceloss)
