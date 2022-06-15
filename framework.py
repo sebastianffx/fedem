@@ -239,10 +239,10 @@ class Fedem:
                     augm_preds2 = []
                     for augm in self.options["test_time_augm"]:
                         #applying the augmentation to the input slice, use cloning to prevent modifying the origin image?
-                        augm_input = augm(inputs[:,:,:,:,slice_selected].clone())
+                        augm_input = augm(inputs[:,:,:,:,slice_selected].clone().cpu()).to(device)
                         augm_out = model(augm_input)
 
-                        #reverse transform when augmentation allows (lossless or lossy transform), linear interpolation because output is not discrete
+                        #reverse transform when augmentation allows, linear interpolation because output is not discrete
                         augm_out_inv = augm_out.apply_inverse_transform(image_interpolation='linear')
                         
                         #apply segmoid and threshold AFTER averaging
@@ -251,14 +251,14 @@ class Fedem:
                         augm_preds.append(self.post_pred(augm_out_inv))
 
                     #average must discretized, using a simple threshold at 0.5
-                    avg_augm_pred = torch.mean(torch.stack(augm_preds))
+                    avg_augm_pred = torch.mean(torch.stack(augm_preds), dim=-1)
                     avg_augm_pred = avg_augm_pred > 0.5
 
                     #average is discretized by the sigmoid and threshold
-                    avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2)))
+                    avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2), dim=-1))
 
-                    dice_metric_augm(avg_augm_pred, labels[:,:,:,:,slice_selected])
-                    dice_metric_augm2(avg_augm_pred2, labels[:,:,:,:,slice_selected])
+                    dice_metric_augm(avg_augm_pred.to(device), labels[:,:,:,:,slice_selected])
+                    dice_metric_augm2(avg_augm_pred2.to(device), labels[:,:,:,:,slice_selected])
 
                     augm_pred_holder.append(avg_augm_pred[0,0,:,:].cpu().numpy())
                     augm_pred_holder2.append(avg_augm_pred2[0,0,:,:].cpu().numpy())
