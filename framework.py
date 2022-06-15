@@ -243,7 +243,7 @@ class Fedem:
                         augm_out = model(augm_input.to(device))
 
                         #reverse transform when augmentation allows, linear interpolation because output is not discrete
-                        augm_out_inv = augm_out.cpu().numpy().apply_inverse_transform(image_interpolation='linear') #happens on cpu
+                        augm_out_inv = augm_out.detach().cpu().numpy().apply_inverse_transform(image_interpolation='linear') #happens on cpu
                         
                         #apply segmoid and threshold AFTER averaging
                         augm_preds2.append(augm_out_inv)
