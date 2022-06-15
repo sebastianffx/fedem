@@ -121,7 +121,7 @@ if __name__ == '__main__':
     #path = 'astral_fedem_v3/'
 
     #experience_name = "astral_no_empty_mask"
-    experience_name = "no_empty_torchio"
+    experience_name = "no_empty_torchio_DLCE"
     modality="ADC"
 
     clients=["center1", "center2", "center3"]
@@ -146,6 +146,7 @@ if __name__ == '__main__':
                "padding":(64,64,0),
                "max_queue_length":16,
                "patches_per_volume":4,
+               "loss_fun":"dicelossCE", #diceloss_CE
                }
 
     #thres_lesion_vol indicate the minimum number of 1 label in the mask required to avoid elimination from the dataset

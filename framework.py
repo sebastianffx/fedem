@@ -659,6 +659,15 @@ class Centralized(Fedem):
         early_stop_val = 0
         early_stop_count = 0
 
+        if self.options["loss_fun"] == "diceloss":
+            print("Using DiceLoss as loss function")
+            loss_function = monai.losses.DiceLoss(sigmoid=True)
+        else:
+            print("Using DiceLoss + CE as loss function")
+            loss_function = monai.losses.DiceCELoss(include_background=True, sigmoid=True, reduction='mean', batch=True, ce_weight=None, lambda_dice=1.0, lambda_ce=1.0)
+
+        optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
+
         if self.options["use_torchio"]:
             _, _, _, all_train_loader = torchio_generate_loaders(partitions_paths=self.partitions_paths, batch_size=self.options["batch_size"],
                                                                  clamp_min=self.options["clamp_min"], clamp_max=self.options["clamp_max"],
@@ -671,12 +680,6 @@ class Centralized(Fedem):
             print("*** epoch:", cur_epoch+1, "***")
 
             self.nn.train()
-                    
-            loss_function = monai.losses.DiceLoss(sigmoid=True)
-            #what weights should I use for the cross entropy since we have such a class imbalance between the background and the lesions?
-            #loss_function = monai.losses.DiceCELoss(include_background=True, sigmoid=True, reduction='mean', batch=True, ce_weight=None, lambda_dice=1.0, lambda_ce=1.0)
-
-            optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
             
             if not self.options["use_torchio"]:
                 #create new loaders for each repetition, to force the sampling of new slices and application of data augmentation
