@@ -207,9 +207,9 @@ class Fedem:
         for batch_data in dataset_loader: 
             inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:].to(device)
 
-            print(type(batch_data))
             if self.options["use_test_augm"]:
                 #apply the transformation on the entire 3D volume, to avoid transfer between cpu and gpu for each slice
+                #computationnaly faster, might just require more memory but since bact size is equal to 1, should be ok
                 test_time_images = [augm(inputs.clone().cpu()[0,:,:,:,:]).to(device) for augm in self.options["test_time_augm"]]
                 inverse_test_augm = [augm.inverse() for augm in self.options["test_time_augm"]]
 
@@ -270,19 +270,18 @@ class Fedem:
                     nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "augm_segpred_"+benchmark_metric)))
                     nib.save(nib.Nifti1Image(np.stack(augm_pred_holder2, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "augm2_segpred_"+benchmark_metric)))
 
-            if self.options["use_test_augm"]:
-                holder_dicemetric_augm2.append(dice_metric_augm2.aggregate().item())
-                holder_dicemetric_augm.append(dice_metric_augm.aggregate().item())
-                dice_metric_augm2.reset()
-                dice_metric_augm.reset()
-
             #retain each volume scores (dice loss and dice score)
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
             holder_diceloss.append(np.mean(loss_volume)) #average per volume
             # reset the status for next computation round
             dice_metric.reset()
 
-        assert(len(all_labels) == len(holder_diceloss) and len(all_labels) == len(holder_dicemetric))
+            if self.options["use_test_augm"]:
+                holder_dicemetric_augm2.append(dice_metric_augm2.aggregate().item())
+                holder_dicemetric_augm.append(dice_metric_augm.aggregate().item())
+                dice_metric_augm2.reset()
+                dice_metric_augm.reset()
+
         #print average over all the volumes
         if verbose:
             print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
