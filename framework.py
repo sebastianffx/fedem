@@ -239,11 +239,11 @@ class Fedem:
                     augm_preds2 = []
                     for augm in self.options["test_time_augm"]:
                         #applying the augmentation to the input slice, use cloning to prevent modifying the origin image?
-                        augm_input = augm(inputs[:,:,:,:,slice_selected].clone().cpu()).to(device)
-                        augm_out = model(augm_input)
+                        augm_input = augm(inputs[:,:,:,:,slice_selected].clone().cpu()) #augment happens on cpu
+                        augm_out = model(augm_input.to(device))
 
                         #reverse transform when augmentation allows, linear interpolation because output is not discrete
-                        augm_out_inv = augm_out.apply_inverse_transform(image_interpolation='linear')
+                        augm_out_inv = augm_out.cpu().numpy().apply_inverse_transform(image_interpolation='linear') #happens on cpu
                         
                         #apply segmoid and threshold AFTER averaging
                         augm_preds2.append(augm_out_inv)
