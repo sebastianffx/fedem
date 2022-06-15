@@ -153,8 +153,6 @@ class Fedem:
             dataset_loader = self.all_test_loader
         elif dataset=="valid":
             dataset_loader = self.all_valid_loader
-        elif dataset=="train":
-            dataset_loader = self.all_train_loader
         else:
             print("invalid dataset type, possible value are train, valid and test")
             return -1
