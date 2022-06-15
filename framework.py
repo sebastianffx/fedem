@@ -746,7 +746,6 @@ class Centralized(Fedem):
                 
                 step += 1
                 if self.options["use_torchio"]:
-                    print(batch_data[self.options['modality']]['data'].shape)
                     inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
