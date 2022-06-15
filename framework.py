@@ -719,10 +719,14 @@ class Centralized(Fedem):
 
         if self.options["loss_fun"] == "diceloss":
             print("Using DiceLoss as loss function")
-            loss_function = monai.losses.DiceLoss(sigmoid=True)
+            loss_function = monai.losses.DiceLoss(sigmoid=True) #should see the impact of batch=True
         else:
             print("Using DiceLoss + CE as loss function")
-            loss_function = monai.losses.DiceCELoss(include_background=True, sigmoid=True, reduction='mean', batch=True, ce_weight=None, lambda_dice=1.0, lambda_ce=1.0)
+            loss_function = monai.losses.DiceCELoss(include_background=True, sigmoid=True, reduction='mean',
+                                                    batch=True, ce_weight=None, 
+                                                    lambda_dice=self.options["hybrid_loss_weights"][0], 
+                                                    lambda_ce=self.options["hybrid_loss_weights"][1]
+                                                    )
 
         optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
