@@ -205,7 +205,7 @@ class Fedem:
 
         #during validation and testing, the batch_data size should be 1
         for batch_data in dataset_loader: 
-            inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+            inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:].to(device)
 
             print(inputs.shape, labels.shape)
 
@@ -746,6 +746,7 @@ class Centralized(Fedem):
                 
                 step += 1
                 if self.options["use_torchio"]:
+                    print(batch_data[self.options['modality']]['data'].shape)
                     inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
