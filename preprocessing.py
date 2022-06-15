@@ -233,6 +233,9 @@ def generate_loaders(partitions_paths, transfo, batch_size):
 
 def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels):
     subjects_list = []
+
+    #TODO: compute connected component on the label map, so that the blob loss can take advantage of it
+
     for i in range(len(partition_paths_adc)):
         subjects_list.append(tio.Subject(
                                 adc=tio.ScalarImage(partition_paths_adc[i]),
