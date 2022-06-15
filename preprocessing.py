@@ -299,6 +299,14 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
 
     transform, transform_valid = torchio_create_transfo(clamp_min=clamp_min, clamp_max=clamp_max, padding=padding, patch_size=patch_size)
 
+    #patch has 0.7 prob of being centered on a label=1
+    labels_probabilities = {0: 0.3, 1: 0.7}
+    sampler_weighted_probs = tio.data.LabelSampler(
+        patch_size=patch_size,
+        label_name='label',
+        label_probabilities=labels_probabilities,
+    )
+
     centers_data_loaders = []
     #create 3 dataloader per site [train, validation, test]
     for i in range(len(partitions_paths)):
@@ -351,14 +359,6 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
     all_test_subjects = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_test_imgs for i in l],
                                                                          [i for l in partitions_test_lbls for i in l]),
                                                                          transform=transform_valid)
-
-    #at least 70% of the label must contain 1?
-    labels_probabilities = {0: 0.3, 1: 0.7}
-    sampler_weighted_probs = tio.data.LabelSampler(
-        patch_size=patch_size,
-        label_name='label',
-        label_probabilities=labels_probabilities,
-    )
 
     queue_train = tio.Queue(all_train_subjects, max_queue_length, patches_per_volume, sampler_weighted_probs)
     all_train_loader = torch.utils.data.DataLoader(queue_train, batch_size=batch_size)
