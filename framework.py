@@ -243,8 +243,7 @@ class Fedem:
                     augm_preds2 = []
                     for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
                         augm_out = model(augmented_test_img[None,:,:,:,slice_selected])
-                        #augm_out_inv = inverse_augm(augm_out.detach().cpu().numpy()) #happens on cpu
-                        augm_out_inv = inverse_augm(augm_out)
+                        augm_out_inv = inverse_augm(augm_out.detach().cpu()) #happens on cpu
 
                         #apply segmoid and threshold AFTER averaging
                         augm_preds2.append(augm_out_inv)
