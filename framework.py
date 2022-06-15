@@ -207,6 +207,12 @@ class Fedem:
         for batch_data in dataset_loader: 
             inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:].to(device)
 
+            print(type(batch_data))
+            if self.options["use_test_augm"]:
+                #apply the transformation on the full volume, to avoid transfer between cpu and gpu for each slice
+                test_time_images = [augm(inputs.clone().cpu()).to(device) for augm in self.options["test_time_augm"]]
+                inverse_test_augm = [augm.inverse() for augm in self.options["test_time_augm"]]
+
             #raw_pred_holder = []
             post_pred_holder = []
             augm_pred_holder = []
@@ -231,17 +237,16 @@ class Fedem:
                 #save the prediction slice to rebuild a 3D prediction volume
                 post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
 
-                #the augmentation affecting the voxel values should probably have been seen/used during training
+                #perform test-time augmentation slice-wise
                 if self.options["use_test_augm"]:
                     augm_preds = []
                     augm_preds2 = []
-                    for augm in self.options["test_time_augm"]:
-                        #applying the augmentation to the input slice, use cloning to prevent modifying the origin image?
-                        augm_input = augm(inputs[:,:,:,:,slice_selected].clone().cpu()) #augment happens on cpu
-                        inverse_augm = augm_input.get_inverse_transform()
-                        augm_out = model(augm_input.to(device))
+                    batch_data.add_image()
+                    for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
+                        augm_out = model(augmented_test_img[:,:,:,:,slice_selected])
                         #reverse transform when augmentation allows, linear interpolation because output is not discrete
-                        augm_out_inv = inverse_augm(augm_out.detach().cpu().numpy()) #happens on cpu
+                        #augm_out_inv = inverse_augm(augm_out.detach().cpu().numpy()) #happens on cpu
+                        augm_out_inv = inverse_augm(augm_out)
                         
                         #apply segmoid and threshold AFTER averaging
                         augm_preds2.append(augm_out_inv)
@@ -251,6 +256,8 @@ class Fedem:
                     #average must discretized, using a simple threshold at 0.5
                     avg_augm_pred = torch.mean(torch.stack(augm_preds), dim=-1)
                     avg_augm_pred = avg_augm_pred > 0.5
+
+                    print(avg_augm_pred.shape)
 
                     #average is discretized by the sigmoid and threshold
                     avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2), dim=-1))
