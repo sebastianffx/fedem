@@ -153,7 +153,7 @@ if __name__ == '__main__':
     #for lr in np.linspace(1e-5, 1e-2, 5):
     #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
     lr = 0.001694
-    for weight_comb in [[0.2, 0.8], [0.3, 0.7], [0.5, 0.5], [0.7, 0.3], [0.8, 0.2]]:
+    for weight_comb in [[0.4, 1.6], [0.6, 1.4], [1, 1], [1.4, 0.6], [1.6, 0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
