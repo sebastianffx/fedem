@@ -265,7 +265,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size):
     transform = tio.Compose(transforms)
 
     #normalization only, no spatial transformation or data augmentation
-    transform_valid = tio.Compose([clamp, rescale, toCanon])
+    transform_valid = tio.Compose([clamp, toCanon, rescale])
     return transform, transform_valid
 
 def torchio_create_test_transfo():
