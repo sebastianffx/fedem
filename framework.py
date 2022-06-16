@@ -242,6 +242,8 @@ class Fedem:
                         augm_out = model(augmented_test_img[None,:,:,:,slice_selected])
                         augm_out_inv = inverse_augm(augm_out.detach().cpu()) #happens on cpu
 
+                        #would probably be good to manually re-check that the inverse augmentation are well applied
+
                         #apply sigmoid and threshold BEFORE averaging
                         augm_preds.append(self.post_pred(augm_out_inv).to(device))
                         #tried applying sigmoid and threshold AFTER averaging UNet output but the negative values overcome the positive prior to the sigmoid
