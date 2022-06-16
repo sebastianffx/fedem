@@ -260,7 +260,8 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size):
 
     #removed the resampler_dwi since it's not used for the ASTRAL dataset
     transforms = [clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation]
-    #randomFlip should probably be along axes=1 to really take advantage of the symmetry of the brain --> Superior or inferior don't make sense since 2D Net
+    #randomFlip should probably be along axes="Right/Left" or "Anterior/Posterior" to take advantage of the symmetry of the brain
+    # Superior or Inferior don't make sense for 2D net
     transform = tio.Compose(transforms)
 
     #normalization only, no spatial transformation or data augmentation
@@ -273,14 +274,15 @@ def torchio_create_test_transfo():
     """
     #lossless
     #default axes for RandomFlip (training) is 0
-    h_flip = tio.Flip(axes="R") #symmetry plane = right plane of the brain
-    v_flip = tio.Flip(axes="S") #symmetry plane = superior plane of the brain --> index engineering when iterating over full volume
+    Right_flip = tio.Flip(axes="R") #symmetry plane = right plane of the brain
+    Superior_flip = tio.Flip(axes="S") #symmetry plane = superior plane of the brain --> index engineering when iterating over full volume
 
     #lossly, tio.Affine was found directly in the source code
     #scale < 1 means dezooming, 0.1 means zooming/dezooming of at most 10%
-    rotation90 = tio.Affine(scales=0.1, degrees=90, translation=0)
-    rotation180 = tio.Affine(scales=0.1, degrees=180, translation=0) #this transformation is geometrically VERY close to h_flip due to the symmetry of the brain
-    rotation270 = tio.Affine(scales=0.1, degrees=270, translation=0)
+    #using scale = 0 to avoid any zooming and prevent interpolation prior to prediction averaging
+    rotation90 = tio.Affine(scales=0, degrees=90, translation=0)
+    rotation180 = tio.Affine(scales=0, degrees=180, translation=0) #this transformation is geometrically VERY close to Anterior Flipping due to the symmetry of the brain
+    rotation270 = tio.Affine(scales=0, degrees=270, translation=0)
 
     gaussian = tio.RandomNoise()
     gamma = tio.RandomGamma()
@@ -293,7 +295,7 @@ def torchio_create_test_transfo():
     #return [h_flip, v_flip, rotation90, rotation180, rotation270]
 
     #proof of work with reduced number of augmentation
-    return [h_flip, rotation90]
+    return [Right_flip, rotation90, rotation180]
     
 
 
