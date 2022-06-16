@@ -265,11 +265,11 @@ class Fedem:
                     augm_pred_holder2.append(avg_augm_pred2[0,0,:,:].cpu().numpy())
 
             if save_pred:
-                #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "raw_segpred_"+benchmark_metric)))
-                nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred_"+benchmark_metric)))
+                #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), inputs['label'].affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "raw_segpred_"+benchmark_metric)))
+                nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), inputs['label'].affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "post_segpred_"+benchmark_metric)))
                 if self.options["use_test_augm"] and dataset=="test":
-                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "augm_segpred_"+benchmark_metric)))
-                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder2, axis=-1), vol_affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "augm2_segpred_"+benchmark_metric)))
+                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), inputs['label'].affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "augm_segpred_"+benchmark_metric)))
+                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder2, axis=-1), inputs['label'].affine), os.path.join(".", "output_viz", self.options["network_name"], path_case.split("/")[-1].replace("adc", "augm2_segpred_"+benchmark_metric)))
 
             #retain each volume scores (dice loss and dice score)
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
