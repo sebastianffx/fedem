@@ -252,13 +252,20 @@ class Fedem:
                         #apply segmoid and threshold BEFORE averaging
                         augm_preds.append(self.post_pred(augm_out_inv).to(device))
 
+                        #trying to understand why the average is 0 for the augmented maps
+                        print("augm2", augm_out_inv.min(), augm_out_inv.max(), augm_out_inv.mean())
+                        print("augm", self.post_pred(augm_out_inv).min(), self.post_pred(augm_out_inv).max(), self.post_pred(augm_out_inv).mean())
+
                     #average must discretized, using a simple threshold at 0.5
                     avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
+                    print("augm after avg", augm_out_inv.min(), augm_out_inv.max(), augm_out_inv.mean())
                     avg_augm_pred = avg_augm_pred > 0.5
                     avg_augm_pred = avg_augm_pred.int() #convert bool to int
+                    print("augm after threshold", augm_out_inv.min(), augm_out_inv.max(), augm_out_inv.mean())
 
                     #average is discretized by the sigmoid and threshold
                     avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2, dim=0), dim=0))
+                    print("augm2 after sigmoid and threshold", augm_out_inv.min(), augm_out_inv.max(), augm_out_inv.mean())
 
                     dice_metric_augm(avg_augm_pred, labels[:,:,:,:,slice_selected])
                     dice_metric_augm2(avg_augm_pred2, labels[:,:,:,:,slice_selected])
