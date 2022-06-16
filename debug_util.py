@@ -19,10 +19,13 @@ def crop2seg(path, r_low, r_high):
 def replace_masks(path_to_dataset, path_mask_archive):
     """ Replace one dataset mask with new masks, using the name of the subject
     """
+    #TODO: also copy the labels with component labeling, could be useful for the blob loss
+
     for center in os.listdir(path_to_dataset):
+        print("processing", str(center))
         for split in ["train", "valid", "test"]:
             #extract te subjects using the mask file
-            split_subjects = [f for f in s.listdir(os.path.join(path_to_dataset, split)) if "msk." in f]
+            split_subjects = [f for f in os.listdir(os.path.join(path_to_dataset, split)) if "msk." in f]
             for subject in split_subjects:
                 #overwrite the existing mask with the new mask
                 shutil.copy(os.path.join(path_mask_archive, f.replace("_msk.", "_ANTS_HDBET_FAST_smooth_concomp_defuseSeg_labeled.")),
