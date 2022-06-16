@@ -254,6 +254,7 @@ class Fedem:
                     #average must discretized, using a simple threshold at 0.5
                     avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0).to(device), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
                     avg_augm_pred = avg_augm_pred > 0.5
+                    avg_augm_pred = avg_augm_pred.int() #convert bool to int
 
                     #average is discretized by the sigmoid and threshold
                     avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2, dim=0).to(device), dim=0)).to(device)
