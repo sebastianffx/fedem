@@ -266,7 +266,7 @@ class Fedem:
 
             if save_pred:
                 affine = batch_data['label']['affine'][0,:,:].detach().cpu().numpy()
-                filename = batch_data['label']['stem'][0]
+                filestem = batch_data['label']['stem'][0]
                 #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_raw_segpred_"+benchmark_metric+".nii.gz")))
                 nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_post_segpred_"+benchmark_metric+".nii.gz")))
                 if self.options["use_test_augm"] and dataset=="test":
