@@ -266,11 +266,12 @@ class Fedem:
 
             if save_pred:
                 affine = batch_data['label']['affine'][0,:,:].detach().cpu().numpy()
-                #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], batch_data['label']['stem'].replace("_msk", "_raw_segpred_"+benchmark_metric+".nii.gz")))
-                nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], batch_data['label']['stem'].replace("_msk", "_post_segpred_"+benchmark_metric+".nii.gz")))
+                filename = batch_data['label']['stem'][0]
+                #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_raw_segpred_"+benchmark_metric+".nii.gz")))
+                nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_post_segpred_"+benchmark_metric+".nii.gz")))
                 if self.options["use_test_augm"] and dataset=="test":
-                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], batch_data['label']['stem'].replace("_msk", "_augm_segpred_"+benchmark_metric+".nii.gz")))
-                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder2, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], batch_data['label']['stem'].replace("_msk", "_augm2_segpred_"+benchmark_metric+".nii.gz")))
+                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_augm_segpred_"+benchmark_metric+".nii.gz")))
+                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder2, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_augm2_segpred_"+benchmark_metric+".nii.gz")))
 
             #retain each volume scores (dice loss and dice score)
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
