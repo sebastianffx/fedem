@@ -271,10 +271,12 @@ def torchio_create_test_transfo():
         Here, we consider the 90, 180 and 270 rotation to be covered by the randomAffine(degrees=360)
     """
     #lossless
-    h_flip = tio.Flip(axes=0)
-    v_flip = tio.Flip(axes=1) #this transform is never seen during the training, default axes for RandomFlip is 1
+    #default axes for RandomFlip (training) is 0
+    h_flip = tio.Flip(axes="Right")
+    v_flip = tio.Flip(axes="Superior") 
 
     #lossly, tio.Affine was found directly in the source code
+    #scale < 1 means dezooming, 0.1 means zooming/dezooming of at most 10%
     rotation90 = tio.Affine(scales=0.1, degrees=90, translation=0)
     rotation180 = tio.Affine(scales=0.1, degrees=180, translation=0) #this transformation is geometrically VERY close to h_flip due to the symmetry of the brain
     rotation270 = tio.Affine(scales=0.1, degrees=270, translation=0)
