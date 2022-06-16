@@ -249,17 +249,17 @@ class Fedem:
                         #apply segmoid and threshold AFTER averaging
                         augm_preds2.append(augm_out_inv)
                         #apply segmoid and threshold BEFORE averaging
-                        augm_preds.append(self.post_pred(augm_out_inv))
+                        augm_preds.append(self.post_pred(augm_out_inv).cpu())
 
                     #average must discretized, using a simple threshold at 0.5
                     avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
                     avg_augm_pred = avg_augm_pred > 0.5
 
                     #average is discretized by the sigmoid and threshold
-                    avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2, dim=0), dim=0))
+                    avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2, dim=0), dim=0).to(device))
 
                     dice_metric_augm(avg_augm_pred.to(device), labels[:,:,:,:,slice_selected])
-                    dice_metric_augm2(avg_augm_pred2.to(device), labels[:,:,:,:,slice_selected])
+                    dice_metric_augm2(avg_augm_pred2, labels[:,:,:,:,slice_selected])
 
                     augm_pred_holder.append(avg_augm_pred[0,0,:,:].cpu().numpy())
                     augm_pred_holder2.append(avg_augm_pred2[0,0,:,:].cpu().numpy())
