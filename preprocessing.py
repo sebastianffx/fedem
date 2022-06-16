@@ -272,7 +272,7 @@ def torchio_create_test_transfo():
     """
     #lossless
     h_flip = tio.Flip(axes=0)
-    v_flip = tio.Flip(axes=1)
+    v_flip = tio.Flip(axes=1) #this transform is never seen during the training
 
     #lossly, tio.Affine was found directly in the source code
     rotation90 = tio.Affine(scales=0.1, degrees=90, translation=0)
@@ -285,10 +285,12 @@ def torchio_create_test_transfo():
     #non-invertible : blurring
 
     #no need to compose, they will be applied indepently
-    #return [h_flip, v_flip, rotation90, rotation180, rotation270, gaussian, gamma]
 
-    #proof of work without the noise adding function, which
-    return [h_flip, v_flip, rotation90, rotation180, rotation270]
+    #proof of work without the noise adding function
+    #return [h_flip, v_flip, rotation90, rotation180, rotation270]
+
+    #proof of work with reduced number of augmentation
+    return [h_flip, rotation180]
     
 
 

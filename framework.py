@@ -273,10 +273,6 @@ class Fedem:
                 #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_raw_segpred_"+benchmark_metric+".nii.gz")))
                 nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_post_segpred_"+benchmark_metric+".nii.gz")))
                 if self.options["use_test_augm"] and dataset=="test":
-                    if np.stack(augm_pred_holder, axis=-1).sum() > 0:
-                        print("test-time augment found a lesion in augm")
-                    if np.stack(augm_pred_holder2, axis=-1).sum() > 0:
-                        print("test-time augment found a lesion in augm2")
                     nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_augm_segpred_"+benchmark_metric+".nii.gz")))
                     nib.save(nib.Nifti1Image(np.stack(augm_pred_holder2, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_augm2_segpred_"+benchmark_metric+".nii.gz")))
 
