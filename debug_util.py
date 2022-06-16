@@ -29,4 +29,4 @@ def replace_masks(path_to_dataset, path_mask_archive):
             for subject in split_subjects:
                 #overwrite the existing mask with the new mask
                 shutil.copy(os.path.join(path_mask_archive, subject.replace("_msk.", "_ANTS_HDBET_FAST_smooth_concomp_defuseSeg_labeled.")),
-                            os.path.join(os.path.join(path_to_dataset, split, subject)))
+                            os.path.join(os.path.join(path_to_dataset, center, split, subject)))
