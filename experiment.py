@@ -72,8 +72,8 @@ if __name__ == '__main__':
     #path = 'astral_fedem_v3/'
 
     #experience_name = "astral_no_empty_mask"
-    experience_name = "no_empty_torchio_DLCE"
-    #experience_name = "no_empty_tio_DLCE_lambdas_opti" 
+    #experience_name = "no_empty_torchio_DLCE"
+    experience_name = "no_empty_tio_DLCE_lambdas_opti" 
     modality="ADC"
 
     clients=["center1", "center2", "center3"]
@@ -111,17 +111,17 @@ if __name__ == '__main__':
     networks_config = []
     networks_name = []
     #storing the best parameters
-    #lr = 0.001694
+    lr = 0.001694
     weight_comb = [1,1]
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
-    #for weight_comb in [[0.4, 1.6], [0.6, 1.4], [1.4, 0.6], [1.6, 0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
+    #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
+    for weight_comb in [[0.4, 1.6], [0.6, 1.4], [1.4, 0.6], [1.6, 0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
-        #networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
-        #legacy network naming, no lambdas
-        networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
+        networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
+        #legacy network naming, no lambdas (valid for v1 to v4)
+        #networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
 
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
@@ -149,4 +149,4 @@ if __name__ == '__main__':
                                                 number_site=number_site,
                                                 size_crop=144,
                                                 nested=False,
-                                                train=False)
+                                                train=True)
