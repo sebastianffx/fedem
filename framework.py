@@ -198,9 +198,7 @@ class Fedem:
 
         #### TMP : used to test the best approach to average the output
         dice_metric_augm = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
-        dice_metric_augm2 = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
         holder_dicemetric_augm = []
-        holder_dicemetric_augm2 = []
         ### END TMP
 
         #during validation and testing, the batch_data size should be 1, last dimension is number of slice in original volume
@@ -212,11 +210,10 @@ class Fedem:
                 #computationnaly faster, might just require more memory but since bact size is equal to 1, should be ok
                 test_time_images = [augm(inputs.clone().cpu()[0,:,:,:,:]).to(device) for augm in self.options["test_time_augm"]]
                 inverse_test_augm = [augm.inverse() for augm in self.options["test_time_augm"]]
+                augm_pred_holder = []
 
             #raw_pred_holder = []
             post_pred_holder = []
-            augm_pred_holder = []
-            augm_pred_holder2 = []
             loss_volume= []
             #iterate over all the slices present in the volume
             for slice_selected in range(inputs.shape[-1]):
@@ -240,32 +237,23 @@ class Fedem:
                 #perform test-time augmentation slice-wise
                 if self.options["use_test_augm"] and dataset=="test":
                     #initialized with the original image output (before/after post_pred routine)
-                    #pred and out are on the device
-                    augm_preds = [pred]
-                    augm_preds2 = [out]
+                    augm_preds = [pred] #pred is already on the device
                     for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
                         augm_out = model(augmented_test_img[None,:,:,:,slice_selected])
                         augm_out_inv = inverse_augm(augm_out.detach().cpu()) #happens on cpu
 
-                        #apply segmoid and threshold AFTER averaging
-                        augm_preds2.append(augm_out_inv.to(device))
-                        #apply segmoid and threshold BEFORE averaging
+                        #apply sigmoid and threshold BEFORE averaging
                         augm_preds.append(self.post_pred(augm_out_inv).to(device))
+                        #tried applying sigmoid and threshold AFTER averaging UNet output but the negative values overcome the positive prior to the sigmoid
 
                     #average must discretized, using a simple threshold at 0.5
                     avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
                     avg_augm_pred = avg_augm_pred >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
                     avg_augm_pred = avg_augm_pred.int() #convert bool to int
 
-                    #average is discretized by the sigmoid and threshold
-                    #single negative value could overwrite all positive value for the same position (Unet output is skewed toward negative values)
-                    avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2, dim=0), dim=0))
-
                     dice_metric_augm(avg_augm_pred, labels[:,:,:,:,slice_selected])
-                    dice_metric_augm2(avg_augm_pred2, labels[:,:,:,:,slice_selected])
 
                     augm_pred_holder.append(avg_augm_pred[0,0,:,:].cpu().numpy())
-                    augm_pred_holder2.append(avg_augm_pred2[0,0,:,:].cpu().numpy())
 
             if save_pred:
                 affine = batch_data['label']['affine'][0,:,:].detach().cpu().numpy()
@@ -274,7 +262,6 @@ class Fedem:
                 nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_post_segpred_"+benchmark_metric+".nii.gz")))
                 if self.options["use_test_augm"] and dataset=="test":
                     nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_augm_segpred_"+benchmark_metric+".nii.gz")))
-                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder2, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_augm2_segpred_"+benchmark_metric+".nii.gz")))
 
             #retain each volume scores (dice loss and dice score)
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
@@ -283,9 +270,7 @@ class Fedem:
             dice_metric.reset()
 
             if self.options["use_test_augm"] and dataset=="test":
-                holder_dicemetric_augm2.append(dice_metric_augm2.aggregate().item())
                 holder_dicemetric_augm.append(dice_metric_augm.aggregate().item())
-                dice_metric_augm2.reset()
                 dice_metric_augm.reset()
 
         #print average over all the volumes
@@ -294,7 +279,6 @@ class Fedem:
             print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
             if self.options["use_test_augm"] and dataset=="test":
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm):", np.round(np.mean(holder_dicemetric_augm),4))
-                print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm 2):", np.round(np.mean(holder_dicemetric_augm2),4))
         return np.mean(holder_dicemetric), np.mean(holder_diceloss)
 
 class FedAvg(Fedem):
