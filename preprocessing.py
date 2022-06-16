@@ -235,6 +235,7 @@ def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels):
     subjects_list = []
 
     #TODO: compute connected component on the label map, so that the blob loss can take advantage of it
+    # this could be performed prior to the loading as well, be part of the dataset creation/organization
 
     for i in range(len(partition_paths_adc)):
         subjects_list.append(tio.Subject(
@@ -244,7 +245,7 @@ def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels):
                             )
     return subjects_list
 
-def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size):
+def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deformation=False):
     clamp = tio.Clamp(out_min=clamp_min, out_max=clamp_max)
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
     spatial = tio.OneOf({
@@ -266,7 +267,12 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size):
 
     #normalization only, no spatial transformation or data augmentation
     transform_valid = tio.Compose([clamp, toCanon, rescale])
-    return transform, transform_valid
+    #just regular campling and normalization
+    if no_deformation:
+        return transform_valid, transform_valid
+    #more transformation: affine, rotation, elastic deformation and planar symmetry
+    else:
+        return transform, transform_valid
 
 def torchio_create_test_transfo():
     """ Transform for test-time augmentation, the transformation should have been seen during the training.
