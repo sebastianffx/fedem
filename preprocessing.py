@@ -259,7 +259,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size):
     toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
 
     #removed the resampler_dwi since it's not used for the ASTRAL dataset
-    transforms = [clamp, toCanon, rescale, spatial, tio.RandomFlip(), padding, rotation]
+    transforms = [clamp, toCanon, rescale, spatial, tio.RandomFlip(), padding, rotation] #randomFlip should probably be along axes=1 to really take advantage of the symmetry of the brain
     transform = tio.Compose(transforms)
 
     #normalization only, no spatial transformation or data augmentation
@@ -272,7 +272,7 @@ def torchio_create_test_transfo():
     """
     #lossless
     h_flip = tio.Flip(axes=0)
-    v_flip = tio.Flip(axes=1) #this transform is never seen during the training
+    v_flip = tio.Flip(axes=1) #this transform is never seen during the training, default axes for RandomFlip is 1
 
     #lossly, tio.Affine was found directly in the source code
     rotation90 = tio.Affine(scales=0.1, degrees=90, translation=0)
@@ -290,7 +290,7 @@ def torchio_create_test_transfo():
     #return [h_flip, v_flip, rotation90, rotation180, rotation270]
 
     #proof of work with reduced number of augmentation
-    return [h_flip, rotation90]
+    return [v_flip, rotation90]
     
 
 
