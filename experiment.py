@@ -101,7 +101,8 @@ if __name__ == '__main__':
                "loss_fun":"dicelossCE", #diceloss_CE
                "hybrid_loss_weights":[1,1],
                #test time augmentation
-               "use_test_augm":True
+               "use_test_augm":True,
+               "test_augm_threshold":0.5 #at least half of the augmented img segmentation must agree to be labelled positive
                }
 
     #thres_lesion_vol indicate the minimum number of 1 label in the mask required to avoid elimination from the dataset
@@ -147,4 +148,5 @@ if __name__ == '__main__':
                                                 modality=modality,
                                                 number_site=number_site,
                                                 size_crop=144,
-                                                nested=False)
+                                                nested=False,
+                                                train=False)

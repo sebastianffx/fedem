@@ -252,20 +252,14 @@ class Fedem:
                         #apply segmoid and threshold BEFORE averaging
                         augm_preds.append(self.post_pred(augm_out_inv).to(device))
 
-                        #trying to understand why the average is 0 for the augmented maps
-                        print("augm2", augm_out_inv.min(), augm_out_inv.max(), augm_out_inv.mean())
-                        print("augm", self.post_pred(augm_out_inv).min(), self.post_pred(augm_out_inv).max(), self.post_pred(augm_out_inv).mean())
-
                     #average must discretized, using a simple threshold at 0.5
                     avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
-                    print("augm after avg", avg_augm_pred.min(), avg_augm_pred.max(), avg_augm_pred.mean())
-                    avg_augm_pred = avg_augm_pred > 0.5
+                    avg_augm_pred = avg_augm_pred >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
                     avg_augm_pred = avg_augm_pred.int() #convert bool to int
-                    print("augm after threshold", avg_augm_pred.min(), avg_augm_pred.max())
 
                     #average is discretized by the sigmoid and threshold
+                    #single negative value could overwrite all positive value for the same position (Unet output is skewed toward negative values)
                     avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2, dim=0), dim=0))
-                    print("augm2 after sigmoid and threshold", avg_augm_pred2.min(), avg_augm_pred2.max())
 
                     dice_metric_augm(avg_augm_pred, labels[:,:,:,:,slice_selected])
                     dice_metric_augm2(avg_augm_pred2, labels[:,:,:,:,slice_selected])
@@ -279,6 +273,10 @@ class Fedem:
                 #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_raw_segpred_"+benchmark_metric+".nii.gz")))
                 nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_post_segpred_"+benchmark_metric+".nii.gz")))
                 if self.options["use_test_augm"] and dataset=="test":
+                    if np.stack(augm_pred_holder, axis=-1).sum() > 0:
+                        print("test-time augment found a lesion in augm")
+                    if np.stack(augm_pred_holder2, axis=-1).sum() > 0:
+                        print("test-time augment found a lesion in augm2")
                     nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_augm_segpred_"+benchmark_metric+".nii.gz")))
                     nib.save(nib.Nifti1Image(np.stack(augm_pred_holder2, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_augm2_segpred_"+benchmark_metric+".nii.gz")))
 
