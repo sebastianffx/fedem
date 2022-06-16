@@ -272,8 +272,8 @@ def torchio_create_test_transfo():
     """
     #lossless
     #default axes for RandomFlip (training) is 0
-    h_flip = tio.Flip(axes="Right")
-    v_flip = tio.Flip(axes="Superior") 
+    h_flip = tio.Flip(axes="R") #symmetry plane = right plane of the brain
+    v_flip = tio.Flip(axes="S") #symmetry plane = superior plane of the brain
 
     #lossly, tio.Affine was found directly in the source code
     #scale < 1 means dezooming, 0.1 means zooming/dezooming of at most 10%
