@@ -240,6 +240,7 @@ class Fedem:
                 #perform test-time augmentation slice-wise
                 if self.options["use_test_augm"] and dataset=="test":
                     #initialized with the original image output (before/after post_pred routine)
+                    #pred and out are on the device
                     augm_preds = [pred]
                     augm_preds2 = [out]
                     for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
@@ -252,12 +253,12 @@ class Fedem:
                         augm_preds.append(self.post_pred(augm_out_inv).to(device))
 
                     #average must discretized, using a simple threshold at 0.5
-                    avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0).to(device), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
+                    avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
                     avg_augm_pred = avg_augm_pred > 0.5
                     avg_augm_pred = avg_augm_pred.int() #convert bool to int
 
                     #average is discretized by the sigmoid and threshold
-                    avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2, dim=0).to(device), dim=0)).to(device)
+                    avg_augm_pred2 = self.post_pred(torch.mean(torch.stack(augm_preds2, dim=0), dim=0))
 
                     dice_metric_augm(avg_augm_pred, labels[:,:,:,:,slice_selected])
                     dice_metric_augm2(avg_augm_pred2, labels[:,:,:,:,slice_selected])
