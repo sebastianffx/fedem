@@ -276,7 +276,7 @@ def torchio_create_test_transfo():
 
     #lossly, tio.Affine was found directly in the source code
     rotation90 = tio.Affine(scales=0.1, degrees=90, translation=0)
-    rotation180 = tio.Affine(scales=0.1, degrees=180, translation=0)
+    rotation180 = tio.Affine(scales=0.1, degrees=180, translation=0) #this transformation is geometrically VERY close to h_flip due to the symmetry of the brain
     rotation270 = tio.Affine(scales=0.1, degrees=270, translation=0)
 
     gaussian = tio.RandomNoise()
@@ -290,7 +290,7 @@ def torchio_create_test_transfo():
     #return [h_flip, v_flip, rotation90, rotation180, rotation270]
 
     #proof of work with reduced number of augmentation
-    return [h_flip, rotation180]
+    return [h_flip, rotation90]
     
 
 
