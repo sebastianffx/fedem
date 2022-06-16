@@ -289,8 +289,8 @@ class Fedem:
 
         #print average over all the volumes
         if verbose:
-            print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
             print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
+            print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
             if self.options["use_test_augm"] and dataset=="test":
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm):", np.round(np.mean(holder_dicemetric_augm),4))
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm 2):", np.round(np.mean(holder_dicemetric_augm2),4))
