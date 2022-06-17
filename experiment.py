@@ -25,7 +25,6 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             print(f"{networks_name[i]} iteration {rep+1}")
             print(conf)
             
-            conf["transfo"] = transfo
             conf["partitions_paths"]=partitions_paths
             conf["partitions_paths_add_mod"]=partitions_paths_add_mod
                 

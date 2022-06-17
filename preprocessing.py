@@ -31,7 +31,7 @@ def dataPreprocessing(path, modality, number_site, additional_modalities, nested
         partitions_paths_add_mod = add_modalities(path, additional_modalities, num_centers=number_site)
         return partitions_paths, partitions_paths_add_mod
     else:
-        return partitions_paths, [[[],[],[]] for i in range(len(number_site))]
+        return partitions_paths, [[[],[],[]] for i in range(number_site)]
 
 def get_train_valid_test_partitions(path, modality, num_centers=4, nested=True):
     centers_partitions = [[] for i in range(num_centers)]
@@ -302,10 +302,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
                 return input[forced_channel:forced_channel+1,:,:,:]
         else:
             sampled_C = torch.randint(low=0,high=input.shape[0],size=(1,)).item()
-            if sampled_C==input.shape[0]:
-                return input[sampled_C:None,:,:,:]
-            else:
-                return input[sampled_C:sampled_C+1,:,:,:]
+            return input[sampled_C:sampled_C+1,:,:,:]
 
     #apply the channel selection to the adc map only, the label have only one channel
     select_channel = tio.Lambda(sample_channel, types_to_apply=tio.INTENSITY)
@@ -414,26 +411,44 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
     #aggreate for centralized model and validation/testing across sites
     partitions_train_imgs = [partitions_paths[i][0][0] for i in range(len(partitions_paths))]
     partitions_train_lbls = [partitions_paths[i][1][0] for i in range(len(partitions_paths))]
-    partitions_train_add_mod = [partitions_paths_add_mod[i][0] for i in range(len(partitions_paths_add_mod))]
+    
+    #get the number of additionnal modalities, taking from first site, training
+    number_add_mod = len(partitions_paths_add_mod[0][0])
+    partitions_train_add_mod = []
+    for mod in range(number_add_mod):
+        mod_holder = []
+        for i in range(len(partitions_paths_add_mod)):
+            mod_holder += partitions_paths_add_mod[i][0][mod] #i -> site, 0 -> train, train [[modality x for all subject], [modality y for all subjects], ...]
+        partitions_train_add_mod.append(mod_holder)
     all_train_subjects = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_train_imgs for i in l],
                                                                           [i for l in partitions_train_lbls for i in l],
-                                                                          [i for l in partitions_train_add_mod for i in l]),
+                                                                          partitions_train_add_mod),
                                                                           transform=transform)
     
     partitions_valid_imgs = [partitions_paths[i][0][1] for i in range(len(partitions_paths))]
     partitions_valid_lbls = [partitions_paths[i][1][1] for i in range(len(partitions_paths))]
-    partitions_valid_add_mod = [partitions_paths_add_mod[i][1] for i in range(len(partitions_paths_add_mod))]
+    partitions_valid_add_mod = []
+    for mod in range(number_add_mod):
+        mod_holder = []
+        for i in range(len(partitions_paths_add_mod)):
+            mod_holder += partitions_paths_add_mod[i][1][mod]
+        partitions_valid_add_mod.append(mod_holder)
     all_valid_subjects = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_valid_imgs for i in l],
                                                                           [i for l in partitions_valid_lbls for i in l],
-                                                                          [i for l in partitions_valid_add_mod for i in l]),
+                                                                          partitions_valid_add_mod),
                                                                           transform=transform_valid)
 
     partitions_test_imgs = [partitions_paths[i][0][2] for i in range(len(partitions_paths))]
     partitions_test_lbls = [partitions_paths[i][1][2] for i in range(len(partitions_paths))]
-    partitions_test_add_mod = [partitions_paths_add_mod[i][2] for i in range(len(partitions_paths_add_mod))]
+    partitions_test_add_mod = []
+    for mod in range(number_add_mod):
+        mod_holder = []
+        for i in range(len(partitions_paths_add_mod)):
+            mod_holder += partitions_paths_add_mod[i][2][mod]
+        partitions_test_add_mod.append(mod_holder)
     all_test_subjects = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_test_imgs for i in l],
                                                                          [i for l in partitions_test_lbls for i in l],
-                                                                         [i for l in partitions_test_add_mod for i in l]),
+                                                                         partitions_test_add_mod),
                                                                          transform=transform_valid)
 
     queue_train = tio.Queue(all_train_subjects, max_queue_length, patches_per_volume, sampler_weighted_probs)
