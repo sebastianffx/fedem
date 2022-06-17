@@ -81,7 +81,7 @@ if __name__ == '__main__':
     number_site=len(clients)
 
     default = {"g_epoch":10,
-               "l_epoch":20,
+               "l_epoch":30,
                "g_lr":0.01,
                "l_lr":0.0001,
                "K":len(clients),
@@ -113,10 +113,10 @@ if __name__ == '__main__':
     networks_name = []
     #storing the best parameters
     lr = 0.001694
-    weight_comb = [1,1]
+    weight_comb = [1.4,0.6]
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
-    for weight_comb in [[1, 1], [1.4,0.6], [1.6,0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
+    for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
+    #for weight_comb in [[1, 1], [1.4,0.6], [1.6,0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
