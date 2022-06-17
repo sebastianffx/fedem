@@ -68,12 +68,13 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 if __name__ == '__main__':
     #path = 'astral_fedem_dti_purged/'
     #path = 'astral_fedem_dti/'
-    path = 'astral_fedem_dti_noempty/'
+    #path = 'astral_fedem_dti_noempty/'
     #path = 'astral_fedem_v3/'
+    path = 'astral_fedem_dti_noempty_newlabels/'
 
     #experience_name = "astral_no_empty_mask"
     #experience_name = "no_empty_torchio_DLCE"
-    experience_name = "no_empty_tio_DLCE_lambdas_opti" 
+    experience_name = "no_empty_tio_DLCE_newlabels" 
     modality="ADC"
 
     clients=["center1", "center2", "center3"]
@@ -115,7 +116,7 @@ if __name__ == '__main__':
     weight_comb = [1,1]
     #for lr in np.linspace(1e-5, 1e-2, 5):
     #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
-    for weight_comb in [[0.4, 1.6], [0.6, 1.4], [1.4, 0.6], [1.6, 0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
+    for weight_comb in [[1, 1], [1.4,0.6], [1.6,0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
