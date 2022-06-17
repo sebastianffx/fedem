@@ -8,6 +8,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
+                  additional_modalities= [],
                   number_site=3, size_crop=100, nested=True, train=True):
 
     print("Experiment using the ", datapath, "dataset")
@@ -15,7 +16,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     tmp_valid = []
 
     #fetch the files paths, create the data loading/augmentation routines
-    partitions_paths, transfo = dataPreprocessing(datapath, modality, number_site, size_crop, nested)
+    partitions_paths, partitions_paths_add_mod = dataPreprocessing(datapath, modality, number_site, additional_modalities, nested)
 
     for i, conf in enumerate(networks_config):
         test_dicemetric = []
@@ -26,6 +27,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             
             conf["transfo"] = transfo
             conf["partitions_paths"]=partitions_paths
+            conf["partitions_paths_add_mod"]=partitions_paths_add_mod
                 
             #add number to differentiate replicates
             if exp_name!=None:
@@ -102,7 +104,10 @@ if __name__ == '__main__':
                "hybrid_loss_weights":[1,1],
                #test time augmentation
                "use_test_augm":True,
-               "test_augm_threshold":0.5 #at least half of the augmented img segmentation must agree to be labelled positive
+               "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
+               #adc subsampling augmentation/harmonization
+               "no_deformation":False,
+               "partitions_paths_add_mod":[] #list the extension of each additionnal modality you want to use
                }
 
     #thres_lesion_vol indicate the minimum number of 1 label in the mask required to avoid elimination from the dataset

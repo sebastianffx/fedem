@@ -30,20 +30,21 @@ print(f"Using {device} as backend")
 class Fedem:
     def __init__(self, options):
         self.options = options
-        self.partitions_paths = options["partitions_paths"]        
 
         #routine to convert U-Net output to segmentation mask
         self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
 
         if self.options["use_torchio"]:
-            self.dataloaders, self.all_test_loader, self.all_valid_loader, self.all_train_loader = torchio_generate_loaders(partitions_paths=self.partitions_paths,
+            self.dataloaders, self.all_test_loader, self.all_valid_loader, self.all_train_loader = torchio_generate_loaders(partitions_paths=options["partitions_paths"],
                                                                                                                             batch_size=self.options["batch_size"],
                                                                                                                             clamp_min=self.options["clamp_min"],
                                                                                                                             clamp_max=self.options["clamp_max"],
                                                                                                                             padding=self.options["padding"],
                                                                                                                             patch_size=self.options["patch_size"],
                                                                                                                             max_queue_length=self.options["max_queue_length"],
-                                                                                                                            patches_per_volume=self.options["patches_per_volume"]
+                                                                                                                            patches_per_volume=self.options["patches_per_volume"],
+                                                                                                                            no_deformation=self.options["no_deformation"],
+                                                                                                                            partitions_paths_add_mod=self.options["partitions_paths_add_mod"]
                                                                                                                             )
 
         if self.options["use_test_augm"]:
