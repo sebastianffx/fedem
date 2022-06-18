@@ -317,7 +317,9 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
     transform_valid = tio.Compose([select_channel, clamp, toCanon, rescale])
     #just regular campling and normalization
     if no_deformation:
-        return transform_valid, transform_valid
+        #still require padding for the label based patches creation
+        transform = tio.Compose([select_channel, clamp, toCanon, rescale, padding])
+        return transform, transform_valid
     #more transformation: affine, rotation, elastic deformation and planar symmetry
     else:
         return transform, transform_valid
@@ -361,7 +363,7 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
 
     transform, transform_valid = torchio_create_transfo(clamp_min=clamp_min, clamp_max=clamp_max,
                                                         padding=padding, patch_size=patch_size,
-                                                        no_deformation=False, forced_channel=forced_channel)
+                                                        no_deformation=no_deformation, forced_channel=forced_channel)
 
     #patch has 0.7 prob of being centered on a label=1
     labels_probabilities = {0: 0.3, 1: 0.7}
