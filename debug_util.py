@@ -25,14 +25,20 @@ def replace_masks(path_to_dataset, path_mask_archive):
     for center in os.listdir(path_to_dataset):
         print("processing", str(center))
         for split in ["train", "valid", "test"]:
-            #extract te subjects using the mask file
-            split_subjects = [f for f in os.listdir(os.path.join(path_to_dataset, center, split)) if "msk." in f]
+            #extract te subjects using the adc file
+            split_subjects = [f for f in os.listdir(os.path.join(path_to_dataset, center, split)) if "adc." in f]
             for subject in split_subjects:
-                source_file = os.path.join(path_mask_archive, subject.replace("_msk.", "_ANTS_HDBET_FAST_smooth_concomp_defuseSeg_labeled."))
+                source_file = os.path.join(path_mask_archive, subject.replace("_adc.", "_ANTS_HDBET_FAST_smooth_concomp_defuseSeg."))
                 if os.path.exists(source_file):
                     #overwrite the existing mask with the new mask
+                    new_mask = nb.load(source_file)
+                    affine = new_mask.affine
+                    new_mask = new_mask.get_fdata()[2:146, 2:146, -42:]#same redim as applied to the adc and orginal mask
+                    nb.save(nb.Nifti1Image(new_mask, affine), os.path.join(path_to_dataset, center, split, subject.replace("_adc.","_msk.")))
+                    """
                     shutil.copy(source_file,
-                                os.path.join(os.path.join(path_to_dataset, center, split, subject)))
+                                os.path.join(path_to_dataset, center, split, subject))
+                    """
                 else:
                     count_missing+=1
                     print("new label does not exist for", subject, "keeping the old labels!")
