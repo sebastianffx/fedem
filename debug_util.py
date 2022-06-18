@@ -44,3 +44,18 @@ def replace_masks(path_to_dataset, path_mask_archive):
                     print("new label does not exist for", subject, "keeping the old labels!")
 
     print(count_missing, "subjects could not have updates with the new labels")
+
+def adding_modalities(path_to_dataset, path_to_modality, name_modality):
+    """ Replace one dataset mask with new masks, using the name of the subject
+    """
+    count_missing = 0
+    for center in os.listdir(path_to_dataset):
+        print("processing", str(center))
+        for split in ["train", "valid", "test"]:
+            #extract te subjects using the mask file
+            split_subjects = [f for f in os.listdir(os.path.join(path_to_dataset, center, split)) if "msk." in f]
+            for subject in split_subjects:
+                shutil.copy(os.path.join(path_to_modality, center, split, subject.replace("msk.","adc.")),
+                            os.path.join(path_to_dataset, center, split, subject.replace("msk.", name_modality+".")))
+
+    print(count_missing, "subjects could not have updates with the new labels")
