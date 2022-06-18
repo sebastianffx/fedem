@@ -305,13 +305,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
             return input[sampled_C:sampled_C+1,:,:,:]
 
     #apply the channel selection to the adc map only, the label have only one channel
-    select_channel = tio.Lambda(sample_channel, types_to_apply=tio.INTENSITY)
-
-    #removed the resampler_dwi since it's not used for the ASTRAL dataset
-    transforms = [select_channel, clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation]
-    #randomFlip should probably be along axes="Right/Left" or "Anterior/Posterior" to take advantage of the symmetry of the brain
-    # Superior or Inferior don't make sense for 2D net
-    transform = tio.Compose(transforms)
+    select_channel = tio.Lambda(sample_channel, types_to_apply=tio.INTENSITY)    
 
     #normalization only, no spatial transformation or data augmentation
     transform_valid = tio.Compose([select_channel, clamp, toCanon, rescale])
@@ -322,6 +316,9 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
         return transform, transform_valid
     #more transformation: affine, rotation, elastic deformation and planar symmetry
     else:
+        #randomFlip should probably be along axes="Right/Left" or "Anterior/Posterior" to take advantage of the symmetry of the brain
+        # Superior or Inferior don't make sense for 2D net
+        transform = tio.Compose([select_channel, clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation])
         return transform, transform_valid
 
 def torchio_create_test_transfo():
