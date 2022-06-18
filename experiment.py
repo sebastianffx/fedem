@@ -71,11 +71,15 @@ if __name__ == '__main__':
     #path = 'astral_fedem_dti/'
     #path = 'astral_fedem_dti_noempty/'
     #path = 'astral_fedem_v3/'
-    path = 'astral_fedem_dti_noempty_newlabels/'
+    #path = 'astral_fedem_dti_newlabels/'
+    #path = 'astral_fedem_dti_noempty_newlabels/'
+    #path = 'astral_fedem_20dir/'
+    path = 'astral_fedem_multiadc_newlabels/'
 
     #experience_name = "astral_no_empty_mask"
     #experience_name = "no_empty_torchio_DLCE"
-    experience_name = "no_empty_tio_DLCE_newlabels" 
+    #experience_name = "no_empty_tio_DLCE_newlabels" 
+    experience_name = "no_empty_DLCE_multiadc_notransfo"
     modality="ADC"
 
     clients=["center1", "center2", "center3"]
@@ -103,11 +107,11 @@ if __name__ == '__main__':
                "loss_fun":"dicelossCE", #diceloss_CE
                "hybrid_loss_weights":[1,1],
                #test time augmentation
-               "use_test_augm":True,
+               "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
                #adc subsampling augmentation/harmonization
-               "no_deformation":False,
-               "partitions_paths_add_mod":[] #list the extension of each additionnal modality you want to use
+               "no_deformation":True,
+               "additional_modalities":["4dir_1","4dir_2","20dir"] #list the extension of each additionnal modality you want to use
                }
 
     #thres_lesion_vol indicate the minimum number of 1 label in the mask required to avoid elimination from the dataset
@@ -119,8 +123,9 @@ if __name__ == '__main__':
     lr = 0.001694
     weight_comb = [1.4,0.6]
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
+    #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
     #for weight_comb in [[1, 1], [1.4,0.6], [1.6,0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
+    for lr in [0.00994]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
@@ -154,4 +159,5 @@ if __name__ == '__main__':
                                                 number_site=number_site,
                                                 size_crop=144,
                                                 nested=False,
-                                                train=True)
+                                                train=True,
+                                                additional_modalities=default["additional_modalities"])
