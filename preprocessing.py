@@ -23,6 +23,16 @@ from monai.transforms import (
     EnsureType,
     Resized)
 
+def dataPreprocessing(path, modality, number_site, additional_modalities, nested=True):
+
+    partitions_paths = get_train_valid_test_partitions(path, modality, number_site, nested)
+
+    if len(additional_modalities)>0:
+        partitions_paths_add_mod = add_modalities(path, additional_modalities, num_centers=number_site)
+        return partitions_paths, partitions_paths_add_mod
+    else:
+        return partitions_paths, [[[],[],[]] for i in range(number_site)]
+
 def get_train_valid_test_partitions(path, modality, num_centers=4, nested=True):
     centers_partitions = [[] for i in range(num_centers)]
     if nested:
@@ -39,6 +49,7 @@ def get_train_valid_test_partitions(path, modality, num_centers=4, nested=True):
                 print("not same number of images and masks!")
     else:
         for center_num in range(1,num_centers+1):
+            #simplest way to add the modalities/channel would be to iterate here over the additionnal modalities, so that center_paths_train contain a list of modalities for each subject
             center_paths_train  = sorted(glob(path+'center'+str(center_num)+'/train/'+f'*{modality.lower()}.nii*'))
             center_paths_valid  = sorted(glob(path+'center'+str(center_num)+'/valid/'+f'*{modality.lower()}.nii*'))
             center_paths_test   = sorted(glob(path+'center'+str(center_num)+'/test/' +f'*{modality.lower()}.nii*'))
@@ -50,6 +61,21 @@ def get_train_valid_test_partitions(path, modality, num_centers=4, nested=True):
             if (len(center_paths_train), len(center_paths_valid), len(center_paths_test)) != (len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test)):
                 print("not same number of images and masks!")
     return centers_partitions
+
+def add_modalities(path, modalities, num_centers=4):
+    partitions_paths_add_mod = []
+    for center_num in range(1,num_centers+1):
+        center_paths_train = []
+        center_paths_valid = []
+        center_paths_test = []
+        for modality in modalities:
+            center_paths_train.append(sorted(glob(path+'center'+str(center_num)+'/train/'+f'*{modality}.nii*')))
+            center_paths_valid.append(sorted(glob(path+'center'+str(center_num)+'/valid/'+f'*{modality}.nii*')))
+            center_paths_test.append(sorted(glob(path+'center'+str(center_num)+'/test/' +f'*{modality}.nii*')))
+        partitions_paths_add_mod.append([center_paths_train,center_paths_valid,center_paths_test])
+    #centers_partitions_add_mod = [[train, valid, test] for each site]
+    #train = [[modality 1 for all subject], [modality 2 for all subject], ...]
+    return partitions_paths_add_mod
 
 def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
     #print("Images-Labels: " + str(len(partitions_paths_center)))
@@ -101,8 +127,8 @@ def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
 
     return center_train_loader, center_valid_loader, center_test_loader
 
-def dataPreprocessing(path, modality, number_site, size_crop=224, nested=True):
-	#creating the dataloader for 10 ISLES volumes using the T_max and the CBF
+def create_transfo(modality, size_crop):
+    #creating the dataloader for 10 ISLES volumes using the T_max and the CBF
     #For cbf we are windowing 1-1024
     #For tmax we'll window 0-60
     #For CBV we'll window 0-200
@@ -188,13 +214,11 @@ def dataPreprocessing(path, modality, number_site, size_crop=224, nested=True):
             #Resized
         ]
     )
+    return transfo
 
-    partitions_paths = get_train_valid_test_partitions(path, modality, number_site, nested)
+def generate_loaders(partitions_paths, batch_size, modality, size_crop=224):
 
-    return partitions_paths, transfo
-
-
-def generate_loaders(partitions_paths, transfo, batch_size):
+    transfo = create_transfo(modality, size_crop)
     
     centers_data_loaders = []
     for i in range(len(partitions_paths)):#Adding all the centers data loaders
@@ -231,20 +255,25 @@ def generate_loaders(partitions_paths, transfo, batch_size):
 
     return centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader
 
-def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels):
+def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels, partition_paths_additional_modalities=[]):
     subjects_list = []
 
     #TODO: compute connected component on the label map, so that the blob loss can take advantage of it
+    # this could be performed prior to the loading as well, be part of the dataset creation/organization
 
     for i in range(len(partition_paths_adc)):
         subjects_list.append(tio.Subject(
-                                adc=tio.ScalarImage(partition_paths_adc[i]),
+                                #by default, tio add a channel when loading 3D volume
+                                adc=tio.ScalarImage(path=[partition_paths_adc[i]]+[add_mod[i] for add_mod in partition_paths_additional_modalities]),
                                 label=tio.LabelMap(partition_paths_labels[i])
+                                #option 1 : store each additionnal modality as a tio.ScalarImage and choose one per subject/epoch?
+                                #**additional_modalities #unpack the additionnal modalities, one attribute per modality
+                                #option 2 : tio.Image can store 4D images, still stack 3D image along the Channel axis
                                 )
                             )
     return subjects_list
 
-def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size):
+def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deformation=False, forced_channel=-1):
     clamp = tio.Clamp(out_min=clamp_min, out_max=clamp_max)
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
     spatial = tio.OneOf({
@@ -258,15 +287,40 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size):
     padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
     toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
 
+    #due to tio.Lambda specifications, output must have input shape
+    def sample_channel(input):
+        """Take advantage of one-element slice to maintain dimensions
+        """
+        if input.shape[0]==1:
+            return input
+        elif forced_channel>0:
+            if forced_channel>input.shape[0]:
+                print(f"Trying to force a non-existing channel {forced_channel}, maximum is {input.shape[0]}")
+            elif forced_channel==input.shape[0]:
+                return input[forced_channel:None,:,:,:]
+            else:
+                return input[forced_channel:forced_channel+1,:,:,:]
+        else:
+            sampled_C = torch.randint(low=0,high=input.shape[0],size=(1,)).item()
+            return input[sampled_C:sampled_C+1,:,:,:]
+
+    #apply the channel selection to the adc map only, the label have only one channel
+    select_channel = tio.Lambda(sample_channel, types_to_apply=tio.INTENSITY)
+
     #removed the resampler_dwi since it's not used for the ASTRAL dataset
-    transforms = [clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation]
+    transforms = [select_channel, clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation]
     #randomFlip should probably be along axes="Right/Left" or "Anterior/Posterior" to take advantage of the symmetry of the brain
     # Superior or Inferior don't make sense for 2D net
     transform = tio.Compose(transforms)
 
     #normalization only, no spatial transformation or data augmentation
-    transform_valid = tio.Compose([clamp, rescale, toCanon])
-    return transform, transform_valid
+    transform_valid = tio.Compose([select_channel, clamp, toCanon, rescale])
+    #just regular campling and normalization
+    if no_deformation:
+        return transform_valid, transform_valid
+    #more transformation: affine, rotation, elastic deformation and planar symmetry
+    else:
+        return transform, transform_valid
 
 def torchio_create_test_transfo():
     """ Transform for test-time augmentation, the transformation should have been seen during the training.
@@ -300,11 +354,14 @@ def torchio_create_test_transfo():
 
 
 def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_max=4000, padding=(50,50,1), patch_size=(128,128,1),
-                             max_queue_length=16, patches_per_volume=4):
+                             max_queue_length=16, patches_per_volume=4, no_deformation=False,
+                             partitions_paths_add_mod=[], forced_channel=-1):
 
     print("Using TORCHIO dataloader")
 
-    transform, transform_valid = torchio_create_transfo(clamp_min=clamp_min, clamp_max=clamp_max, padding=padding, patch_size=patch_size)
+    transform, transform_valid = torchio_create_transfo(clamp_min=clamp_min, clamp_max=clamp_max,
+                                                        padding=padding, patch_size=patch_size,
+                                                        no_deformation=False, forced_channel=forced_channel)
 
     #patch has 0.7 prob of being centered on a label=1
     labels_probabilities = {0: 0.3, 1: 0.7}
@@ -319,7 +376,8 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
     for i in range(len(partitions_paths)):
         # get the subject, create subject datatset, feed it to a queue for the path creation, then converted to a dataloader
         centers_data_loaders.append([torch.utils.data.DataLoader(tio.Queue(tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][0],
-                                                                                                                            partitions_paths[i][1][0]
+                                                                                                                            partitions_paths[i][1][0],
+                                                                                                                            partitions_paths_add_mod[i][0]
                                                                                                                             ),
                                                                                                transform=transform
                                                                                                ),
@@ -331,7 +389,8 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                                  ),
                                      #validation and test don't need the patch sampler (hence no queue)
                                      torch.utils.data.DataLoader(tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][1],
-                                                                                                                  partitions_paths[i][1][1]
+                                                                                                                  partitions_paths[i][1][1],
+                                                                                                                  partitions_paths_add_mod[i][1]
                                                                                                                   ),
                                                                                      transform=transform_valid
                                                                                      ),
@@ -339,7 +398,8 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                                  batch_size=batch_size
                                                                  ),
                                      torch.utils.data.DataLoader(tio.SubjectsDataset(torchio_get_loader_partition(partitions_paths[i][0][2],
-                                                                                                                  partitions_paths[i][1][2]
+                                                                                                                  partitions_paths[i][1][2],
+                                                                                                                  partitions_paths_add_mod[i][2]
                                                                                                                   ),
                                                                                      transform=transform_valid
                                                                                      ),
@@ -351,20 +411,44 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
     #aggreate for centralized model and validation/testing across sites
     partitions_train_imgs = [partitions_paths[i][0][0] for i in range(len(partitions_paths))]
     partitions_train_lbls = [partitions_paths[i][1][0] for i in range(len(partitions_paths))]
+    
+    #get the number of additionnal modalities, taking from first site, training
+    number_add_mod = len(partitions_paths_add_mod[0][0])
+    partitions_train_add_mod = []
+    for mod in range(number_add_mod):
+        mod_holder = []
+        for i in range(len(partitions_paths_add_mod)):
+            mod_holder += partitions_paths_add_mod[i][0][mod] #i -> site, 0 -> train, train [[modality x for all subject], [modality y for all subjects], ...]
+        partitions_train_add_mod.append(mod_holder)
     all_train_subjects = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_train_imgs for i in l],
-                                                                          [i for l in partitions_train_lbls for i in l]),
+                                                                          [i for l in partitions_train_lbls for i in l],
+                                                                          partitions_train_add_mod),
                                                                           transform=transform)
     
     partitions_valid_imgs = [partitions_paths[i][0][1] for i in range(len(partitions_paths))]
     partitions_valid_lbls = [partitions_paths[i][1][1] for i in range(len(partitions_paths))]
+    partitions_valid_add_mod = []
+    for mod in range(number_add_mod):
+        mod_holder = []
+        for i in range(len(partitions_paths_add_mod)):
+            mod_holder += partitions_paths_add_mod[i][1][mod]
+        partitions_valid_add_mod.append(mod_holder)
     all_valid_subjects = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_valid_imgs for i in l],
-                                                                          [i for l in partitions_valid_lbls for i in l]),
+                                                                          [i for l in partitions_valid_lbls for i in l],
+                                                                          partitions_valid_add_mod),
                                                                           transform=transform_valid)
 
     partitions_test_imgs = [partitions_paths[i][0][2] for i in range(len(partitions_paths))]
     partitions_test_lbls = [partitions_paths[i][1][2] for i in range(len(partitions_paths))]
+    partitions_test_add_mod = []
+    for mod in range(number_add_mod):
+        mod_holder = []
+        for i in range(len(partitions_paths_add_mod)):
+            mod_holder += partitions_paths_add_mod[i][2][mod]
+        partitions_test_add_mod.append(mod_holder)
     all_test_subjects = tio.SubjectsDataset(torchio_get_loader_partition([i for l in partitions_test_imgs for i in l],
-                                                                         [i for l in partitions_test_lbls for i in l]),
+                                                                         [i for l in partitions_test_lbls for i in l],
+                                                                         partitions_test_add_mod),
                                                                          transform=transform_valid)
 
     queue_train = tio.Queue(all_train_subjects, max_queue_length, patches_per_volume, sampler_weighted_probs)
