@@ -294,10 +294,8 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
         if input.shape[0]==1:
             return input
         elif forced_channel>0:
-            if forced_channel>input.shape[0]:
-                print(f"Trying to force a non-existing channel {forced_channel}, maximum is {input.shape[0]}")
-            elif forced_channel==input.shape[0]:
-                return input[forced_channel:None,:,:,:]
+            if forced_channel>=input.shape[0]:
+                print(f"Trying to force a non-existing channel {forced_channel}, maximum is {input.shape[0]-1}")
             else:
                 return input[forced_channel:forced_channel+1,:,:,:]
         else:
