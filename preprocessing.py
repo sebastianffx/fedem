@@ -484,8 +484,10 @@ def check_volume(path, dim, thres_neg_val=-1e-6, thres_lesion_vol=10):
             bad_files.append(path+f)
             print(path+f, tmp_shape)
         #check the negatives values
+        """
         if tmp.min()<thres_neg_val:
             print(path+f, "contains negative value")
+        """
         #check nans
         if np.isnan(tmp).sum() > 0:
             print(path+f, "contains NaN")
