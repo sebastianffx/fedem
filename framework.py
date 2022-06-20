@@ -92,7 +92,7 @@ class Fedem:
                     best_metric = epoch_valid_dice_score
                     best_metric_epoch = cur_epoch+1
 
-                    torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'))
+                    torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_DICE_model_segmentation2d_array.pth'))
                     print("saved new best metric model (according to DICE SCORE)")
 
                 print("validation dice SCORE : {:.4f}, best valid. dice SCORE: {:.4f} at epoch {}".format(
