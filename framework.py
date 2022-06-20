@@ -50,6 +50,7 @@ class Fedem:
         if self.options["use_test_augm"]:
             self.options["test_time_augm"] = torchio_create_test_transfo()
 
+        #define the loss function for all the clients
         if self.options["loss_fun"] == "diceloss":
             print("Using DiceLoss as loss function")
             self.loss_function = monai.losses.DiceLoss(sigmoid=True, batch=True)
@@ -69,7 +70,7 @@ class Fedem:
         early_stop_val = 0
         early_stop_count = 0
 
-        index = [0,1,2]
+        index = [0,1,2] #TODO: simplify in a expression list using the number of centers
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
 
@@ -372,7 +373,6 @@ class FedAvg(Fedem):
     def train(self, ann, dataloader_train, local_epoch, local_lr):
         #train client to train mode
         ann.train()
-        ann.len = len(dataloader_train)
                 
         optimizer = Adam(ann.parameters(), local_lr)
 
@@ -736,17 +736,6 @@ class Centralized(Fedem):
         early_stop_val = 0
         early_stop_count = 0
 
-        if self.options["loss_fun"] == "diceloss":
-            print("Using DiceLoss as loss function")
-            loss_function = monai.losses.DiceLoss(sigmoid=True) #should see the impact of batch=True
-        else:
-            print("Using DiceLoss + CE as loss function")
-            loss_function = monai.losses.DiceCELoss(include_background=True, sigmoid=True, reduction='mean',
-                                                    batch=True, ce_weight=None, 
-                                                    lambda_dice=self.options["hybrid_loss_weights"][0], 
-                                                    lambda_ce=self.options["hybrid_loss_weights"][1]
-                                                    )
-
         optimizer = torch.optim.Adam(self.nn.parameters(), lr=local_lr)
 
         #multiply global and local epoch to have similar conditions
@@ -774,7 +763,7 @@ class Centralized(Fedem):
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
 
                 y_pred_generic = self.nn(inputs)
-                loss = loss_function(input=y_pred_generic, target=labels) #average over the batch after computing it for each slice
+                loss = self.loss_function(input=y_pred_generic, target=labels) #average over the batch after computing it for each slice
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -794,7 +783,7 @@ class Centralized(Fedem):
             #aggregate makes the average of the values, nan are ignored.
             print("training dice SCORE : {:.4f}".format(dice_metric.aggregate().item()))
             self.writer.add_scalar('avg training dice score', dice_metric.aggregate().item(), cur_epoch)
-            print("training dice LOSS : {:.4f}".format(epoch_loss/step))
+            print("training dice LOSS : {:.4f}".format(epoch_loss/step)) #should be changed to loss alone because fraction of loss can be CE
             self.writer.add_scalar('avg training dice loss', epoch_loss/step, cur_epoch)
 
             #Evaluation on validation and saving model if needed, on full volume
