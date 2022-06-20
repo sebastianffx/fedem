@@ -50,6 +50,17 @@ class Fedem:
         if self.options["use_test_augm"]:
             self.options["test_time_augm"] = torchio_create_test_transfo()
 
+        if self.options["loss_fun"] == "diceloss":
+            print("Using DiceLoss as loss function")
+            self.loss_function = monai.losses.DiceLoss(sigmoid=True, batch=True)
+        else:
+            print("Using DiceLoss + CE as loss function")
+            self.loss_function = monai.losses.DiceCELoss(include_background=True, sigmoid=True, reduction='mean',
+                                                         batch=True, ce_weight=None, 
+                                                         lambda_dice=self.options["hybrid_loss_weights"][0], 
+                                                         lambda_ce=self.options["hybrid_loss_weights"][1]
+                                                         )
+
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr, early_stop_limit=-1):
         metric_values = list()
         best_metric = -1
@@ -57,7 +68,7 @@ class Fedem:
         
         early_stop_val = 0
         early_stop_count = 0
-        
+
         index = [0,1,2]
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
@@ -82,6 +93,11 @@ class Fedem:
 
                     torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'))
                     print("saved new best metric model (according to DICE SCORE)")
+
+                print("validation dice SCORE : {:.4f}, best valid. dice SCORE: {:.4f} at epoch {}".format(
+                    epoch_valid_dice_score, best_metric, best_metric_epoch)
+                     )
+                self.writer.add_scalar("avg validation dice score", epoch_valid_dice_score, cur_epoch)
 
                 #early stopping implementation; if the validation dice score don't change after X consecutive round, stop the training
                 if early_stop_limit > 0:
@@ -358,7 +374,6 @@ class FedAvg(Fedem):
         ann.train()
         ann.len = len(dataloader_train)
                 
-        loss_function = monai.losses.DiceLoss(sigmoid=True)
         optimizer = Adam(ann.parameters(), local_lr)
 
         for epoch in range(local_epoch):
@@ -368,7 +383,7 @@ class FedAvg(Fedem):
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred = ann(inputs)
-                loss = loss_function(y_pred, labels)
+                loss = self.loss_function(y_pred, labels)
                 optimizer.zero_grad()        
                 loss.backward()
                 optimizer.step()
@@ -439,7 +454,6 @@ class Scaffold(Fedem):
         ann.len = len(dataloader_train)
                 
         x = copy.deepcopy(ann)
-        loss_function = monai.losses.DiceLoss(sigmoid=True)
         optimizer = ScaffoldOptimizer(ann.parameters(), lr=local_lr, weight_decay=1e-4)
 
         for epoch in range(local_epoch):
@@ -449,7 +463,7 @@ class Scaffold(Fedem):
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred = ann(inputs)
-                loss = loss_function(y_pred, labels)
+                loss = self.loss_function(y_pred, labels)
                 optimizer.zero_grad()
                 loss.backward()          
                 optimizer.step(self.nn.control, ann.control) #performing SGD on the control variables
@@ -618,11 +632,9 @@ class FedRod(Fedem):
         ann.train()
         ann.len = len(dataloader_train)
                 
-        loss_function = monai.losses.DiceLoss(sigmoid=True)
-
         optimizer = torch.optim.Adam(ann.parameters(), lr=local_lr)
-        loss_generic = loss_function(torch.tensor(np.zeros((1,10))), torch.tensor(np.zeros((1,10))))
-        loss_personalized = loss_function(torch.tensor(np.zeros((1,10))), torch.tensor(np.zeros((1,10))))
+        loss_generic = self.loss_function(torch.tensor(np.zeros((1,10))), torch.tensor(np.zeros((1,10))))
+        loss_personalized = self.loss_function(torch.tensor(np.zeros((1,10))), torch.tensor(np.zeros((1,10))))
         # for k, v in self.nn.named_parameters():
         # print(v.requires_grad, v.dtype, v.device, k)
 
@@ -637,7 +649,7 @@ class FedRod(Fedem):
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred_generic = ann(inputs)
-                loss_generic   = loss_function(y_pred_generic, labels)
+                loss_generic   = self.loss_function(y_pred_generic, labels)
                 optimizer.zero_grad()
                 loss_generic.backward()
                 optimizer.step()
@@ -677,7 +689,7 @@ class FedRod(Fedem):
 
                 #output_personalized = ann(inputs) + torch.tensor(output_generic).to(device) #regularized personalized output
                 output_personalized = ann(inputs) + output_generic.clone().detach().requires_grad_(requires_grad=True).to(device) #changed to stop a torch warning
-                loss_personalized = loss_function(output_personalized, labels)
+                loss_personalized = self.loss_function(output_personalized, labels)
                 optimizer.zero_grad()
                 loss_personalized.backward()
                 optimizer.step()
