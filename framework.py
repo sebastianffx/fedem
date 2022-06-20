@@ -50,7 +50,7 @@ class Fedem:
         if self.options["use_test_augm"]:
             self.options["test_time_augm"] = torchio_create_test_transfo()
 
-    def train_server(self, global_epoch, local_epoch, global_lr, local_lr):
+    def train_server(self, global_epoch, local_epoch, global_lr, local_lr, early_stop_limit=-1):
         metric_values = list()
         best_metric = -1
         best_metric_epoch = -1
@@ -78,6 +78,17 @@ class Fedem:
 
                     torch.save(self.nn.state_dict(), os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth'))
                     print("saved new best metric model (according to DICE SCORE)")
+
+                #early stopping implementation; if the validation dice score don't change after X consecutive round, stop the training
+                if early_stop_limit > 0:
+                    if np.abs(early_stop_val - epoch_valid_dice_loss) < 1e-5:
+                        early_stop_count += 1
+                        if early_stop_count >= early_stop_limit:
+                            print(f"Early stopping, the model has converged/diverged and the loss is constant for the last {early_stop_limit} epochs")
+                            return self.nn
+                    else:
+                        early_stop_val = epoch_valid_dice_loss
+                        early_stop_count = 0
         return self.nn
 
     def validation(self,index):        
