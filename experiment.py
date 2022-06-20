@@ -73,13 +73,14 @@ if __name__ == '__main__':
     #path = 'astral_fedem_v3/'
     #path = 'astral_fedem_dti_newlabels/'
     #path = 'astral_fedem_dti_noempty_newlabels/'
+    #path = 'astral_fedem_4dir_1/'
     #path = 'astral_fedem_20dir/'
     path = 'astral_fedem_multiadc_newlabels/'
 
     #experience_name = "astral_no_empty_mask"
     #experience_name = "no_empty_torchio_DLCE"
     #experience_name = "no_empty_tio_DLCE_newlabels" 
-    experience_name = "no_empty_DLCE_multiadc_notransfo"
+    experience_name = "no_empty_DLCE_multiadc_transfo"
     modality="ADC"
 
     clients=["center1", "center2", "center3"]
@@ -110,7 +111,7 @@ if __name__ == '__main__':
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
                #adc subsampling augmentation/harmonization
-               "no_deformation":True,
+               "no_deformation":False,
                "additional_modalities":["4dir_1","4dir_2","20dir"] #list the extension of each additionnal modality you want to use
                }
 
@@ -159,5 +160,5 @@ if __name__ == '__main__':
                                                 number_site=number_site,
                                                 size_crop=144,
                                                 nested=False,
-                                                train=True,
-                                                additional_modalities=default["additional_modalities"])
+                                                train=False,
+                                                additional_modalities=[]) #default["additional_modalities"])
