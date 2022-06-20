@@ -130,15 +130,12 @@ class BlobLoss(_Loss):
         # loop over elements in the batch
         for sample_idx in range(input.shape[0]):
             #extract label of this specific sample
-            if sample_idx < input.shape[0]:
-                sample_label = target[sample_idx:sample_idx+1, ...]
-                sample_pred = input[sample_idx:sample_idx+1, ...]
-            else:
-                sample_label = target[sample_idx:None, ...]
-                sample_pred = input[sample_idx:None, ...]
+            sample_label = target[sample_idx:sample_idx+1, ...]
+            sample_pred = input[sample_idx:sample_idx+1, ...]
 
             # each component/blob correspond to a unique label
             unique_labels = torch.unique(sample_label, sorted=True)
+            #remove the background
             if unique_labels[0]==0:
                 unique_labels = unique_labels[1:]
 
@@ -164,7 +161,7 @@ class BlobLoss(_Loss):
                 sample_loss.append(blob_loss)
 
             #normalize blob loss by the number of blob -> hope that it does not break autograd
-            samples_blob_loss.append(torch.average(torch.stack(sample_loss), dim=-1))
+            samples_blob_loss.append(torch.average(torch.stack(sample_loss), dim=-1)) #check that the dimensions are correct
         
         #stack them so that the batch dimension is restaured
         output = torch.stack(samples_blob_loss, dim=0)
