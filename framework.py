@@ -54,6 +54,10 @@ class Fedem:
         metric_values = list()
         best_metric = -1
         best_metric_epoch = -1
+        
+        early_stop_val = 0
+        early_stop_count = 0
+        
         index = [0,1,2]
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
