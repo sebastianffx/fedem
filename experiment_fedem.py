@@ -49,10 +49,11 @@ if __name__ == '__main__':
 
     #thres_lesion_vol indicate the minimum number of 1 label in the mask required to avoid elimination from the dataset
     check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=5)
-
+    networks_config=[]
+    networks_name=[]
     for g_lr, l_lr in zip([0.01, 0.001, 0.0001], [0.001]*3):
         tmp = default.copy()
-        tmp.update({"weighting_scheme":"FEDAVG", "l_lr":l_lr, "g_lr":g_lr, "hybrid_loss_weights":weight_comb})
+        tmp.update({"weighting_scheme":"FEDAVG", "l_lr":l_lr, "g_lr":g_lr})
         networks_config.append(tmp)
         networks_name.append(f"{experience_name}_FEDAVG_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
      
