@@ -37,7 +37,7 @@ def get_train_valid_test_partitions(path, modality, clients, nested=True, multi_
     """Retrieve paths to the modality map and the corresponding labels.
        Handle two dataset folder herarchy, nested (one folder per subject) or not (all subjects volume are in a single folder)
     """
-    centers_partitions = [[] for i in range(len(clients))]
+    centers_partitions = []
     if nested:
         for center in clients:
             #expect folder hierarchy : root/centerX/train/subjectX/*modality*/volume.nii
@@ -47,7 +47,7 @@ def get_train_valid_test_partitions(path, modality, clients, nested=True, multi_
             center_lbl_paths_train  = sorted(glob(path+center+'/train'+'/**/*OT*/*nii'))
             center_lbl_paths_valid  = sorted(glob(path+center+'/valid'+'/**/*OT*/*nii'))
             center_lbl_paths_test   = sorted(glob(path+center+'/test'+'/**/*OT*/*nii'))
-            centers_partitions[center_num-1] = [[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]]
+            centers_partitions.append([[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]])
             print(center, "data loader contains (train/valid/test) map", len(center_paths_train), len(center_paths_valid), len(center_paths_test))
             if (len(center_paths_train), len(center_paths_valid), len(center_paths_test)) != (len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test)):
                 print("not same number of images and masks!")
@@ -66,7 +66,7 @@ def get_train_valid_test_partitions(path, modality, clients, nested=True, multi_
                 center_lbl_paths_train  = sorted(glob(path+center+'/train/'+'*msk.nii*'))
                 center_lbl_paths_valid  = sorted(glob(path+center+'/valid/'+'*msk.nii*'))
                 center_lbl_paths_test   = sorted(glob(path+center+'/test/' +'*msk.nii*'))
-            centers_partitions[center_num-1] = [[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]]
+            centers_partitions.append([[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]])
             print(center, "data loader contains (train/valid/test) map", len(center_paths_train), len(center_paths_valid), len(center_paths_test))
             if (len(center_paths_train), len(center_paths_valid), len(center_paths_test)) != (len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test)):
                 print("not same number of images and masks!")
