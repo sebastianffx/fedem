@@ -9,14 +9,18 @@ warnings.filterwarnings("ignore")
 
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
                   additional_modalities= [], multi_label=False,
-                  number_site=3, size_crop=100, nested=True, train=True):
+                  clients=[], size_crop=100, nested=True, train=True):
 
     print("Experiment using the ", datapath, "dataset")
     tmp_test = []
     tmp_valid = []
 
     #fetch the files paths, create the data loading/augmentation routines
-    partitions_paths, partitions_paths_add_mod = dataPreprocessing(datapath, modality, number_site, additional_modalities, nested, multi_label)
+    partitions_paths, partitions_paths_add_mod = dataPreprocessing(datapath, modality, clients, additional_modalities, nested, multi_label)
+
+    if len(clients)<1:
+        print("Must have at least one client")
+        return None, None
 
     for i, conf in enumerate(networks_config):
         test_dicemetric = []
@@ -162,7 +166,7 @@ if __name__ == '__main__':
                                                 networks_name=networks_name,
                                                 exp_name=experience_name,
                                                 modality=modality,
-                                                number_site=number_site,
+                                                clients=clients,
                                                 size_crop=144,
                                                 nested=False,
                                                 train=False,
