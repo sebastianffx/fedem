@@ -82,7 +82,7 @@ if __name__ == '__main__':
     #experience_name = "no_empty_tio_DLCE_newlabels" 
     #experience_name = "no_empty_DLCE_multiadc_transfo"
     #experience_name = "singlesite_transfo"
-    experience_name = "singlesite2_transfo"
+    experience_name = "singlesite2_no_transfo"
     modality="ADC"
 
     #clients=["center1", "center2", "center3"]
@@ -114,7 +114,7 @@ if __name__ == '__main__':
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
                #adc subsampling augmentation/harmonization
-               "no_deformation":False,
+               "no_deformation":True,
                "additional_modalities":[] #["4dir_1","4dir_2","20dir"] #list the extension of each additionnal modality you want to use
                }
 
@@ -127,9 +127,9 @@ if __name__ == '__main__':
     lr = 0.001694
     weight_comb = [1.4,0.6]
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
+    #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
     #for weight_comb in [[1, 1], [1.4,0.6], [1.6,0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
-    #for lr in [0.00994]:
+    for lr in [0.00994]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
