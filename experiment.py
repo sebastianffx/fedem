@@ -119,7 +119,7 @@ if __name__ == '__main__':
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
                #adc subsampling augmentation/harmonization
                "no_deformation":True,
-               "additional_modalities":[] #["4dir_1","4dir_2","20dir"] #list the extension of each additionnal modality you want to use
+               "additional_modalities":[[],[],[]],#[[],["tra4_1", "tra4_2", "dt6"],[]] #list the extension of each additionnal modality you want to use for each site
                }
 
     #only used when using blob loss, labels are used to identify the blob
@@ -127,6 +127,9 @@ if __name__ == '__main__':
 
     #thres_lesion_vol indicate the minimum number of 1 label in the mask required to avoid elimination from the dataset
     check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=5)
+
+    #check that the additional_modalities argument has the good length
+    assert len(clients)==len(default["additional_modalities"]), "additionnal modality and clients should have the same length"
 
     #TODO: if using blob loss, should check if the labeled masks exist?
 
