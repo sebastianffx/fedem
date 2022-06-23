@@ -55,6 +55,8 @@ class BlobLoss(_Loss):
         self.lambda_main = lambda_main
         self.lambda_blob = lambda_blob
 
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
         Args:
@@ -167,7 +169,8 @@ class BlobLoss(_Loss):
             if len(sample_loss)>0:
                 samples_blob_loss.append(torch.mean(torch.stack(sample_loss)))
             else:
-                samples_blob_loss.append(torch.tensor(0)) #no blob in the slice, loss is zero
+                #no blob in the slice, loss is zero
+                samples_blob_loss.append(torch.tensor(0).to(self.device)) #must sent it to the correct device
         
         #stack them so that the batch dimension is restaured
         output = torch.stack(samples_blob_loss, dim=0)[:,None,None,None]
