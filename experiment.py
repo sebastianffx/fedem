@@ -8,7 +8,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
-                  additional_modalities= [],
+                  additional_modalities= [], multi_label=False,
                   number_site=3, size_crop=100, nested=True, train=True):
 
     print("Experiment using the ", datapath, "dataset")
@@ -16,7 +16,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     tmp_valid = []
 
     #fetch the files paths, create the data loading/augmentation routines
-    partitions_paths, partitions_paths_add_mod = dataPreprocessing(datapath, modality, number_site, additional_modalities, nested)
+    partitions_paths, partitions_paths_add_mod = dataPreprocessing(datapath, modality, number_site, additional_modalities, nested, multi_label)
 
     for i, conf in enumerate(networks_config):
         test_dicemetric = []
@@ -161,4 +161,5 @@ if __name__ == '__main__':
                                                 size_crop=144,
                                                 nested=False,
                                                 train=False,
-                                                additional_modalities=[]) #default["additional_modalities"])
+                                                additional_modalities=[],
+                                                multi_label=False) #default["additional_modalities"])
