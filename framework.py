@@ -9,6 +9,7 @@ import numpy as np
 import nibabel as nib
 
 from network import UNet_custom
+from utils.blob_loss import BlobLoss
 from monai.metrics import DiceMetric
 from torch.optim import Optimizer, Adam
 from preprocessing import generate_loaders, torchio_generate_loaders, torchio_create_test_transfo
@@ -54,6 +55,15 @@ class Fedem:
         if self.options["loss_fun"] == "diceloss":
             print("Using DiceLoss as loss function")
             self.loss_function = monai.losses.DiceLoss(sigmoid=True, batch=True)
+        elif self.options["loss_fun"] == "blobloss":
+            print("Using BlobLoss with DiceLoss as loss function")
+            self.loss_function = BlobLoss(loss_function=monai.losses.DiceLoss(sigmoid=True, batch=False, reduction="none"),
+                                          lambda_main = self.options["hybrid_loss_weights"][0],
+                                          lambda_blob = self.options["hybrid_loss_weights"][1],
+                                          sigmoid = True,
+                                          softmax = False,
+                                          reduction = "mean",
+                                          batch = True)
         else:
             print("Using DiceLoss + CE as loss function")
             self.loss_function = monai.losses.DiceCELoss(include_background=True, sigmoid=True, reduction='mean',
@@ -236,7 +246,11 @@ class Fedem:
 
         #during validation and testing, the batch_data size should be 1, last dimension is number of slice in original volume
         for batch_data in dataset_loader: 
-            inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:].to(device)
+            inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
+
+            if self.options["multi_label"]:
+                #must convert the labels to binary for dice score computation
+                labels = labels > 0
 
             if self.options["use_test_augm"] and dataset=="test":
                 #apply the transformation on the entire 3D volume, to avoid transfer between cpu and gpu for each slice
@@ -293,10 +307,14 @@ class Fedem:
             if save_pred:
                 affine = batch_data['label']['affine'][0,:,:].detach().cpu().numpy()
                 filestem = batch_data['label']['stem'][0]
+                if self.options["multi_label"]:
+                    suffix = "_msk_labeled"
+                else:
+                    suffix = "_msk"
                 #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_raw_segpred_"+benchmark_metric+".nii.gz")))
-                nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_post_segpred_"+benchmark_metric+".nii.gz")))
+                nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_post_segpred_"+benchmark_metric+".nii.gz")))
                 if self.options["use_test_augm"] and dataset=="test":
-                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_augm_segpred_"+benchmark_metric+".nii.gz")))
+                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_augm_segpred_"+benchmark_metric+".nii.gz")))
 
             #retain each volume scores (dice loss and dice score)
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
