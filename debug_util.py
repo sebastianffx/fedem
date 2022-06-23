@@ -1,5 +1,6 @@
 import os
 import shutil
+import cc3d
 import numpy as np
 import nibabel as nb
 
@@ -52,10 +53,24 @@ def adding_modalities(path_to_dataset, path_to_modality, name_modality):
     for center in os.listdir(path_to_dataset):
         print("processing", str(center))
         for split in ["train", "valid", "test"]:
-            #extract te subjects using the mask file
+            #extract the subjects using the mask file
             split_subjects = [f for f in os.listdir(os.path.join(path_to_dataset, center, split)) if "msk." in f]
             for subject in split_subjects:
                 shutil.copy(os.path.join(path_to_modality, center, split, subject.replace("msk.","adc.")),
                             os.path.join(path_to_dataset, center, split, subject.replace("msk.", name_modality+".")))
 
     print(count_missing, "subjects could not have updates with the new labels")
+
+def apply_cc3d(path_to_dataset, connectivity=26):
+    for center in os.listdir(path_to_dataset):
+        print("processing", str(center))
+        for split in ["train", "valid", "test"]:
+            tmp_path = os.path.join(path_to_dataset, center, split)
+            #extract the subjects using the mask file
+            split_subjects = [f for f in os.listdir(tmp_path) if "msk." in f]
+            for subject in split_subjects:
+                bin_msk = nb.load(os.path.join(tmp_path, subject))
+                msk_affine = bin_msk.affine
+                #should maybe remove the blob that are smaller than XX to prevent having > 20 unique single components
+                lbl_msk = cc3d.connected_components(bin_msk.get_fdata(), connectivity=connectivity) #face, vertex or corner adjacent by default
+                nb.save(nb.Nifti1Image(lbl_msk, msk_affine), os.path.join(path_to_dataset, center, split, subject.replace("_msk.","_msk_labeled.")))
