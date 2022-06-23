@@ -160,6 +160,7 @@ class BlobLoss(_Loss):
                     # if int does not work we try float
                     blob_loss = self.loss_function(masked_pred, blob_label.float())
 
+                #Jonas idea: multiply the blob_loss value by the surface/volume of this lesion (be careful otherwise we return to DiceLoss)
                 sample_loss.append(blob_loss)
 
             #normalize blob loss by the number of blob -> hope that it does not break autograd

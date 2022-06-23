@@ -76,11 +76,12 @@ def add_modalities(path, modalities, clients):
     """Based on not-nested hierarchy, retrieve path to additionnal modality/representation of the same modality
     """
     partitions_paths_add_mod = []
-    for center in clients:
+    for center_idx, center in enumerate(clients):
         center_paths_train = []
         center_paths_valid = []
         center_paths_test = []
-        for modality in modalities:
+        #each site can have different additionnal modalities
+        for modality in modalities[center_idx]:
             center_paths_train.append(sorted(glob(path+center+'/train/'+f'*{modality}.nii*')))
             center_paths_valid.append(sorted(glob(path+center+'/valid/'+f'*{modality}.nii*')))
             center_paths_test.append(sorted(glob(path+center+'/test/' +f'*{modality}.nii*')))
