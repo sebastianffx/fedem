@@ -1,5 +1,6 @@
 import torch
 from torch.nn.modules.loss import _Loss
+from monai.utils import LossReduction
 from typing import Callable, List, Optional, Sequence, Union
 
 class BlobLoss(_Loss):
@@ -89,13 +90,14 @@ class BlobLoss(_Loss):
             reduce_axis = [0] + reduce_axis
 
         if self.lambda_main > 0:
-            #the reduction should happen later
-            self.loss_function(input, target, reduction=LossReduction.NONE)
+            #convert target to binary mask, original implementation is using two different target tensor
+            main_loss = self.loss_function(input, target>0)
         else:
             main_loss = 0
 
         if self.lambda_blob > 0:
-            blob_loss = compute_compound_loss(input, target, reduce_axis=reduce_axis)
+            #using multi-labelled mask (using 3D connected component)
+            blob_loss = self.compute_compound_loss(input=input, target=target)
         else:
             blob_loss = 0
         
@@ -115,7 +117,7 @@ class BlobLoss(_Loss):
 
         return f
 
-    def compute_compound_loss(input: torch.Tensor, target: torch.Tensor):
+    def compute_compound_loss(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """ Compute blob loss for a batch of samples
         """
         #TODO: try to vectorize the entire thing, might be difficult due to the varying number of blob
@@ -153,22 +155,19 @@ class BlobLoss(_Loss):
                 masked_pred = sample_pred*label_mask
                 try:
                     # we try with int labels first, but some losses require floats
-                    blob_loss = self.loss_function(masked_pred, blob_label.int(), reduction=LossReduction.NONE)
+                    blob_loss = self.loss_function(masked_pred, blob_label.int())
                 except:
                     # if int does not work we try float
-                    blob_loss = self.loss_function(masked_pred, blob_label.float(), reduction=LossReduction.NONE)
+                    blob_loss = self.loss_function(masked_pred, blob_label.float())
 
                 sample_loss.append(blob_loss)
 
             #normalize blob loss by the number of blob -> hope that it does not break autograd
-            samples_blob_loss.append(torch.average(torch.stack(sample_loss), dim=-1)) #check that the dimensions are correct
+            if len(sample_loss)>0:
+                samples_blob_loss.append(torch.mean(torch.stack(sample_loss)))
+            else:
+                samples_blob_loss.append(torch.tensor(0)) #no blob in the slice, loss is zero
         
         #stack them so that the batch dimension is restaured
-        output = torch.stack(samples_blob_loss, dim=0)
-
-        #input and output should have the same shape
-        print(output.shape)
-        print(input.shape)
-        assert (input.shape == output.shape)
-
+        output = torch.stack(samples_blob_loss, dim=0)[:,None,None,None]
         return output
