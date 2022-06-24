@@ -55,9 +55,24 @@ class Fedem:
         if self.options["loss_fun"] == "diceloss":
             print("Using DiceLoss as loss function")
             self.loss_function = monai.losses.DiceLoss(sigmoid=True, batch=True)
-        elif self.options["loss_fun"] == "blobloss":
+        elif self.options["loss_fun"] == "blob_diceloss":
             print("Using BlobLoss with DiceLoss as loss function")
-            self.loss_function = BlobLoss(loss_function=monai.losses.DiceLoss(sigmoid=True, batch=False, reduction="none"),
+            #application of sigmoid is handled by Blobloss, for both main and blob components of the loss
+            self.loss_function = BlobLoss(loss_function=monai.losses.DiceLoss(sigmoid=False, batch=False, reduction="none"),
+                                          lambda_main = self.options["hybrid_loss_weights"][0],
+                                          lambda_blob = self.options["hybrid_loss_weights"][1],
+                                          sigmoid = True,
+                                          softmax = False,
+                                          reduction = "mean",
+                                          batch = True)
+        elif self.options["loss_fun"] == "blob_dicelossCE":
+            print("Using BlobLoss with DiceLossCE as loss function")
+            #application of sigmoid is handled by Blobloss, for both main and blob components of the loss
+            self.loss_function = BlobLoss(loss_function=monai.losses.DiceCELoss(include_background=True, sigmoid=False, reduction='none',
+                                                         batch=True, ce_weight=None, 
+                                                         lambda_dice=1.4, #shame on me, hardcoded value because two many lambdas
+                                                         lambda_ce=0.6 #shame on me, hardcoded value because two many lambdas
+                                                         ),
                                           lambda_main = self.options["hybrid_loss_weights"][0],
                                           lambda_blob = self.options["hybrid_loss_weights"][1],
                                           sigmoid = True,
