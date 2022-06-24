@@ -106,7 +106,7 @@ def get_same_res_paths(nifti_labl_paths, spacing=(2.0, 2.0, 2.0), folder_label="
             other_flair_paths.append(path_to_modality.replace("_msk.nii.gz", "_flair.nii.gz"))
             other_dwi_paths.append(path_to_modality.replace("_msk.nii.gz", "_dwi.nii.gz"))
             other_adc_paths.append(path_to_modality.replace("_msk.nii.gz", "_adc.nii.gz"))
-    return labels_paths, dwi_paths, flair_paths, adc_paths, other_labels, other_dwi_paths, other_flair_paths, other_adc_paths
+    return labels_paths, dwi_paths, flair_paths, adc_paths, other_labels_paths, other_dwi_paths, other_flair_paths, other_adc_paths
 
 
 def generateSPLIT(path_to_dataset, dataset_name, train_valid_test=[0.75,0.1,0.15], spacing=(2.0, 2.0, 2.0), gen_csv=False):
