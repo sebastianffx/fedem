@@ -86,7 +86,8 @@ if __name__ == '__main__':
     #experience_name = "no_empty_tio_DLCE_newlabels" 
     #experience_name = "no_empty_DLCE_multiadc_transfo"
     #experience_name = "singlesite_transfo"
-    experience_name = "singlesite1_transfo"
+    #experience_name = "singlesite1_transfo"
+    experience_name = "singlesite1_no_transfo_blobloss"
     modality="ADC"
 
     #clients=["center1", "center2", "center3"]
@@ -112,14 +113,14 @@ if __name__ == '__main__':
                "padding":(64,64,0), #typically half the dimensions of the patch_size
                "max_queue_length":16,
                "patches_per_volume":4,
-               "loss_fun":"dicelossCE", #diceloss_CE
+               "loss_fun":"blobloss", #"dicelossCE", #diceloss_CE
                "hybrid_loss_weights":[1.4,0.6],
                #test time augmentation
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
                #adc subsampling augmentation/harmonization
                "no_deformation":True,
-               "additional_modalities":[[],[],[]],#[[],["tra4_1", "tra4_2", "dt6"],[]] #list the extension of each additionnal modality you want to use for each site
+               "additional_modalities":[[]], #[[],[],[]],#[[],["tra4_1", "tra4_2", "dt6"],[]] #list the extension of each additionnal modality you want to use for each site
                }
 
     #only used when using blob loss, labels are used to identify the blob
@@ -137,11 +138,11 @@ if __name__ == '__main__':
     networks_name = []
     #storing the best parameters
     lr = 0.001694
-    weight_comb = [1.4,0.6]
+    weight_comb = [1.3,0.7]
     #for lr in np.linspace(1e-5, 1e-2, 5):
-    #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
+    for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
     #for weight_comb in [[1, 1], [1.4,0.6], [1.6,0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
-    for lr in [0.00994]:
+    #for lr in [0.00994]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
