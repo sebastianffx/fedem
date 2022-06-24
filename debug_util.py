@@ -81,7 +81,7 @@ def apply_cc3d(path_to_dataset, connectivity=26):
 def get_same_res_paths(nifti_labl_paths, spacing=(2.0, 2.0, 2.0), folder_label="derivatives", folder_maps="rawdata_adc_transformed"):
     """ Take the path to the root of a dataset and share the data into two; one with identical spacing and another with the rest
     """
-    labels_paths, other_labels  = [],[]
+    labels_paths, other_labels_paths  = [],[]
     dwi_paths, other_dwi_paths   = [],[]
     flair_paths, other_flair_paths  = [],[]
     adc_paths, other_adc_paths  = [],[]
