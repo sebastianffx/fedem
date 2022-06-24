@@ -1,10 +1,11 @@
 import os
-import glob
 import shutil
 import cc3d
 import numpy as np
 import pandas as pd
 import nibabel as nb
+
+from glob import glob
 
 def crop2seg(path, r_low, r_high):
     """ Crop volume and the corresponding labels to a given slices range
