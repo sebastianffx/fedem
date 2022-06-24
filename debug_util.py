@@ -148,7 +148,7 @@ def generateSPLIT(path_to_dataset, dataset_name, train_valid_test=[0.75,0.1,0.15
         target_folder = os.path.join(dataset_name, "center"+str(center_num))
         os.makedirs(os.path.join(target_folder, "train"), exist_ok=True)
 
-        for f in df.loc[df["site"+str(center_num) == "train"]].iterrows():
+        for f in df_fedem.loc[df_fedem["site"+str(center_num) == "train"]].iterrows():
             shutil.copy(f["label"],
                         os.path.join(target_folder, "train", f.split("/")[-1]))
             shutil.copy(f["dwi"],
@@ -159,7 +159,7 @@ def generateSPLIT(path_to_dataset, dataset_name, train_valid_test=[0.75,0.1,0.15
                         os.path.join(target_folder, "train", f.split("/")[-1]))
 
         os.makedirs(os.path.join(target_folder, "valid"), exist_ok=True)
-        for f in df.loc[df["site"+str(center_num) == "valid"]].iterrows():
+        for f in df_fedem.loc[df_fedem["site"+str(center_num) == "valid"]].iterrows():
             shutil.copy(f["label"],
                         os.path.join(target_folder, "valid", f.split("/")[-1]))
             shutil.copy(f["dwi"],
@@ -170,7 +170,7 @@ def generateSPLIT(path_to_dataset, dataset_name, train_valid_test=[0.75,0.1,0.15
                         os.path.join(target_folder, "valid", f.split("/")[-1]))
 
         os.makedirs(os.path.join(target_folder, "test") , exist_ok=True)
-        for f in df.loc[df["site"+str(center_num) == "test"]].iterrows():
+        for f in df_fedem.loc[df_fedem["site"+str(center_num) == "test"]].iterrows():
             shutil.copy(f["label"],
                         os.path.join(target_folder, "test", f.split("/")[-1]))
             shutil.copy(f["dwi"],
