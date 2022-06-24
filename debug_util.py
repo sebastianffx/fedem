@@ -119,6 +119,7 @@ def generateSPLIT(path_to_dataset, dataset_name, train_valid_test=[0.75,0.1,0.15
  
         print("WARNING, your generating a new subject split csv file")
         #shuffle based on labels, because modality agnostic
+        print(len(lbl_paths))
         percentages_train_val_test = (int(0.75*len(lbl_paths)),int(0.1*len(lbl_paths))+1,int(0.15*len(lbl_paths)))
         print("Train, Val, Test Imgs: ", percentages_train_val_test)
         assert len(lbl_paths) == np.sum(percentages_train_val_test)
