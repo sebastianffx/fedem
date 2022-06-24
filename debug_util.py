@@ -77,7 +77,7 @@ def apply_cc3d(path_to_dataset, connectivity=26):
                 lbl_msk = cc3d.connected_components(bin_msk.get_fdata(), connectivity=connectivity) #face, vertex or corner adjacent by default
                 nb.save(nb.Nifti1Image(lbl_msk, msk_affine), os.path.join(path_to_dataset, center, split, subject.replace("_msk.","_msk_labeled.")))
 
-def get_same_res_paths(nifti_labl_paths, spacing=(2.0, 2.0, 2.0)):
+def get_same_res_paths(nifti_labl_paths, spacing=(2.0, 2.0, 2.0), folder_label="derivatives", folder_maps="rawdata_adc_transformed"):
     """ Take the path to the root of a dataset and share the data into two; one with identical spacing and another with the rest
     """
     labels_paths, other_labels  = [],[]
@@ -93,7 +93,7 @@ def get_same_res_paths(nifti_labl_paths, spacing=(2.0, 2.0, 2.0)):
             #save path to labels
             labels_paths.append(label_path)
             #switch to the modalities folder
-            path_to_modality = label_path.replace("derivatives", "rawdata")
+            path_to_modality = label_path.replace(folder_label, folder_maps)
             flair_paths.append(path_to_modality.replace("_msk.nii.gz", "_flair.nii.gz"))
             dwi_paths.append(path_to_modality.replace("_msk.nii.gz", "_dwi.nii.gz"))
             adc_paths.append(path_to_modality.replace("_msk.nii.gz", "_adc.nii.gz"))
@@ -101,7 +101,7 @@ def get_same_res_paths(nifti_labl_paths, spacing=(2.0, 2.0, 2.0)):
             #save path to labels
             other_labels_paths.append(label_path)
             #switch to the modalities folder
-            path_to_modality = label_path.replace("derivatives", "rawdata")
+            path_to_modality = label_path.replace(folder_label, folder_maps)
             other_flair_paths.append(path_to_modality.replace("_msk.nii.gz", "_flair.nii.gz"))
             other_dwi_paths.append(path_to_modality.replace("_msk.nii.gz", "_dwi.nii.gz"))
             other_adc_paths.append(path_to_modality.replace("_msk.nii.gz", "_adc.nii.gz"))
