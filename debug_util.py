@@ -130,7 +130,7 @@ def generateSPLIT(path_to_dataset, dataset_name, train_valid_test=[0.75,0.1,0.15
         #generate csv file containing the informations for FEDEM training
         indexes=list(range(len(lbl_paths)))
         np.random.shuffle(indexes)
-        df_fedem = pd.DataFrame(data=[lbl_paths, dwi_paths, flair_paths, adc_paths], columns=["label", "dwi", "flair", "adc"])
+        df_fedem = pd.DataFrame(dict(zip(["label", "dwi", "flair", "adc"], [lbl_paths, dwi_paths, flair_paths, adc_paths])))
         df_fedem["site1"] = "train"
         df_fedem.loc[indexes[:percentages_train_val_test[1]], "site1"] = "valid"
         df_fedem.loc[indexes[percentages_train_val_test[1]:percentages_train_val_test[2]+percentages_train_val_test[1]], "site1"] = "test"
