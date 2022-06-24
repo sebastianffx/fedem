@@ -760,6 +760,9 @@ class Centralized(Fedem):
 
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 
+        #overwritte the argument to free space?
+        self.dataloaders = [[] for i in range(len(self.options["clients"]))]
+    
     #overwrite the superclass method since there are no client models
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False, early_stop_limit=-1):
         metric_values = list()
