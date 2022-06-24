@@ -139,7 +139,7 @@ def generateSPLIT(path_to_dataset, dataset_name, train_valid_test=[0.75,0.1,0.15
         df_fedem = pd.read_csv("fedem_split_"+dataset_name+".csv", index_col=0)
 
     #COPIED from MASiVAR_ProcessingPipeline.py and adapted for multi-modality dataset
-    nb_sites = len(df_fedem.columns)-1
+    nb_sites = len([f for f in df_fedem.columns if "site" in f])
     #master folder
     os.makedirs(dataset_name, exist_ok=True)
     for center_num in range(1, nb_sites+1):
