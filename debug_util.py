@@ -109,6 +109,8 @@ def get_same_res_paths(nifti_labl_paths, spacing=(2.0, 2.0, 2.0), folder_label="
 
 
 def generateSPLIT(path_to_dataset, dataset_name, train_valid_test=[0.75,0.1,0.15], spacing=(2.0, 2.0, 2.0), gen_csv=False):
+
+    nifti_labl_paths= glob(path_to_dataset)
    
     if gen_csv:
         lbl_paths, dwi_paths, flair_paths, adc_paths, o_lbl_paths, o_dwi_paths, o_flair_paths, o_adc_paths = get_same_res_paths(nifti_labl_paths,
