@@ -16,7 +16,7 @@ local_lr, global_lr = 0.00932, 1.7 #np.sqrt(K)
 num_repetitions = 5
 number_site=4
 
-partitions_paths, centers_data_loaders, all_test_loader, all_valid_loader = dataPreprocessing(datapath, modality, number_site=4, batch_size =batch_size)        
+partitions_paths, centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader = dataPreprocessing(datapath, modality, number_site=4, batch_size =batch_size)        
 
 default = {"g_epoch":2,
            "l_epoch":1,
@@ -57,7 +57,7 @@ for i, conf in enumerate(networks_config):
     for rep in range(num_repetitions):
         print(f"{networks_name[i]} iteration {rep+1}")
         #create new loaders for each repetition
-        _, centers_data_loaders, all_test_loader, all_valid_loader = dataPreprocessing(datapath, modality, number_site, batch_size)
+        _, centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader = dataPreprocessing(datapath, modality, number_site, batch_size)
         conf["dataloader"]=centers_data_loaders
         #add number to differentiate replicates
         if exp_name!=None:
