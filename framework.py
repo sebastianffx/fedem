@@ -261,7 +261,9 @@ class Fedem:
 
         #during validation and testing, the batch_data size should be 1, last dimension is number of slice in original volume
         for batch_data in dataset_loader: 
-            inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
+            #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
+            inputs, labels = batch_data['adc']['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
+
 
             if self.options["multi_label"]:
                 #must convert the labels to binary for dice score computation
@@ -412,7 +414,8 @@ class FedAvg(Fedem):
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
                 if self.options["use_torchio"]:
-                    inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred = ann(inputs)
@@ -492,7 +495,9 @@ class Scaffold(Fedem):
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
                 if self.options["use_torchio"]:
-                    inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred = ann(inputs)
@@ -678,7 +683,9 @@ class FedRod(Fedem):
                     v.requires_grad = True #deriving gradients to all the generic layers
                 
                 if self.options["use_torchio"]:
-                    inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred_generic = ann(inputs)
@@ -794,7 +801,9 @@ class Centralized(Fedem):
                 
                 step += 1
                 if self.options["use_torchio"]:
-                    inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
 
