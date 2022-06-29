@@ -23,13 +23,6 @@ from monai.transforms import (
     EnsureType,
     Resized)
 
-#necessary to increase the tolerance, causing issues for ISLE data
-class MySubject(tio.Subject):
-    def check_consistent_attribute(self, *args, **kwargs) -> None:
-        kwargs['relative_tolerance'] = 1e-4
-        kwargs['absolute_tolerance'] = 1e-4
-        return super().check_consistent_attribute(*args, **kwargs)
-
 def dataPreprocessing(path, modality, clients, additional_modalities, nested=True, multi_label=False):
 
     partitions_paths = get_train_valid_test_partitions(path, modality, clients, nested, multi_label)
@@ -282,7 +275,7 @@ def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels, pa
     # this could be performed prior to the loading as well, be part of the dataset creation/organization
 
     for i in range(len(partition_paths_adc)):
-        subjects_list.append(MySubject(
+        subjects_list.append(tio.Subject(
                                 #by default, tio add a channel when loading 3D volume. Leveraging this aspect to encode several ADC representations in the channel dimension
                                 adc=tio.ScalarImage(path=[partition_paths_adc[i]]+[add_mod[i] for add_mod in partition_paths_additional_modalities]),
                                 label=tio.LabelMap(partition_paths_labels[i])
