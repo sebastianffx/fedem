@@ -79,8 +79,8 @@ if __name__ == '__main__':
     #path = 'astral_fedem_dti_noempty_newlabels/'
     #path = 'astral_fedem_4dir_1/'
     #path = 'astral_fedem_20dir/'
-    path = 'astral_fedem_multiadc_newlabels/'
-    #path = 'astral_fedem_ABC/'
+    #path = 'astral_fedem_multiadc_newlabels/'
+    path = 'astral_fedem_ABC/'
 
     #experience_name = "astral_no_empty_mask"
     #experience_name = "no_empty_torchio_DLCE"
@@ -89,13 +89,13 @@ if __name__ == '__main__':
     #experience_name = "singlesite1_transfo"
     #experience_name = "singlesite2_no_transfo_blobloss"
     #experience_name = "allsite_transfo"
-    experience_name = "multirep_siteB"
+    experience_name = "singlerep_siteB"
     
     modality="ADC"
-    modality="20dir"
+    #modality="20dir"
 
-    clients=["center1", "center2", "center3"]
-    #clients=["center3"]
+    #clients=["center1", "center2", "center3"]
+    clients=["center3"]
     number_site=len(clients)
 
     default = {"g_epoch":60,
@@ -124,7 +124,7 @@ if __name__ == '__main__':
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
                #adc subsampling augmentation/harmonization
                "no_deformation":True,
-               "additional_modalities": [[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
+               "additional_modalities": [[]]#[[],[],[]] #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
                }
 
     #only used when using blob loss, labels are used to identify the blob
@@ -148,8 +148,9 @@ if __name__ == '__main__':
     #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
     #for weight_comb in [[1, 1], [1.4,0.6], [1.6,0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
     #for lr in [0.00994]:
-    #for lr in [0.00994, 0.0116]:
-    """
+    """ 
+    for lr in [0.00994, 0.0116]:
+    
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
@@ -157,12 +158,13 @@ if __name__ == '__main__':
         #legacy network naming, no lambdas (valid for v1 to v4)
         #networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
     """
-    for g_lr, l_lr in zip([0.01, 0.001, 0.0001], [0.001]*3):
+    #for g_lr, l_lr in zip([0.01, 0.001, 0.0001], [0.001]*3):
+    for g_lr, l_lr in zip([0.001, 0.0001], [0.001]*2):
         tmp = default.copy()
         tmp.update({"weighting_scheme":"FEDAVG", "l_lr":l_lr, "g_lr":g_lr})
         networks_config.append(tmp)
         networks_name.append(f"{experience_name}_FEDAVG_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
-
+        
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
 
@@ -189,6 +191,6 @@ if __name__ == '__main__':
                                                 clients=clients,
                                                 size_crop=144,
                                                 nested=False,
-                                                train=True,
+                                                train=False,
                                                 additional_modalities=default["additional_modalities"],
                                                 multi_label=default["multi_label"]) 
