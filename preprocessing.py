@@ -23,13 +23,6 @@ from monai.transforms import (
     EnsureType,
     Resized)
 
-#necessary to increase the tolerance, causing issues for ISLE data
-class MySubject(tio.Subject):
-    def check_consistent_attribute(self, *args, **kwargs) -> None:
-        kwargs['relative_tolerance'] = 1e-4
-        kwargs['absolute_tolerance'] = 1e-4
-        return super().check_consistent_attribute(*args, **kwargs)
-
 def dataPreprocessing(path, modality, clients, additional_modalities, nested=True, multi_label=False):
 
     partitions_paths = get_train_valid_test_partitions(path, modality, clients, nested, multi_label)
@@ -282,7 +275,7 @@ def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels, pa
     # this could be performed prior to the loading as well, be part of the dataset creation/organization
 
     for i in range(len(partition_paths_adc)):
-        subjects_list.append(MySubject(
+        subjects_list.append(tio.Subject(
                                 #by default, tio add a channel when loading 3D volume. Leveraging this aspect to encode several ADC representations in the channel dimension
                                 adc=tio.ScalarImage(path=[partition_paths_adc[i]]+[add_mod[i] for add_mod in partition_paths_additional_modalities]),
                                 label=tio.LabelMap(partition_paths_labels[i])
@@ -300,7 +293,21 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
             },
             p=0.75,
         )
-    rotation = tio.RandomAffine(degrees=360)
+    #old approach, was not always improving performance
+    #rotation = tio.RandomAffine(degrees=360)
+    rotation = tio.OneOf({
+                    tio.Affine(scales=0, degrees=90, translation=0): 0.33,
+                    tio.Affine(scales=0, degrees=180, translation=0): 0.34,
+                    tio.Affine(scales=0, degrees=270, translation=0): 0.33
+            },
+            p=0.75,
+        )
+    flipping = tio.OneOf({
+                    tio.Flip(axes="R"): 0.5, #¶ight flipping
+                    tio.Flip(axes="P"): 0.5, #posterior flipping
+            },
+            p=0.66,
+        )
     padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
     toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
 
@@ -333,7 +340,10 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
     else:
         #randomFlip should probably be along axes="Right/Left" or "Anterior/Posterior" to take advantage of the symmetry of the brain
         # Superior or Inferior don't make sense for 2D net
-        transform = tio.Compose([select_channel, clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation])
+        #transform = tio.Compose([select_channel, clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation])
+
+        #removed the random affine and elastic deformation
+        transform = tio.Compose([select_channel, clamp, toCanon, rescale, flipping, rotation, padding])
         return transform, transform_valid
 
 def torchio_create_test_transfo():

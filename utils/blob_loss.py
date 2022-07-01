@@ -122,7 +122,7 @@ class BlobLoss(_Loss):
     def compute_compound_loss(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """ Compute blob loss for a batch of samples
         """
-        #TODO: try to vectorize the entire thing, might be difficult due to the varying number of blob
+        #TODO: try to vectorize the entire thing, might be difficult due to the varying number of blob -> use torch.einsum?
         #UNLESS we add zero for the labels that other samples don't have in their labels!
         """
         #it does not make sense to reduce along the batch or channel, would merge the labels

@@ -23,6 +23,8 @@ from monai.transforms import (
     EnsureType,
 )
 
+from utils.eval_utils import compute_dice, compute_absolute_volume_difference, compute_absolute_lesion_difference, compute_lesion_f1_score
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
 
@@ -259,9 +261,17 @@ class Fedem:
         holder_dicemetric_augm = []
         ### END TMP
 
+        ### TMP : for ISLES22 metrics functions
+        use_isles22_metrics=True
+        isles_metrics = [[],[],[],[]]
+        astral_voxel_size = 1.63*1.63*3
+        ###
+
         #during validation and testing, the batch_data size should be 1, last dimension is number of slice in original volume
         for batch_data in dataset_loader: 
-            inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
+            #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
+            inputs, labels = batch_data['adc']['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
+
 
             if self.options["multi_label"]:
                 #must convert the labels to binary for dice score computation
@@ -319,6 +329,8 @@ class Fedem:
 
                     augm_pred_holder.append(avg_augm_pred[0,0,:,:].cpu().numpy())
 
+            prediction3d = np.stack(post_pred_holder, axis=-1)
+
             if save_pred:
                 affine = batch_data['label']['affine'][0,:,:].detach().cpu().numpy()
                 filestem = batch_data['label']['stem'][0]
@@ -327,7 +339,7 @@ class Fedem:
                 else:
                     suffix = "_msk"
                 #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_raw_segpred_"+benchmark_metric+".nii.gz")))
-                nib.save(nib.Nifti1Image(np.stack(post_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_post_segpred_"+benchmark_metric+".nii.gz")))
+                nib.save(nib.Nifti1Image(prediction3d, affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_post_segpred_"+benchmark_metric+".nii.gz")))
                 if self.options["use_test_augm"] and dataset=="test":
                     nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_augm_segpred_"+benchmark_metric+".nii.gz")))
 
@@ -341,13 +353,29 @@ class Fedem:
                 holder_dicemetric_augm.append(dice_metric_augm.aggregate().item())
                 dice_metric_augm.reset()
 
+            #call the metrics functions from ISLES22 repo
+            if use_isles22_metrics:
+                ground_truth = labels[0,0,:,:,:].cpu().numpy()
+                isles_metrics[0].append(compute_dice(prediction3d, ground_truth))
+                isles_metrics[1].append(compute_absolute_volume_difference(prediction3d, ground_truth, astral_voxel_size))
+                isles_metrics[2].append(compute_absolute_lesion_difference(prediction3d, ground_truth))
+                isles_metrics[3].append(compute_lesion_f1_score(prediction3d, ground_truth))
+
         #print average over all the volumes
         if verbose:
             print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
-            print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4))
+            print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4), "std:", np.round(np.std(holder_dicemetric),4))
             if self.options["use_test_augm"] and dataset=="test":
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm):", np.round(np.mean(holder_dicemetric_augm),4))
-        return np.mean(holder_dicemetric), np.mean(holder_diceloss)
+
+            if use_isles22_metrics and dataset=="test":
+                print("ISLES22 metrics")
+                print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(isles_metrics[0]),4), "std:", np.round(np.std(isles_metrics[0]),4))
+                print(f"Global (all sites, all slices) {dataset} ABS VOLUME DIFF :", np.round(np.mean(isles_metrics[1]),4))
+                print(f"Global (all sites, all slices) {dataset} ABS LESION DIFF :", np.round(np.mean(isles_metrics[2]),4))
+                print(f"Global (all sites, all slices) {dataset} LESION F1 :", np.round(np.mean(isles_metrics[3]),4))
+
+        return np.mean(holder_dicemetric), np.std(holder_dicemetric)
 
 class FedAvg(Fedem):
     def __init__(self, options):
@@ -412,7 +440,8 @@ class FedAvg(Fedem):
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
                 if self.options["use_torchio"]:
-                    inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred = ann(inputs)
@@ -492,7 +521,9 @@ class Scaffold(Fedem):
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
                 if self.options["use_torchio"]:
-                    inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred = ann(inputs)
@@ -678,7 +709,9 @@ class FedRod(Fedem):
                     v.requires_grad = True #deriving gradients to all the generic layers
                 
                 if self.options["use_torchio"]:
-                    inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred_generic = ann(inputs)
@@ -794,7 +827,9 @@ class Centralized(Fedem):
                 
                 step += 1
                 if self.options["use_torchio"]:
-                    inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
 
