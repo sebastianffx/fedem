@@ -353,10 +353,11 @@ class Fedem:
 
             #call the metrics functions from ISLES22 repo
             if use_isles22_metrics:
-                isles_metrics[0].append(compute_dice(prediction3d, labels[0,0,:,:,:]))
-                isles_metrics[1].append(compute_absolute_volume_difference(prediction3d, labels[0,0,:,:,:], astral_voxel_size))
-                isles_metrics[2].append(compute_absolute_lesion_difference(prediction3d, labels[0,0,:,:,:]))
-                isles_metrics[3].append(compute_lesion_f1_score(prediction3d, labels[0,0,:,:,:]))
+                ground_truth = labels[0,0,:,:,:].cpu().numpy()
+                isles_metrics[0].append(compute_dice(prediction3d, ground_truth))
+                isles_metrics[1].append(compute_absolute_volume_difference(prediction3d, ground_truth, astral_voxel_size))
+                isles_metrics[2].append(compute_absolute_lesion_difference(prediction3d, ground_truth))
+                isles_metrics[3].append(compute_lesion_f1_score(prediction3d, ground_truth))
 
         #print average over all the volumes
         if verbose:
