@@ -296,17 +296,16 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
     #old approach, was not always improving performance
     #rotation = tio.RandomAffine(degrees=360)
     rotation = tio.OneOf({
-                    tio.Affine(scales=0, degrees=90, translation=0): 0.33,
-                    tio.Affine(scales=0, degrees=180, translation=0): 0.34,
-                    tio.Affine(scales=0, degrees=270, translation=0): 0.33
+                    tio.Affine(scales=0, degrees=90, translation=0): 0.5,
+                    tio.Affine(scales=0, degrees=180, translation=0): 0.5,
             },
-            p=0.75,
+            p=0.5,
         )
     flipping = tio.OneOf({
                     tio.Flip(axes="R"): 0.5, #¶ight flipping
                     tio.Flip(axes="P"): 0.5, #posterior flipping
             },
-            p=0.66,
+            p=0.5,
         )
     padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
     toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
