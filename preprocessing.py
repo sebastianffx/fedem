@@ -293,7 +293,21 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
             },
             p=0.75,
         )
-    rotation = tio.RandomAffine(degrees=360)
+    #old approach, was not always improving performance
+    #rotation = tio.RandomAffine(degrees=360)
+    rotation = tio.OneOf({
+                    tio.Affine(scales=0, degrees=90, translation=0): 0.33,
+                    tio.Affine(scales=0, degrees=180, translation=0): 0.34,
+                    tio.Affine(scales=0, degrees=270, translation=0): 0.33
+            },
+            p=0.75,
+        )
+    flipping = tio.OneOf({
+                    tio.Flip(axes="R"): 0.5, #¶ight flipping
+                    tio.Flip(axes="P"): 0.5, #posterior flipping
+            },
+            p=0.66,
+        )
     padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
     toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
 
@@ -326,7 +340,10 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
     else:
         #randomFlip should probably be along axes="Right/Left" or "Anterior/Posterior" to take advantage of the symmetry of the brain
         # Superior or Inferior don't make sense for 2D net
-        transform = tio.Compose([select_channel, clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation])
+        #transform = tio.Compose([select_channel, clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation])
+
+        #removed the random affine and elastic deformation
+        transform = tio.Compose([select_channel, clamp, toCanon, rescale, flipping, rotation, padding])
         return transform, transform_valid
 
 def torchio_create_test_transfo():
