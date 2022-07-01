@@ -372,7 +372,7 @@ class Fedem:
                 print(f"Global (all sites, all slices) {dataset} ABS LESION DIFF :", np.round(np.mean(isles_metrics[2]),4))
                 print(f"Global (all sites, all slices) {dataset} LESION F1 :", np.round(np.mean(isles_metrics[3]),4))
 
-        return np.mean(holder_dicemetric), np.mean(holder_diceloss)
+        return np.mean(holder_dicemetric), np.std(holder_dicemetric)
 
 class FedAvg(Fedem):
     def __init__(self, options):

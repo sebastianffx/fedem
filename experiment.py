@@ -56,17 +56,18 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
                 network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'], early_stop_limit=conf['early_stop_limit'])
 
             # compute validation and test dice loss/score using full volume (instead of slice-wise) and the best possible model
-            valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best", save_pred=True)[0])
-            test_dicemetric.append(network.full_volume_metric(dataset="test", network="best", save_pred=True)[0])
+            valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best", save_pred=False))
+            test_dicemetric.append(network.full_volume_metric(dataset="test", network="best", save_pred=True))
 
         tmp_valid.append(valid_dicemetric)
         tmp_test.append(test_dicemetric)
 
     print("*** Summary for the experiment metrics ***")
 
+    #average over the repetition of the same network
     for k, (valid_metrics, test_metrics) in enumerate(zip(tmp_valid, tmp_test)):
-        print(f"{networks_name[k]} valid avg dice: {mean(valid_metrics)} std: {std(valid_metrics)}")
-        print(f"{networks_name[k]} test avg dice: {mean(test_metrics)} std: {std(test_metrics)}")
+        print(f"{networks_name[k]} valid avg dice: {mean([tmp[0] for tmp in valid_metrics])} ({[tmp[0] for tmp in valid_metrics]}, std: {[tmp[1] for tmp in valid_metrics]}) global std: {std(valid_metrics)}")
+        print(f"{networks_name[k]} test avg dice: {mean([tmp[0] for tmp in test_metrics])} ({[tmp[0] for tmp in test_metrics]}, std: {[tmp[1] for tmp in test_metrics]}) global std: {std(test_metrics)}")
 
     return tmp_valid, tmp_test
 
