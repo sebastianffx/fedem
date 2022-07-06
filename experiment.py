@@ -9,14 +9,14 @@ warnings.filterwarnings("ignore")
 
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
                   additional_modalities= [], multi_label=False,
-                  clients=[], size_crop=100, nested=True, train=True):
+                  clients=[], size_crop=100, folder_struct="site_nested", train=True):
 
     print("Experiment using the ", datapath, "dataset")
     tmp_test = []
     tmp_valid = []
 
     #fetch the files paths, create the data loading/augmentation routines
-    partitions_paths, partitions_paths_add_mod = dataPreprocessing(datapath, modality, clients, additional_modalities, nested, multi_label)
+    partitions_paths, partitions_paths_add_mod = dataPreprocessing(datapath, modality, clients, additional_modalities, folder_struct, multi_label)
 
     if len(clients)<1:
         print("Must have at least one client")
@@ -191,7 +191,7 @@ if __name__ == '__main__':
                                                 modality=modality,
                                                 clients=clients,
                                                 size_crop=144,
-                                                nested=False,
+                                                folder_struct="site_simple",
                                                 train=True,
                                                 additional_modalities=default["additional_modalities"],
                                                 multi_label=default["multi_label"]) 

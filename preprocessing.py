@@ -23,54 +23,136 @@ from monai.transforms import (
     EnsureType,
     Resized)
 
-def dataPreprocessing(path, modality, clients, additional_modalities, nested=True, multi_label=False):
+from debug_util import get_same_res_paths
 
-    partitions_paths = get_train_valid_test_partitions(path, modality, clients, nested, multi_label)
+def dataPreprocessing(path, modality, clients, additional_modalities=[], folder_struct="site_nested", multi_label=False):
 
-    if len(additional_modalities)>0:
-        partitions_paths_add_mod = add_modalities(path, additional_modalities, clients=clients)
-        return partitions_paths, partitions_paths_add_mod
-    else:
-        return partitions_paths, [[[],[],[]] for i in range(len(clients))]
+    return get_train_valid_test_partitions(path, modality, clients, folder_struct, multi_label, additional_modalities)
 
-def get_train_valid_test_partitions(path, modality, clients, nested=True, multi_label=False):
+def get_train_valid_test_partitions(path, modality, clients, folder_struct="site_nested", multi_label=False, additional_modalities=[]):
     """Retrieve paths to the modality map and the corresponding labels.
        Handle two dataset folder herarchy, nested (one folder per subject) or not (all subjects volume are in a single folder)
     """
-    centers_partitions = []
-    if nested:
-        for center in clients:
-            #expect folder hierarchy : root/centerX/train/subjectX/*modality*/volume.nii
-            center_paths_train  = sorted(glob(path+center+'/train'+'/**/*'+modality+'*/*.nii'))
-            center_paths_valid  = sorted(glob(path+center+'/valid'+'/**/*'+modality+'*/*.nii'))
-            center_paths_test   = sorted(glob(path+center+'/test'+'/**/*'+modality+'*/*.nii'))
-            center_lbl_paths_train  = sorted(glob(path+center+'/train'+'/**/*OT*/*nii'))
-            center_lbl_paths_valid  = sorted(glob(path+center+'/valid'+'/**/*OT*/*nii'))
-            center_lbl_paths_test   = sorted(glob(path+center+'/test'+'/**/*OT*/*nii'))
-            centers_partitions.append([[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]])
-            print(center, "data loader contains (train/valid/test) map", len(center_paths_train), len(center_paths_valid), len(center_paths_test))
-            if (len(center_paths_train), len(center_paths_valid), len(center_paths_test)) != (len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test)):
-                print("not same number of images and masks!")
+    centers_partitions_add_mod = []
+    #original implementation, does not support mutly modality or multi label masks
+    if folder_struct=="site_nested":
+        centers_partitions = partition_multisite_nested(path, modality, clients)
+    #second approac, support mutly modality or multi label masks
+    elif folder_struct=="site_simple":
+        centers_partitions = partition_multisite(path, modality, clients, multi_label)
+    #coded specially for ISLES22, data-set have 2 folder; derived and rawdata, with one folder for each subject, containing respectively the mask or adc/flair/dwi
     else:
-        for center in clients:
-            #expect folder hierarchy : root/centerX/train/subject_volume.nii.gz
-            center_paths_train  = sorted(glob(path+center+'/train/'+f'*{modality.lower()}.nii*'))
-            center_paths_valid  = sorted(glob(path+center+'/valid/'+f'*{modality.lower()}.nii*'))
-            center_paths_test   = sorted(glob(path+center+'/test/' +f'*{modality.lower()}.nii*'))
-            if multi_label:
-                #using output of 3D connected component, notably for blob loss
-                center_lbl_paths_train  = sorted(glob(path+center+'/train/'+'*msk_labeled.nii*'))
-                center_lbl_paths_valid  = sorted(glob(path+center+'/valid/'+'*msk_labeled.nii*'))
-                center_lbl_paths_test   = sorted(glob(path+center+'/test/' +'*msk_labeled.nii*'))
-            else:
-                center_lbl_paths_train  = sorted(glob(path+center+'/train/'+'*msk.nii*'))
-                center_lbl_paths_valid  = sorted(glob(path+center+'/valid/'+'*msk.nii*'))
-                center_lbl_paths_test   = sorted(glob(path+center+'/test/' +'*msk.nii*'))
-            centers_partitions.append([[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]])
-            print(center, "data loader contains (train/valid/test) map", len(center_paths_train), len(center_paths_valid), len(center_paths_test))
-            if (len(center_paths_train), len(center_paths_valid), len(center_paths_test)) != (len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test)):
-                print("not same number of images and masks!")
+        centers_partitions, centers_partitions_add_mod = partition_single_folder(path, modality, clients, additional_modalities)
+
+    #if using one of the multisite partition, additionnal modalities must be added separately
+    if len(additional_modalities)>0:
+        if len(centers_partitions_add_mod)==0:
+            centers_partitions_add_mod = add_modalities(path, additional_modalities, clients)
+    else:
+        centers_partitions_add_mod = [[[],[],[]] for i in range(len(clients))]
+
+    return centers_partitions, centers_partitions_add_mod 
+
+def partition_multisite(path, modality, clients, multi_label):
+    centers_partitions=[]
+    for center in clients:
+        #expect folder hierarchy : root/centerX/train/subject_volume.nii.gz
+        center_paths_train  = sorted(glob(path+center+'/train/'+f'*{modality.lower()}.nii*'))
+        center_paths_valid  = sorted(glob(path+center+'/valid/'+f'*{modality.lower()}.nii*'))
+        center_paths_test   = sorted(glob(path+center+'/test/' +f'*{modality.lower()}.nii*'))
+        if multi_label:
+            #using output of 3D connected component, notably for blob loss
+            center_lbl_paths_train  = sorted(glob(path+center+'/train/'+'*msk_labeled.nii*'))
+            center_lbl_paths_valid  = sorted(glob(path+center+'/valid/'+'*msk_labeled.nii*'))
+            center_lbl_paths_test   = sorted(glob(path+center+'/test/' +'*msk_labeled.nii*'))
+        else:
+            center_lbl_paths_train  = sorted(glob(path+center+'/train/'+'*msk.nii*'))
+            center_lbl_paths_valid  = sorted(glob(path+center+'/valid/'+'*msk.nii*'))
+            center_lbl_paths_test   = sorted(glob(path+center+'/test/' +'*msk.nii*'))
+        centers_partitions.append([[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]])
+        print(center, "data loader contains (train/valid/test) map", len(center_paths_train), len(center_paths_valid), len(center_paths_test))
+        if (len(center_paths_train), len(center_paths_valid), len(center_paths_test)) != (len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test)):
+            print("not same number of images and masks!")
     return centers_partitions
+
+def partition_multisite_nested(path, modality, clients):
+    centers_partitions=[]
+    for center in clients:
+        #expect folder hierarchy : root/centerX/train/subjectX/*modality*/volume.nii
+        center_paths_train  = sorted(glob(path+center+'/train'+'/**/*'+modality+'*/*.nii'))
+        center_paths_valid  = sorted(glob(path+center+'/valid'+'/**/*'+modality+'*/*.nii'))
+        center_paths_test   = sorted(glob(path+center+'/test'+'/**/*'+modality+'*/*.nii'))
+        center_lbl_paths_train  = sorted(glob(path+center+'/train'+'/**/*OT*/*nii'))
+        center_lbl_paths_valid  = sorted(glob(path+center+'/valid'+'/**/*OT*/*nii'))
+        center_lbl_paths_test   = sorted(glob(path+center+'/test'+'/**/*OT*/*nii'))
+        centers_partitions.append([[center_paths_train,center_paths_valid,center_paths_test],[center_lbl_paths_train,center_lbl_paths_valid,center_lbl_paths_test]])
+        print(center, "data loader contains (train/valid/test) map", len(center_paths_train), len(center_paths_valid), len(center_paths_test))
+        if (len(center_paths_train), len(center_paths_valid), len(center_paths_test)) != (len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test)):
+            print("not same number of images and masks!")
+
+def partition_single_folder(path, modality, clients, additional_modalities):
+    """Retrieve paths to the modality map and the corresponding labels.
+       Handle two dataset folder herarchy, nested (one folder per subject) or not (all subjects volume are in a single folder)
+    """
+    #list containing all the labels, despite the nesting...
+    nifti_labl_paths = glob(os.path.join(path,"derivatives", "**","**","*.nii.gz"))
+
+    lbl_paths, dwi_paths, flair_paths, adc_paths, \
+            o_lbl_paths, o_dwi_paths, o_flair_paths, o_adc_paths = get_same_res_paths(nifti_labl_paths, spacing=(2.0, 2.0, 2.0),folder_maps="rawdata")
+    
+    #shuffle based on labels, because modality agnostic
+    percentages_train_val_test = [int(0.75*len(lbl_paths)),int(0.1*len(lbl_paths))+1,int(0.15*len(lbl_paths))]
+    #rounding issues are going to the training set
+    percentages_train_val_test[0] += len(lbl_paths) - np.sum(percentages_train_val_test)
+    print("Train, Val, Test Imgs: ", percentages_train_val_test)
+
+    patients = [lbl_path.split("/")[-1] for lbl_path in lbl_paths]
+
+    indexes=list(range(len(lbl_paths)))
+
+    np.random.shuffle(indexes)
+
+    #create a single site
+    centers_partitions=[
+                    [
+                        [
+                            [dwi_paths[idx] for idx in indexes[:percentages_train_val_test[0]]],
+                            [dwi_paths[idx] for idx in indexes[percentages_train_val_test[0]:percentages_train_val_test[0]+percentages_train_val_test[1]]],
+                            [dwi_paths[idx] for idx in indexes[percentages_train_val_test[0]+percentages_train_val_test[1]:]]
+                        ],
+                        [
+                            [lbl_paths[idx] for idx in indexes[:percentages_train_val_test[0]]],
+                            [lbl_paths[idx] for idx in indexes[percentages_train_val_test[0]:percentages_train_val_test[0]+percentages_train_val_test[1]]],
+                            [lbl_paths[idx] for idx in indexes[percentages_train_val_test[0]+percentages_train_val_test[1]:]]
+                        ]
+                    ]]
+
+    #don't know how to make this available for external testing in an elegant way..
+    external_test = [o_dwi_paths, o_lbl_paths]
+
+    #site, volume/mask, train/val/test
+    print("data loader contains (train/valid/test) map", len(centers_partitions[0][0][0]), len(centers_partitions[0][0][1]), len(centers_partitions[0][0][2]))
+    if (len(centers_partitions[0][0][0]), len(centers_partitions[0][0][1]), len(centers_partitions[0][0][2])) != (len(centers_partitions[0][1][0]), len(centers_partitions[0][1][1]), len(centers_partitions[0][1][2])):
+        print("not same number of images and masks!")
+
+    #additionnal modalities, stored in the channel dimension of the tio.Subject.adc
+    train_add_mod = []
+    valid_add_mod = []
+    test_add_mod = []
+    #single site, we can directly access the first element
+    for mod in additional_modalities[0]:
+        if mod == "adc":
+            train_add_mod.append([adc_paths[idx] for idx in indexes[:percentages_train_val_test[0]]])
+            valid_add_mod.append([adc_paths[idx] for idx in indexes[percentages_train_val_test[0]:percentages_train_val_test[0]+percentages_train_val_test[1]]])
+            test_add_mod.append([adc_paths[idx] for idx in indexes[percentages_train_val_test[0]+percentages_train_val_test[1]:]])
+        else:
+            #could use flair, but it would require a special preprocessing pipeline to register the volumes
+            print("modality is not supported")
+
+    #centers_partitions_add_mod = [[train, valid, test] for each site]
+    #train = [[modality 1 for all subject], [modality 2 for all subject], ...]
+    centers_partitions_add_mod = [[train_add_mod, valid_add_mod, test_add_mod ]] #nested list to simulate single site
+    return centers_partitions, centers_partitions_add_mod
 
 def add_modalities(path, modalities, clients):
     """Based on not-nested hierarchy, retrieve path to additionnal modality/representation of the same modality
@@ -345,6 +427,73 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
         transform = tio.Compose([select_channel, clamp, toCanon, rescale, flipping, rotation, padding])
         return transform, transform_valid
 
+def ISLES22_torchio_create_transfo(padding, patch_size, no_deformation):
+    """Normalize each modality differently using hardcoded values.
+       The order of the modalities in the channel dimensionsis assumed to be either:
+       - dwi
+       - dwi, adc
+       - dwi, adc, flair
+    """
+    rescale = tio.RescaleIntensity(out_min_max=(0, 1))
+
+    rotation = tio.OneOf({
+                    tio.Affine(scales=0, degrees=90, translation=0): 0.5,
+                    tio.Affine(scales=0, degrees=180, translation=0): 0.5,
+            },
+            p=0.5,
+        )
+    flipping = tio.OneOf({
+                    tio.Flip(axes="R"): 0.5, #¶ight flipping
+                    tio.Flip(axes="P"): 0.5, #posterior flipping
+            },
+            p=0.5,
+        )
+    padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
+    toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
+
+    #due to tio.Lambda specifications, output must have input shape
+    def normalize_multimodal(input):
+        """Normalize each modality independently, hardcoded value extracted from Jony's code (shared on slack) or 
+           https://github.com/sebastianffx/isles22/blob/main/2d_unet_adc.py by Sebastian
+        """
+        tmp_vol = input['adc'].data
+        for idx in range(tmp_vol.shape[0]):
+            #adc
+            if idx == 1:
+                # perform the site specific normalization
+                if tmp_vol[idx:idx+1,...].max() < 1:
+                    tmp_vol[idx:idx+1,...]*= 1e6
+                elif tmp_vol[idx:idx+1,...].max() < 10:
+                    tmp_vol[idx:idx+1,...]*= 1e3
+                
+                tmp_vol[idx:idx+1,...] = tmp_vol[idx:idx+1,...].clamp(0,3500)
+            #dwi
+            elif idx == 0:
+                tmp_vol[idx:idx+1,...] = tmp_vol[idx:idx+1,...].clamp(0,1500)
+            #flair
+            elif idx == 2:
+                tmp_vol[idx:idx+1,...] = tmp_vol[idx:idx+1,...].clamp(0,2000)
+            else:
+                print("modality not supported:", mod)
+            
+        input['adc'].set_data(tmp_vol)
+
+        return input
+
+    #apply the normalization to the adc attribute only, not the labels
+    select_channel = tio.Lambda(normalize_multimodal, types_to_apply=tio.INTENSITY)    
+
+    #normalization only, no spatial transformation or data augmentation
+    transform_valid = tio.Compose([normalize_multimodal, toCanon, rescale])
+
+    #just regular campling and normalization
+    if no_deformation:
+        transform = tio.Compose([normalize_multimodal, toCanon, rescale, padding])
+        return transform, transform_valid
+    else:
+        transform = tio.Compose([normalize_multimodal, toCanon, rescale, flipping, rotation, padding])
+        return transform, transform_valid
+
 def torchio_create_test_transfo():
     """ Transform for test-time augmentation, the transformation should have been seen during the training.
         Here, we consider the 90, 180 and 270 rotation to be covered by the randomAffine(degrees=360)
@@ -373,16 +522,17 @@ def torchio_create_test_transfo():
 
     #proof of work with reduced number of augmentation
     return [Right_flip, rotation90, rotation180]
-    
-
 
 def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_max=4000, padding=(50,50,1), patch_size=(128,128,1),
                              max_queue_length=16, patches_per_volume=4, no_deformation=False,
                              partitions_paths_add_mod=[], forced_channel=-1):
 
     print("Using TORCHIO dataloader")
-
-    transform, transform_valid = torchio_create_transfo(clamp_min=clamp_min, clamp_max=clamp_max,
+    if no_deformation == "isles":
+        transform, transform_valid = ISLES22_torchio_create_transfo(padding=padding, patch_size=patch_size,
+                                                        no_deformation=False)
+    else:
+        transform, transform_valid = torchio_create_transfo(clamp_min=clamp_min, clamp_max=clamp_max,
                                                         padding=padding, patch_size=patch_size,
                                                         no_deformation=no_deformation, forced_channel=forced_channel)
 
