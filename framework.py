@@ -432,8 +432,13 @@ class FedAvg(Fedem):
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
                 if self.options["use_torchio"]:
-                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #2D Net, potentially multi-channel
+                    if self.options["space_cardinality"]==2:
+                        #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                        inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #3D Net, potentially multi-channel
+                    elif self.options["space_cardinality"]==3:
+                        inputs, labels = batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred = ann(inputs)
@@ -505,9 +510,13 @@ class Scaffold(Fedem):
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
                 if self.options["use_torchio"]:
-                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-
+                    #2D Net, potentially multi-channel
+                    if self.options["space_cardinality"]==2:
+                        #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                        inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #3D Net, potentially multi-channel
+                    elif self.options["space_cardinality"]==3:
+                        inputs, labels = batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
                 y_pred = ann(inputs)
@@ -684,11 +693,16 @@ class FedRod(Fedem):
                     v.requires_grad = True #deriving gradients to all the generic layers
                 
                 if self.options["use_torchio"]:
-                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-
+                    #2D Net, potentially multi-channel
+                    if self.options["space_cardinality"]==2:
+                        #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                        inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #3D Net, potentially multi-channel
+                    elif self.options["space_cardinality"]==3:
+                        inputs, labels = batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                    
                 y_pred_generic = ann(inputs)
                 loss_generic   = self.loss_function(y_pred_generic, labels)
                 optimizer.zero_grad()
