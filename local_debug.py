@@ -8,42 +8,55 @@ from experiment import runExperiment
 import warnings
 
 if __name__ == '__main__':
-    #path, clients, folder_struct = 'debug_dataset/', ["center1", "center2"], "site_simple"
-    path, clients, folder_struct = '../../../../../downloads/dataset_ISLES22_rel1/', ["center1"], "OTHER"
+    path, clients, folder_struct = 'debug_dataset/', ["center1", "center2"], "site_simple"
+    #path, clients, folder_struct = '../../../../../downloads/dataset_ISLES22_rel1/', ["center1"], "OTHER"
 
     experience_name = "debug" 
     modality="ADC"
 
     number_site=len(clients)
 
-    default = {"g_epoch":2,
+    #regular 2D Unet, used for all Antoine's experiments
+    nn_params= {"spatial_dims":2,
+                "in_channels":1,
+                "out_channels":1,
+                "channels":(16, 32, 64, 128),
+                "strides":(2, 2, 2),
+                "kernel_size":(3,3),
+                "num_res_units":2}
+
+    default = {#federation parameters
+               "g_epoch":2,
                "l_epoch":2,
-               "g_lr":0.01,
-               "l_lr":0.0001,
+               "g_lr":0.001,
+               "l_lr":0.001,
                "K":len(clients),
                "clients":clients,
+               #network parameters
+               "nn_class":"unet",
+               "nn_params":nn_params,
+               "loss_fun":"dicelossCE", #"blob_dicelossCE", #"dicelossCE", #diceloss_CE
+               "hybrid_loss_weights":[1.4,0.6],
                "suffix":"exp5",
+               #training parameters
                "val_interval":2,
                "modality":modality.lower(),
                "space_cardinality":2, #or 3, depending if you have a 2D or 3D network
                "batch_size":2,
                'early_stop_limit':20,
-               #all the parameters required to use the "new" torchio dataloader, a lot more of data augmentation
+               #preprocessing pipeline parameters
                "use_torchio":True,
                "clamp_min":0,
                "clamp_max":4000,
-               "patch_size":(32,32,1),
-               "padding":(16,16,0), #typically half the dimensions of the patch_size
+               "patch_size":(64,64,1),
+               "padding":(32,32,0), #typically half the dimensions of the patch_size
                "max_queue_length":16,
                "patches_per_volume":4,
-               "loss_fun":"dicelossCE",#"blobloss",#"dicelossCE", #diceloss_CE
-               "hybrid_loss_weights":[0,1],
+               "no_deformation":True,
+               "additional_modalities": [[]], #[[],[],[]] #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
                #test time augmentation
-               "use_test_augm":True,
+               "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
-               #adc subsampling augmentation/harmonization
-               "no_deformation":"isles",
-               #"additional_modalities":[["tra4_1", "tra4_2", "dt6"],["tra4_1", "tra4_2", "dt6"]] #list the extension of each additionnal modality you want to use for each site
                }
 
     if "isle" in path.lower():

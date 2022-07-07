@@ -434,6 +434,7 @@ def ISLES22_torchio_create_transfo(padding, patch_size, no_deformation):
        - dwi, adc
        - dwi, adc, flair
     """
+    print("using isles custom preprocessing transformations")
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
 
     rotation = tio.OneOf({

@@ -8,7 +8,7 @@ import monai
 import numpy as np
 import nibabel as nib
 
-from network import neuralNet
+from network import generate_nn
 from utils.blob_loss import BlobLoss
 from monai.metrics import DiceMetric
 from torch.optim import Optimizer, Adam
@@ -441,7 +441,7 @@ class FedAvg(Fedem):
             self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
         
         #server model
-        self.nn = neuralNet(name='server', scaff=False, fed_rod=False).to(device)
+        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], scaff=False, fed_rod=False).to(device)
         
         #create clients
         self.nns = []
@@ -505,7 +505,7 @@ class Scaffold(Fedem):
         self.K = options['K']
         
         #server model
-        self.nn = neuralNet(name='server', scaff=True, fed_rod=False).to(device)
+        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], scaff=True, fed_rod=False).to(device)
         
         #control variables
         for k, v in self.nn.named_parameters():
@@ -659,8 +659,7 @@ class FedRod(Fedem):
         self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
         print(self.trainloaders_lengths)
         #server model
-        self.nn = neuralNet(name='server', scaff=False, fed_rod=True).to(device)
-        
+        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], scaff=False, fed_rod=True).to(device)
         
         #Global encoder - decoder (inlcuding personalized) layers init
         for k, v in self.nn.named_parameters():
@@ -821,7 +820,7 @@ class Centralized(Fedem):
 
         #could verify that space_cardinality == spatial_dims!
 
-        self.nn = neuralNet(name='centralized', scaff=False, fed_rod=False).to(device)
+        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], scaff=False, fed_rod=False).to(device)
 
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 

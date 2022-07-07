@@ -7,6 +7,11 @@ import numpy as np
 import warnings
 warnings.filterwarnings("ignore")
 
+def check_config(config):
+    if "spatial_dims" in config["nn_params"].keys():
+        assert config["nn_params"]["spatial_dims"] == config["space_cardinality"]
+    #TODO: verify more parameters
+
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
                   additional_modalities= [], multi_label=False,
                   clients=[], size_crop=100, folder_struct="site_nested", train=True):
@@ -25,6 +30,10 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     for i, conf in enumerate(networks_config):
         test_dicemetric = []
         valid_dicemetric = []
+
+        #verify that the config parameters are coherent
+        check_config(conf)
+
         for rep in range(num_repetitions):
             print(f"{networks_name[i]} iteration {rep+1}")
             print(conf)
@@ -99,19 +108,35 @@ if __name__ == '__main__':
     clients=["center1"]
     number_site=len(clients)
 
-    default = {"g_epoch":60,
+    #regular 2D Unet, used for all Antoine's experiments
+    nn_params= {"spatial_dims":2,
+                "in_channes":1,
+                "out_channels":1,
+                "channels":(16, 32, 64, 128),
+                "strides":(2, 2, 2),
+                "kernel_size":(3,3),
+                "num_res_units":2}
+
+    default = {#federation parameters
+               "g_epoch":60,
                "l_epoch":5,
                "g_lr":0.001,
                "l_lr":0.001,
                "K":len(clients),
                "clients":clients,
+               #network parameters
+               "nn_class":"unet",
+               "nn_params":nn_params,
+               "loss_fun":"dicelossCE", #"blob_dicelossCE", #"dicelossCE", #diceloss_CE
+               "hybrid_loss_weights":[1.4,0.6],
                "suffix":"exp5",
+               #training parameters
                "val_interval":2,
                "modality":modality.lower(),
                "space_cardinality":2, #or 3, depending if you have a 2D or 3D network
                "batch_size":8,
                'early_stop_limit':20,
-               #all the parameters required to use the "new" torchio dataloader, a lot more of data augmentation
+               #preprocessing pipeline parameters
                "use_torchio":True,
                "clamp_min":0,
                "clamp_max":4000,
@@ -119,14 +144,11 @@ if __name__ == '__main__':
                "padding":(64,64,0), #typically half the dimensions of the patch_size
                "max_queue_length":16,
                "patches_per_volume":4,
-               "loss_fun":"dicelossCE", #"blob_dicelossCE", #"dicelossCE", #diceloss_CE
-               "hybrid_loss_weights":[1.4,0.6],
+               "no_deformation":False,
+               "additional_modalities": [[]], #[[],[],[]] #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
                #test time augmentation
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
-               #adc subsampling augmentation/harmonization
-               "no_deformation":False,
-               "additional_modalities": [[]], #[[],[],[]] #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
                }
 
     #only used when using blob loss, labels are used to identify the blob

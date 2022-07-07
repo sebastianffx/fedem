@@ -1,124 +1,23 @@
-##Networks
 import monai
 
-#network present in each client
-#class neuralNet(monai.networks.nets.SegResNet):
-#class neuralNet(monai.networks.nets.UNETR):
-#class neuralNet(monai.networks.nets.SwinUNETR):
-class neuralNet(monai.networks.nets.UNet):
-    """Wrapper for Monai network, adding attribute necessary for the various Federated Learning frameworks.
-       In order to use another network, the super class and the constructor of this class should be modified.
-    """
-    def __init__(self, name, scaff=False, fed_rod=False):
-        #call parent constructor
-        super(neuralNet, self).__init__(spatial_dims=2,
-                                        in_channels=1,
-                                        out_channels=1,
-                                        channels=(16, 32, 64, 128),
-                                        strides=(2, 2, 2),
-                                        kernel_size=(3,3),
-                                        num_res_units=2,)
-        """
-        #SegResNet
-        super(neuralNet, self).__init__(blocks_down=[1, 2, 2, 4],
-                                        blocks_up=[1, 1, 1],
-                                        init_filters=16,
-                                        in_channels=4,
-                                        out_channels=3,
-                                        dropout_prob=0.2)
-
-        #UNETR
-        super(neuralNet, self).__init__(in_channels, out_channels,
-                                        img_size=patch_site, 
-                                        feature_size=16,
-                                        hidden_size=768,
-                                        mlp_dim=3072,
-                                        num_heads=12,
-                                        pos_embed='conv',
-                                        norm_name='instance',
-                                        conv_block=True,
-                                        res_block=True,
-                                        dropout_rate=0.0,
-                                        spatial_dims=3)
-
-        #SwinUNETR
-        super(neuralNet, self).__init__(img_size=patch_size,
-                                        in_channels=4,
-                                        out_channels=3,
-                                        feature_size=48,
-                                        use_checkpoint=True)
-        """
-
-        self.name = name
-        self.control = {}
-        self.delta_control = {}
-        self.delta_y = {}
-        if scaff:
-            #control variables for SCAFFOLD
-            self.control = {}
-            self.delta_control = {}
-            self.delta_y = {}
-
-        if fed_rod:
-            #Unet params sets for FedRod
-            self.encoder_generic = {}
-            self.decoder_generic = {}
-            self.decoder_personalized = {}
-
-"""
-def generate_nn(nn_name, name, dim="2D", scaff=False, fed_rod=False, **kwargs):
-    if nn_name=="unet":
-        #network used by Antoine
-        if dim=="2D":
-            nn=monai.networks.nets.UNet(spatial_dims=2,
-                                      in_channels=1,
-                                      out_channels=1,
-                                      channels=(16, 32, 64, 128),
-                                      strides=(2, 2, 2),
-                                      kernel_size = (3,3),
-                                      num_res_units=2)
-        #network used by Seb/Jony
-        elif dim=="3D":
-            nn=monai.networks.nets.UNet(spatial_dims=3,
-                                        in_channels=4,
-                                        out_channels=3,
-                                        channels=(16, 32, 64, 128, 256),
-                                        strides=(2, 2, 2, 2),
-                                        num_res_units=2)
-        #custom definition using a dictionnary?
-        else:
-            nn = monai.networks.nets.UNet(**kwargs)
-
-    elif nn_name=="unetr":
-        nn = monai.networks.nets.UNETR(in_channels, out_channels,
-                                  img_size=patch_site, 
-                                  feature_size=16,
-                                  hidden_size=768,
-                                  mlp_dim=3072,
-                                  num_heads=12,
-                                  pos_embed='conv',
-                                  norm_name='instance',
-                                  conv_block=True,
-                                  res_block=True,
-                                  dropout_rate=0.0,
-                                  spatial_dims=3)
-    elif nn_name=="swin_unetr":
-        nn = monai.networks.nets.SwinUNETR(img_size=patch_size,
-                                           in_channels=4,
-                                           out_channels=3,
-                                           feature_size=48,
-                                           use_checkpoint=True)
+def generate_nn(nn_name, nn_class, nn_params={}, scaff=False, fed_rod=False):
+    if nn_class.lower()=="unet":
+        nn=monai.networks.nets.UNet(**nn_params)
+        print("Using UNET as segmentation network")
+    elif nn_class.lower()=="unetr":
+        nn = monai.networks.nets.UNETR(**nn_params)
+        print("Using UNETR as segmentation network")
+    elif nn_class.lower()=="swin_unetr":
+        nn = monai.networks.nets.SwinUNETR(**nn_params)
         #weight = torch.load("./models/model_swinvit.pt")
         #model.load_from(weights=weight)
-        #print("Using pretrained self-supervied Swin UNETR backbone weights !") 
-
-    elif nn_name=="segresnet":
-        nn = monai.networks.nets.SegResNet(blocks_down=[1, 2, 2, 4],
-                                           blocks_up=[1, 1, 1],
-                                           init_filters=16,
-                                           in_channels=4,
-                                           out_channels=3,
-                                           dropout_prob=0.2)
+        #print("Using pretrained self-supervied Swin UNETR backbone weights !")
+        print("Using SWIN UNETR as segmentation network")
+    elif nn_class.lower()=="segresnet":
+        nn = monai.networks.nets.SegResNet(**nn_params)
+        print("Using SEGRESNET as segmentation network")
+    else:
+        print("network name not supported", nn_class.lower())
 
     if scaff:
         #control variables for SCAFFOLD
@@ -127,12 +26,11 @@ def generate_nn(nn_name, name, dim="2D", scaff=False, fed_rod=False, **kwargs):
         nn.delta_y = {}
 
     if fed_rod:
-        #Unet params sets for FedRod
+        #params sets for FedRod
         nn.encoder_generic = {}
         nn.decoder_generic = {}
         nn.decoder_personalized = {}
 
-    nn.name = name
+    nn.name = nn_name
     
     return nn
-"""
