@@ -333,7 +333,8 @@ class Fedem:
                         augm_pred_holder.append(avg_augm_pred[0,0,:,:].cpu().numpy())
 
                 prediction3d = np.stack(post_pred_holder, axis=-1)
-                avg_augm_pred = np.stack(augm_pred_holder, axis=-1)
+                if self.options["use_test_augm"] and dataset=="test":
+                    avg_augm_pred = np.stack(augm_pred_holder, axis=-1)
 
             #3D networks
             elif self.options["space_cardinality"]==3:
@@ -374,7 +375,8 @@ class Fedem:
                     dice_metric_augm(avg_augm_pred, labels)
 
                 prediction3d = prediction3d.detach().cpu().numpy()
-                avg_augm_pred = avg_augm_pred.cpu().numpy()
+                if self.options["use_test_augm"] and dataset=="test":
+                    avg_augm_pred = avg_augm_pred.cpu().numpy()
 
             if save_pred:
                 affine = batch_data['label']['affine'][0,:,:].detach().cpu().numpy()
