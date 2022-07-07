@@ -287,31 +287,77 @@ class Fedem:
             #raw_pred_holder = []
             post_pred_holder = []
             loss_volume= []
-            #iterate over all the slices present in the volume
-            for slice_selected in range(inputs.shape[-1]):
+
+            #2D networks
+            if self.options["space_cardinality"]==2:
+                #iterate over all the slices present in the volume
+                for slice_selected in range(inputs.shape[-1]):
+                    out = model(inputs[:,:,:,:,slice_selected])
+                    
+                    #compute loss between output and label (loss function applies the sigmoid function itself)
+                    loss_volume.append(loss_function(input=out,
+                                                    target=labels[:,:,:,:,slice_selected]
+                                                    ).item()
+                                    )
+
+                    #saving the raw output of the network
+                    #raw_pred_holder.append(out[0,0,:,:].detach().cpu().numpy())
+                    #apply sigmoid then activation threshold to obtain a discrete segmentation mask
+                    pred = self.post_pred(out)
+                    #compute dice score between the processed prediction and the labels (single slice)
+                    dice_metric(pred,labels[:,:,:,:,slice_selected])
+                    #save the prediction slice to rebuild a 3D prediction volume
+                    post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
+
+                    #perform test-time augmentation slice-wise
+                    if self.options["use_test_augm"] and dataset=="test":
+                        #initialized with the original image output (before/after post_pred routine)
+                        augm_preds = [pred] #pred is already on the device
+                        for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
+                            augm_out = model(augmented_test_img[None,:,:,:,slice_selected])
+                            augm_out_inv = inverse_augm(augm_out.detach().cpu()) #happens on cpu
+
+                            #would probably be good to manually re-check that the inverse augmentation are well applied
+
+                            #apply sigmoid and threshold BEFORE averaging
+                            augm_preds.append(self.post_pred(augm_out_inv).to(device))
+                            #tried applying sigmoid and threshold AFTER averaging UNet output but the negative values overcome the positive prior to the sigmoid
+
+                        #average must discretized, using a simple threshold at 0.5
+                        avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
+                        avg_augm_pred = avg_augm_pred >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
+                        avg_augm_pred = avg_augm_pred.int() #convert bool to int
+
+                        dice_metric_augm(avg_augm_pred, labels[:,:,:,:,slice_selected])
+
+                        augm_pred_holder.append(avg_augm_pred[0,0,:,:].cpu().numpy())
+
+                prediction3d = np.stack(post_pred_holder, axis=-1)
+                avg_augm_pred = np.stack(augm_pred_holder, axis=-1)
+
+            #3D networks
+            elif self.options["space_cardinality"]==3:
                 out = model(inputs[:,:,:,:,slice_selected])
-                
+                    
                 #compute loss between output and label (loss function applies the sigmoid function itself)
                 loss_volume.append(loss_function(input=out,
                                                  target=labels[:,:,:,:,slice_selected]
                                                 ).item()
-                                  )
+                                )
 
                 #saving the raw output of the network
                 #raw_pred_holder.append(out[0,0,:,:].detach().cpu().numpy())
                 #apply sigmoid then activation threshold to obtain a discrete segmentation mask
-                pred = self.post_pred(out)
+                prediction3d = self.post_pred(out)
                 #compute dice score between the processed prediction and the labels (single slice)
-                dice_metric(pred,labels[:,:,:,:,slice_selected])
-                #save the prediction slice to rebuild a 3D prediction volume
-                post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
+                dice_metric(prediction3d, labels)
 
-                #perform test-time augmentation slice-wise
+                #perform test-time augmentation
                 if self.options["use_test_augm"] and dataset=="test":
                     #initialized with the original image output (before/after post_pred routine)
-                    augm_preds = [pred] #pred is already on the device
+                    augm_preds = [prediction3d] #pred is already on the device
                     for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
-                        augm_out = model(augmented_test_img[None,:,:,:,slice_selected])
+                        augm_out = model(augmented_test_img)
                         augm_out_inv = inverse_augm(augm_out.detach().cpu()) #happens on cpu
 
                         #would probably be good to manually re-check that the inverse augmentation are well applied
@@ -325,11 +371,10 @@ class Fedem:
                     avg_augm_pred = avg_augm_pred >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
                     avg_augm_pred = avg_augm_pred.int() #convert bool to int
 
-                    dice_metric_augm(avg_augm_pred, labels[:,:,:,:,slice_selected])
+                    dice_metric_augm(avg_augm_pred, labels)
 
-                    augm_pred_holder.append(avg_augm_pred[0,0,:,:].cpu().numpy())
-
-            prediction3d = np.stack(post_pred_holder, axis=-1)
+                prediction3d = prediction3d.detach().cpu().numpy()
+                avg_augm_pred = avg_augm_pred.cpu().numpy()
 
             if save_pred:
                 affine = batch_data['label']['affine'][0,:,:].detach().cpu().numpy()
@@ -339,9 +384,9 @@ class Fedem:
                 else:
                     suffix = "_msk"
                 #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_raw_segpred_"+benchmark_metric+".nii.gz")))
-                nib.save(nib.Nifti1Image(prediction3d, affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_post_segpred_"+benchmark_metric+".nii.gz")))
+                nib.save(nib.Nifti1Image(prediction3d.squeeze(), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_post_segpred_"+benchmark_metric+".nii.gz")))
                 if self.options["use_test_augm"] and dataset=="test":
-                    nib.save(nib.Nifti1Image(np.stack(augm_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_augm_segpred_"+benchmark_metric+".nii.gz")))
+                    nib.save(nib.Nifti1Image(avg_augm_pred.squeeze(), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_augm_segpred_"+benchmark_metric+".nii.gz")))
 
             #retain each volume scores (dice loss and dice score)
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
@@ -702,7 +747,7 @@ class FedRod(Fedem):
                         inputs, labels = batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
-                    
+
                 y_pred_generic = ann(inputs)
                 loss_generic   = self.loss_function(y_pred_generic, labels)
                 optimizer.zero_grad()
