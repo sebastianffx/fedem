@@ -8,7 +8,7 @@ import monai
 import numpy as np
 import nibabel as nib
 
-from network import UNet_custom
+from network import neuralNet
 from utils.blob_loss import BlobLoss
 from monai.metrics import DiceMetric
 from torch.optim import Optimizer, Adam
@@ -394,7 +394,7 @@ class FedAvg(Fedem):
             self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
         
         #server model
-        self.nn = UNet_custom(spatial_dims=2,
+        self.nn = neuralNet(spatial_dims=2,
                               in_channels=1,
                               out_channels=1,
                               channels=(16, 32, 64, 128),
@@ -461,7 +461,7 @@ class Scaffold(Fedem):
         self.K = options['K']
         
         #server model
-        self.nn = UNet_custom(spatial_dims=2,
+        self.nn = neuralNet(spatial_dims=2,
                              in_channels=1,
                              out_channels=1,
                              channels=(16, 32, 64, 128),
@@ -619,7 +619,7 @@ class FedRod(Fedem):
         self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
         print(self.trainloaders_lengths)
         #server model
-        self.nn = UNet_custom(spatial_dims=2,
+        self.nn = neuralNet(spatial_dims=2,
                              in_channels=1,
                              out_channels=1,
                              channels=(16, 32, 64, 128),
@@ -782,7 +782,7 @@ class FedRod(Fedem):
 class Centralized(Fedem):
     def __init__(self, options):
         super(Centralized, self).__init__(options)
-        self.nn = UNet_custom(spatial_dims=2,
+        self.nn = neuralNet(spatial_dims=2,
                             in_channels=1,
                             out_channels=1,
                             channels=(16, 32, 64, 128),
@@ -829,7 +829,6 @@ class Centralized(Fedem):
                 if self.options["use_torchio"]:
                     #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
                     inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
 

@@ -1,6 +1,72 @@
 ##Networks
 import monai
 
+#network present in each client
+#class neuralNet(monai.networks.nets.SegResNet):
+#class neuralNet(monai.networks.nets.UNETR):
+#class neuralNet(monai.networks.nets.SwinUNETR):
+class neuralNet(monai.networks.nets.UNet):
+    """Wrapper for Monai network, adding attribute necessary for the various Federated Learning frameworks.
+       In order to use another network, the super class and the constructor of this class should be modified.
+    """
+    def __init__(self, spatial_dims, in_channels, out_channels, channels,
+                 strides, kernel_size, num_res_units, name, scaff=False, fed_rod=False):
+        #call parent constructor
+        super(neuralNet, self).__init__(spatial_dims=spatial_dims,
+                                          in_channels=in_channels,
+                                          out_channels=out_channels, 
+                                          channels=channels,
+                                          strides=strides,
+                                          kernel_size=kernel_size, 
+                                          num_res_units=num_res_units)
+        """
+        #SegResNet
+        super(neuralNet, self).__init__(blocks_down=[1, 2, 2, 4],
+                                           blocks_up=[1, 1, 1],
+                                           init_filters=16,
+                                           in_channels=4,
+                                           out_channels=3,
+                                           dropout_prob=0.2)
+
+        #UNETR
+        super(neuralNet, self).__init__(in_channels, out_channels,
+                                  img_size=patch_site, 
+                                  feature_size=16,
+                                  hidden_size=768,
+                                  mlp_dim=3072,
+                                  num_heads=12,
+                                  pos_embed='conv',
+                                  norm_name='instance',
+                                  conv_block=True,
+                                  res_block=True,
+                                  dropout_rate=0.0,
+                                  spatial_dims=3)
+
+        #SwinUNETR
+        super(neuralNet, self).__init__(img_size=patch_size,
+                                           in_channels=4,
+                                           out_channels=3,
+                                           feature_size=48,
+                                           use_checkpoint=True)
+        """
+
+        self.name = name
+        self.control = {}
+        self.delta_control = {}
+        self.delta_y = {}
+        if scaff:
+            #control variables for SCAFFOLD
+            self.control = {}
+            self.delta_control = {}
+            self.delta_y = {}
+
+        if fed_rod:
+            #Unet params sets for FedRod
+            self.encoder_generic = {}
+            self.decoder_generic = {}
+            self.decoder_personalized = {}
+
+"""
 def generate_nn(nn_name, name, dim="2D", scaff=False, fed_rod=False, **kwargs):
     if nn_name=="unet":
         #network used by Antoine
@@ -70,3 +136,4 @@ def generate_nn(nn_name, name, dim="2D", scaff=False, fed_rod=False, **kwargs):
     nn.name = name
     
     return nn
+"""

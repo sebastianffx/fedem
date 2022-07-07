@@ -448,6 +448,7 @@ def ISLES22_torchio_create_transfo(padding, patch_size, no_deformation):
             },
             p=0.5,
         )
+    resample = tio.Resample('label') #using label as it is the stable thing, should be identical to dwi...
     padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
     toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
 
@@ -474,7 +475,7 @@ def ISLES22_torchio_create_transfo(padding, patch_size, no_deformation):
             elif idx == 2:
                 tmp_vol[idx:idx+1,...] = tmp_vol[idx:idx+1,...].clamp(0,2000)
             else:
-                print("modality not supported:", mod)
+                print("modality not supported")
             
         input['adc'].set_data(tmp_vol)
 
@@ -484,14 +485,14 @@ def ISLES22_torchio_create_transfo(padding, patch_size, no_deformation):
     select_channel = tio.Lambda(normalize_multimodal, types_to_apply=tio.INTENSITY)    
 
     #normalization only, no spatial transformation or data augmentation
-    transform_valid = tio.Compose([normalize_multimodal, toCanon, rescale])
+    transform_valid = tio.Compose([normalize_multimodal, toCanon, resample, rescale])
 
     #just regular campling and normalization
     if no_deformation:
-        transform = tio.Compose([normalize_multimodal, toCanon, rescale, padding])
+        transform = tio.Compose([normalize_multimodal, toCanon, resample, rescale, padding])
         return transform, transform_valid
     else:
-        transform = tio.Compose([normalize_multimodal, toCanon, rescale, flipping, rotation, padding])
+        transform = tio.Compose([normalize_multimodal, toCanon, resample, rescale, flipping, rotation, padding])
         return transform, transform_valid
 
 def torchio_create_test_transfo():
