@@ -394,15 +394,7 @@ class FedAvg(Fedem):
             self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
         
         #server model
-        self.nn = neuralNet(spatial_dims=2,
-                              in_channels=1,
-                              out_channels=1,
-                              channels=(16, 32, 64, 128),
-                              strides=(2, 2, 2),
-                              kernel_size = (3,3),
-                              num_res_units=2,
-                              name='server',
-                              scaff=False).to(device)
+        self.nn = neuralNet(name='server', scaff=False, fed_rod=False).to(device)
         
         #create clients
         self.nns = []
@@ -461,15 +453,7 @@ class Scaffold(Fedem):
         self.K = options['K']
         
         #server model
-        self.nn = neuralNet(spatial_dims=2,
-                             in_channels=1,
-                             out_channels=1,
-                             channels=(16, 32, 64, 128),
-                             strides=(2, 2, 2),
-                             kernel_size = (3,3),
-                             num_res_units=2,
-                             name='server',
-                             scaff=True).to(device)
+        self.nn = neuralNet(name='server', scaff=True, fed_rod=False).to(device)
         
         #control variables
         for k, v in self.nn.named_parameters():
@@ -619,16 +603,7 @@ class FedRod(Fedem):
         self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
         print(self.trainloaders_lengths)
         #server model
-        self.nn = neuralNet(spatial_dims=2,
-                             in_channels=1,
-                             out_channels=1,
-                             channels=(16, 32, 64, 128),
-                             strides=(2, 2, 2),
-                             kernel_size = (3,3),
-                             num_res_units=2,
-                             name='server',
-                             scaff=False,
-                             fed_rod=True).to(device)
+        self.nn = neuralNet(name='server', scaff=False, fed_rod=True).to(device)
         
         
         #Global encoder - decoder (inlcuding personalized) layers init
@@ -782,18 +757,14 @@ class FedRod(Fedem):
 class Centralized(Fedem):
     def __init__(self, options):
         super(Centralized, self).__init__(options)
-        self.nn = neuralNet(spatial_dims=2,
-                            in_channels=1,
-                            out_channels=1,
-                            channels=(16, 32, 64, 128),
-                            strides=(2, 2, 2),
-                            kernel_size = (3,3),
-                            num_res_units=2,
-                            name='centralized').to(device)
+
+        #could verify that space_cardinality == spatial_dims!
+
+        self.nn = neuralNet(name='centralized', scaff=False, fed_rod=False).to(device)
 
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 
-        #overwritte the argument to free space?
+        #overwrite the argument to free space?
         self.dataloaders = [[] for i in range(len(self.options["clients"]))]
     
     #overwrite the superclass method since there are no client models
@@ -827,8 +798,13 @@ class Centralized(Fedem):
                 
                 step += 1
                 if self.options["use_torchio"]:
-                    #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                    inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #2D Net, potentially multi-channel
+                    if self.options["space_cardinality"]==2:
+                        #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                        inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                    #3D Net, potentially multi-channel
+                    elif self.options["space_cardinality"]==3:
+                        inputs, labels = batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
                 else:
                     inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
 

@@ -108,6 +108,7 @@ if __name__ == '__main__':
                "suffix":"exp5",
                "val_interval":2,
                "modality":modality.lower(),
+               "space_cardinality":2, #or 3, depending if you have a 2D or 3D network
                "batch_size":8,
                'early_stop_limit':20,
                #all the parameters required to use the "new" torchio dataloader, a lot more of data augmentation
