@@ -8,13 +8,12 @@ from experiment import runExperiment
 import warnings
 
 if __name__ == '__main__':
-    path = 'debug_dataset/'
-    path = '../../../../../downloads/dataset_ISLES22_rel1/'
+    #path, clients, folder_struct = 'debug_dataset/', ["center1", "center2"], "site_simple"
+    path, clients, folder_struct = '../../../../../downloads/dataset_ISLES22_rel1/', ["center1"], "OTHER"
 
     experience_name = "debug" 
     modality="ADC"
 
-    clients=["center1"]
     number_site=len(clients)
 
     default = {"g_epoch":2,
@@ -44,10 +43,13 @@ if __name__ == '__main__':
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
                #adc subsampling augmentation/harmonization
                "no_deformation":"isles",
-               #"additional_modalities":[[],[]]
-               "additional_modalities":[["adc"]]
                #"additional_modalities":[["tra4_1", "tra4_2", "dt6"],["tra4_1", "tra4_2", "dt6"]] #list the extension of each additionnal modality you want to use for each site
                }
+
+    if "isle" in path.lower():
+        default["additional_modalities"] = [["adc"]] #the adc maps will be used in addition to the dwi (default)
+    else:
+        default["additional_modalities"] = [[] for i in range(number_site)]
 
     #only used when using blob loss, labels are used to identify the blob
     default["multi_label"] = "blob" in default["loss_fun"]
@@ -98,7 +100,7 @@ if __name__ == '__main__':
                                                 modality=modality,
                                                 clients=clients,
                                                 size_crop=144,
-                                                folder_struct="prout",#"site_simple",
+                                                folder_struct=folder_struct,
                                                 train=True,
                                                 additional_modalities=default["additional_modalities"],
                                                 multi_label=default["multi_label"])
