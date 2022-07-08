@@ -7,6 +7,7 @@ import random
 import monai
 import numpy as np
 import nibabel as nib
+from monai.inferers import sliding_window_inference
 
 from network import generate_nn
 from utils.blob_loss import BlobLoss
@@ -270,7 +271,7 @@ class Fedem:
         #during validation and testing, the batch_data size should be 1, last dimension is number of slice in original volume
         for batch_data in dataset_loader: 
             #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
-            inputs, labels = batch_data['adc']['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
+            inputs, labels = batch_data['adc']['data'].float().to(device),batch_data['label']['data'].to(device)
 
 
             if self.options["multi_label"]:
@@ -338,11 +339,14 @@ class Fedem:
 
             #3D networks
             elif self.options["space_cardinality"]==3:
-                out = model(inputs[:,:,:,:,slice_selected])
+
+                out = sliding_window_inference(inputs, self.options['patch_size'], 4, model) ## sheck this argument
+
+                #out = model(inputs)
                     
                 #compute loss between output and label (loss function applies the sigmoid function itself)
                 loss_volume.append(loss_function(input=out,
-                                                 target=labels[:,:,:,:,slice_selected]
+                                                 target=labels
                                                 ).item()
                                 )
 
@@ -374,7 +378,7 @@ class Fedem:
 
                     dice_metric_augm(avg_augm_pred, labels)
 
-                prediction3d = prediction3d.detach().cpu().numpy()
+                prediction3d = prediction3d.detach().cpu().numpy().squeeze()
                 if self.options["use_test_augm"] and dataset=="test":
                     avg_augm_pred = avg_augm_pred.cpu().numpy()
 
@@ -432,7 +436,7 @@ class Fedem:
                 return batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
             #3D Net, potentially multi-channel
             elif self.options["space_cardinality"]==3:
-                return batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                return batch_data['adc']['data'].to(device),batch_data['label']['data'].to(device)
         else:
             return batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
 

@@ -110,7 +110,7 @@ def partition_single_folder(path, modality, clients, additional_modalities):
 
     indexes=list(range(len(lbl_paths)))
 
-    np.random.shuffle(indexes)
+    #np.random.shuffle(indexes) # TODO to leave the same test comment this line or random shuffle.
 
     #create a single site
     centers_partitions=[
@@ -144,7 +144,11 @@ def partition_single_folder(path, modality, clients, additional_modalities):
         if mod == "adc":
             train_add_mod.append([adc_paths[idx] for idx in indexes[:percentages_train_val_test[0]]])
             valid_add_mod.append([adc_paths[idx] for idx in indexes[percentages_train_val_test[0]:percentages_train_val_test[0]+percentages_train_val_test[1]]])
-            test_add_mod.append([adc_paths[idx] for idx in indexes[percentages_train_val_test[0]+percentages_train_val_test[1]:]])
+            test_add_mod.append([adc_paths[idx] for idx in indexes [percentages_train_val_test[0]+percentages_train_val_test[1]:]])
+        if mod == "flair": # TODO
+            train_add_mod.append([flair_paths[idx] for idx in indexes[:percentages_train_val_test[0]]])
+            valid_add_mod.append([flair_paths[idx] for idx in indexes[percentages_train_val_test[0]:percentages_train_val_test[0]+percentages_train_val_test[1]]])
+            test_add_mod.append( [flair_paths[idx] for idx in indexes[percentages_train_val_test[0]+percentages_train_val_test[1]:]])
         else:
             #could use flair, but it would require a special preprocessing pipeline to register the volumes
             print("modality is not supported")
@@ -350,6 +354,8 @@ def generate_loaders(partitions_paths, batch_size, modality, size_crop=224):
 
     return centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader
 
+# could get refractored tu a feature map with different "channels" for each modality
+
 def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels, partition_paths_additional_modalities=[]):
     subjects_list = []
 
@@ -455,10 +461,10 @@ def ISLES22_torchio_create_transfo(padding, patch_size, no_deformation):
 
     #due to tio.Lambda specifications, output must have input shape
     def normalize_multimodal(input):
-        """Normalize each modality independently, hardcoded value extracted from Jony's code (shared on slack) or 
+        """Normalize each modality independently, VERY hardcoded value extracted from Jony's code (shared on slack) or 
            https://github.com/sebastianffx/isles22/blob/main/2d_unet_adc.py by Sebastian
         """
-        tmp_vol = input['adc'].data
+        tmp_vol = input
         for idx in range(tmp_vol.shape[0]):
             #adc
             if idx == 1:
@@ -478,22 +484,22 @@ def ISLES22_torchio_create_transfo(padding, patch_size, no_deformation):
             else:
                 print("modality not supported")
             
-        input['adc'].set_data(tmp_vol)
+        input = tmp_vol
 
         return input
 
     #apply the normalization to the adc attribute only, not the labels
-    select_channel = tio.Lambda(normalize_multimodal, types_to_apply=tio.INTENSITY)    
+    normalize_transformation = tio.Lambda(normalize_multimodal, types_to_apply=tio.INTENSITY)    
 
     #normalization only, no spatial transformation or data augmentation
-    transform_valid = tio.Compose([normalize_multimodal, toCanon, resample, rescale])
+    transform_valid = tio.Compose([normalize_transformation, toCanon, resample, rescale])
 
     #just regular campling and normalization
     if no_deformation:
-        transform = tio.Compose([normalize_multimodal, toCanon, resample, rescale, padding])
+        transform = tio.Compose([normalize_transformation, toCanon, resample, rescale, padding])
         return transform, transform_valid
     else:
-        transform = tio.Compose([normalize_multimodal, toCanon, resample, rescale, flipping, rotation, padding])
+        transform = tio.Compose([normalize_transformation, toCanon, resample, rescale, flipping, rotation, padding])
         return transform, transform_valid
 
 def torchio_create_test_transfo():
