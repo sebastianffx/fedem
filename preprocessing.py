@@ -34,6 +34,8 @@ def get_train_valid_test_partitions(path, modality, clients, folder_struct="site
        Handle two dataset folder herarchy, nested (one folder per subject) or not (all subjects volume are in a single folder)
     """
     centers_partitions_add_mod = []
+    external_test = []
+    external_test_add_mod = []
     #original implementation, does not support mutly modality or multi label masks
     if folder_struct=="site_nested":
         centers_partitions = partition_multisite_nested(path, modality, clients)
@@ -42,7 +44,7 @@ def get_train_valid_test_partitions(path, modality, clients, folder_struct="site
         centers_partitions = partition_multisite(path, modality, clients, multi_label)
     #coded specially for ISLES22, data-set have 2 folder; derived and rawdata, with one folder for each subject, containing respectively the mask or adc/flair/dwi
     else:
-        centers_partitions, centers_partitions_add_mod = partition_single_folder(path, modality, clients, additional_modalities)
+        centers_partitions, centers_partitions_add_mod, external_test, external_test_add_mod = partition_single_folder(path, modality, clients, additional_modalities)
 
     #if using one of the multisite partition, additionnal modalities must be added separately
     if len(additional_modalities)>0:
@@ -51,7 +53,7 @@ def get_train_valid_test_partitions(path, modality, clients, folder_struct="site
     else:
         centers_partitions_add_mod = [[[],[],[]] for i in range(len(clients))]
 
-    return centers_partitions, centers_partitions_add_mod 
+    return centers_partitions, centers_partitions_add_mod, external_test, external_test_add_mod
 
 def partition_multisite(path, modality, clients, multi_label):
     centers_partitions=[]
@@ -139,16 +141,24 @@ def partition_single_folder(path, modality, clients, additional_modalities):
     train_add_mod = []
     valid_add_mod = []
     test_add_mod = []
+    #external test
+    external_test_add_mod=[]
+
     #single site, we can directly access the first element
     for mod in additional_modalities[0]:
         if mod == "adc":
             train_add_mod.append([adc_paths[idx] for idx in indexes[:percentages_train_val_test[0]]])
             valid_add_mod.append([adc_paths[idx] for idx in indexes[percentages_train_val_test[0]:percentages_train_val_test[0]+percentages_train_val_test[1]]])
             test_add_mod.append([adc_paths[idx] for idx in indexes [percentages_train_val_test[0]+percentages_train_val_test[1]:]])
+
+            #much simpler for external test, there are no centers/split
+            external_test_add_mod.append(o_adc_paths)
         if mod == "flair": # TODO
             train_add_mod.append([flair_paths[idx] for idx in indexes[:percentages_train_val_test[0]]])
             valid_add_mod.append([flair_paths[idx] for idx in indexes[percentages_train_val_test[0]:percentages_train_val_test[0]+percentages_train_val_test[1]]])
             test_add_mod.append( [flair_paths[idx] for idx in indexes[percentages_train_val_test[0]+percentages_train_val_test[1]:]])
+            #much simpler for external test, there are no centers/split
+            external_test_add_mod.append(o_flair_paths)
         else:
             #could use flair, but it would require a special preprocessing pipeline to register the volumes
             print("modality is not supported")
@@ -156,7 +166,7 @@ def partition_single_folder(path, modality, clients, additional_modalities):
     #centers_partitions_add_mod = [[train, valid, test] for each site]
     #train = [[modality 1 for all subject], [modality 2 for all subject], ...]
     centers_partitions_add_mod = [[train_add_mod, valid_add_mod, test_add_mod ]] #nested list to simulate single site
-    return centers_partitions, centers_partitions_add_mod
+    return centers_partitions, centers_partitions_add_mod, external_test, external_test_add_mod
 
 def add_modalities(path, modalities, clients):
     """Based on not-nested hierarchy, retrieve path to additionnal modality/representation of the same modality
@@ -533,7 +543,8 @@ def torchio_create_test_transfo():
 
 def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_max=4000, padding=(50,50,1), patch_size=(128,128,1),
                              max_queue_length=16, patches_per_volume=4, no_deformation=False,
-                             partitions_paths_add_mod=[], forced_channel=-1):
+                             partitions_paths_add_mod=[], forced_channel=-1,
+                             external_test=[], external_test_add_mod=[]):
 
     print("Using TORCHIO dataloader")
     if no_deformation == "isles":
@@ -638,8 +649,16 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
     #validation and test don't need the patch sampler
     all_valid_loader = torch.utils.data.DataLoader(all_valid_subjects, batch_size=1)
     all_test_loader = torch.utils.data.DataLoader(all_test_subjects, batch_size=1)
+
+    ##external test
+    if len(external_test)>0:
+        external_subjects = tio.SubjectsDataset(torchio_get_loader_partition(external_test[0], #features
+                                                                             external_test[1], #labels
+                                                                             partitions_valid_add_mod), #additionnal features
+                                                                             transform=transform_valid)
+        external_loader = torch.utils.data.DataLoader(external_subjects, batch_size=1)
     
-    return centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader 
+    return centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader, external_loader
 
 def check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=10):
     bad_dim_files = []
