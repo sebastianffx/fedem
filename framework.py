@@ -276,7 +276,7 @@ class Fedem:
         #during validation and testing, the batch_data size should be 1, last dimension is number of slice in original volume
         for batch_data in dataset_loader: 
             #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
-            inputs, labels = batch_data['adc']['data'].float().to(device),batch_data['label']['data'].to(device)
+            inputs, labels = batch_data['feature_map']['data'].float().to(device),batch_data['label']['data'].to(device)
 
 
             if self.options["multi_label"]:
@@ -426,7 +426,7 @@ class Fedem:
 
         #print average over all the volumes
         if verbose:
-            print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
+            print(f"Global (all sites, all slices) {dataset} LOSS :", np.round(np.mean(holder_diceloss),4))
             print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4), "std:", np.round(np.std(holder_dicemetric),4))
             if self.options["use_test_augm"] and "test" in dataset.lower():
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm):", np.round(np.mean(holder_dicemetric_augm),4))
@@ -438,17 +438,17 @@ class Fedem:
                 print(f"Global (all sites, all slices) {dataset} ABS LESION DIFF :", np.round(np.mean(isles_metrics[2]),4))
                 print(f"Global (all sites, all slices) {dataset} LESION F1 :", np.round(np.mean(isles_metrics[3]),4))
 
-        return np.mean(holder_dicemetric), np.std(holder_dicemetric)
+        return np.round(np.mean(holder_dicemetric), 4), np.round(np.std(holder_dicemetric),4)
 
     def load_inputs(self, batch_data):
         if self.options["use_torchio"]:
             #2D Net, potentially multi-channel
             if self.options["space_cardinality"]==2:
                 #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                return batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                return batch_data['feature_map']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
             #3D Net, potentially multi-channel
             elif self.options["space_cardinality"]==3:
-                return batch_data['adc']['data'].to(device),batch_data['label']['data'].to(device)
+                return batch_data['feature_map']['data'].to(device),batch_data['label']['data'].to(device)
         else:
             return batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
 

@@ -374,8 +374,10 @@ def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels, pa
 
     for i in range(len(partition_paths_adc)):
         subjects_list.append(tio.Subject(
-                                #by default, tio add a channel when loading 3D volume. Leveraging this aspect to encode several ADC representations in the channel dimension
-                                adc=tio.ScalarImage(path=[partition_paths_adc[i]]+[add_mod[i] for add_mod in partition_paths_additional_modalities]),
+                                #duplicate the "main" feature to perform resampling into this space (specially for ISLES22)
+                                ref_space=tio.ScalarImage(path=[partition_paths_adc[i]]), #adc for ASTRAL, dwi for ISLES22
+                                #by default, tio load images as C,W,H,D: C is used to encode several ADC representations or modalities
+                                feature_map=tio.ScalarImage(path=[partition_paths_adc[i]]+[add_mod[i] for add_mod in partition_paths_additional_modalities]),
                                 label=tio.LabelMap(partition_paths_labels[i])
                                 )
                             )
@@ -465,7 +467,8 @@ def ISLES22_torchio_create_transfo(padding, patch_size, no_deformation):
             },
             p=0.5,
         )
-    resample = tio.Resample('label') #using label as it is the stable thing, should be identical to dwi...
+    resample = tio.Resample('ref_space') #using dwi since label were created based on them...
+    #Resampling is used to project all the modalities (dwi, and eventually adc) to the same space (dwi space)
     padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
     toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
 
@@ -502,14 +505,14 @@ def ISLES22_torchio_create_transfo(padding, patch_size, no_deformation):
     normalize_transformation = tio.Lambda(normalize_multimodal, types_to_apply=tio.INTENSITY)    
 
     #normalization only, no spatial transformation or data augmentation
-    transform_valid = tio.Compose([normalize_transformation, toCanon, resample, rescale])
+    transform_valid = tio.Compose([resample, normalize_transformation, rescale])
 
     #just regular campling and normalization
     if no_deformation:
-        transform = tio.Compose([normalize_transformation, toCanon, resample, rescale, padding])
+        transform = tio.Compose([resample, normalize_transformation, rescale, padding])
         return transform, transform_valid
     else:
-        transform = tio.Compose([normalize_transformation, toCanon, resample, rescale, flipping, rotation, padding])
+        transform = tio.Compose([resample, normalize_transformation, resample, rescale, flipping, rotation, padding])
         return transform, transform_valid
 
 def torchio_create_test_transfo():
@@ -657,6 +660,8 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                                              partitions_valid_add_mod), #additionnal features
                                                                              transform=transform_valid)
         external_loader = torch.utils.data.DataLoader(external_subjects, batch_size=1)
+    else:
+        external_loader = None
     
     return centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader, external_loader
 

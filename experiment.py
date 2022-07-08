@@ -71,23 +71,24 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             # compute validation and test dice loss/score using full volume (instead of slice-wise) and the best possible model
             valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best", save_pred=False))
             test_dicemetric.append(network.full_volume_metric(dataset="test", network="best", save_pred=True))
-
             if len(external_test)>0:
                 external_dicemetric.append(network.full_volume_metric(dataset="external_test", network="best", save_pred=False))
+            #network="best" is redundant, we are reloading the same network for validation, test and external validation
 
         tmp_valid.append(valid_dicemetric)
         tmp_test.append(test_dicemetric)
         if len(external_test)>0:
-            tmp_test.append(external_dicemetric)
+            tmp_external.append(external_dicemetric)
+        else:
+            tmp_external.append(None)
 
     print("*** Summary for the experiment metrics ***")
-
     #average over the repetition of the same network
-    for k, (valid_metrics, test_metrics) in enumerate(zip(tmp_valid, tmp_test)):
-        print(f"{networks_name[k]} valid avg dice: {mean([tmp[0] for tmp in valid_metrics])} ({[tmp[0] for tmp in valid_metrics]}, std: {[tmp[1] for tmp in valid_metrics]}) global std: {std(valid_metrics)}")
-        print(f"{networks_name[k]} test avg dice: {mean([tmp[0] for tmp in test_metrics])} ({[tmp[0] for tmp in test_metrics]}, std: {[tmp[1] for tmp in test_metrics]}) global std: {std(test_metrics)}")
+    for k, (valid_metrics, test_metrics, external_metrics) in enumerate(zip(tmp_valid, tmp_test, tmp_external)):
+        print(f"{networks_name[k]} valid avg dice: {mean([tmp[0] for tmp in valid_metrics])} ({[tmp[0] for tmp in valid_metrics]}, std: {[tmp[1] for tmp in valid_metrics]}) global std: {np.round(std(valid_metrics),4)}")
+        print(f"{networks_name[k]} test avg dice: {mean([tmp[0] for tmp in test_metrics])} ({[tmp[0] for tmp in test_metrics]}, std: {[tmp[1] for tmp in test_metrics]}) global std: {np.round(std(test_metrics),4)}")
         if len(external_test)>0:
-            print(f"{networks_name[k]} external avg dice: {mean([tmp[0] for tmp in external_metrics])} ({[tmp[0] for tmp in external_metrics]}, std: {[tmp[1] for tmp in external_metrics]}) global std: {std(external_metrics)}")
+            print(f"{networks_name[k]} external avg dice: {mean([tmp[0] for tmp in external_metrics])} ({[tmp[0] for tmp in external_metrics]}, std: {[tmp[1] for tmp in external_metrics]}) global std: {np.round(std(external_metrics),4)}")
     return tmp_valid, tmp_test
 
 if __name__ == '__main__':
