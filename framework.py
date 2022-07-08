@@ -271,13 +271,12 @@ class Fedem:
         use_isles22_metrics=True
         isles_metrics = [[],[],[],[]]
         astral_voxel_size = 1.63*1.63*3
-        ###
+        ###                
 
         #during validation and testing, the batch_data size should be 1, last dimension is number of slice in original volume
         for batch_data in dataset_loader: 
             #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
             inputs, labels = batch_data['feature_map']['data'].float().to(device),batch_data['label']['data'].to(device)
-
 
             if self.options["multi_label"]:
                 #must convert the labels to binary for dice score computation
@@ -327,14 +326,16 @@ class Fedem:
                         #initialized with the original image output (before/after post_pred routine)
                         augm_preds = [pred] #pred is already on the device
                         for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
-                            augm_out = model(augmented_test_img[None,:,:,:,slice_selected])
+                            augm_out = sliding_window_inference(inputs=inputs[:,:,:,:,slice_selected],
+                                                                roi_size=self.options['patch_size'][:2], #last dimension is 1, equivalent to squeeze
+                                                                sw_batch_size=3,
+                                                                predictor=model)
                             augm_out_inv = inverse_augm(augm_out.detach().cpu()) #happens on cpu
 
                             #would probably be good to manually re-check that the inverse augmentation are well applied
 
                             #apply sigmoid and threshold BEFORE averaging
                             augm_preds.append(self.post_pred(augm_out_inv).to(device))
-                            #tried applying sigmoid and threshold AFTER averaging UNet output but the negative values overcome the positive prior to the sigmoid
 
                         #average must discretized, using a simple threshold at 0.5
                         avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
@@ -355,7 +356,7 @@ class Fedem:
                 out = sliding_window_inference(inputs=inputs,
                                                roi_size=self.options['patch_size'],
                                                sw_batch_size=5,
-                                               predictor=model)                    
+                                               predictor=model)
                 #compute loss between output and label (loss function applies the sigmoid function itself)
                 loss_volume.append(loss_function(input=out,
                                                  target=labels
@@ -372,14 +373,14 @@ class Fedem:
                     #initialized with the original image output (before/after post_pred routine)
                     augm_preds = [prediction3d] #pred is already on the device
                     for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
-                        augm_out = model(augmented_test_img)
+                        augm_out = sliding_window_inference(inputs=augmented_test_img,
+                                                            roi_size=self.options['patch_size'],
+                                                            sw_batch_size=5,
+                                                            predictor=model)
                         augm_out_inv = inverse_augm(augm_out.detach().cpu()) #happens on cpu
-
-                        #would probably be good to manually re-check that the inverse augmentation are well applied
 
                         #apply sigmoid and threshold BEFORE averaging
                         augm_preds.append(self.post_pred(augm_out_inv).to(device))
-                        #tried applying sigmoid and threshold AFTER averaging UNet output but the negative values overcome the positive prior to the sigmoid
 
                     #average must discretized, using a simple threshold at 0.5
                     avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
@@ -429,6 +430,7 @@ class Fedem:
             print(f"Global (all sites, all slices) {dataset} LOSS :", np.round(np.mean(holder_diceloss),4))
             print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4), "std:", np.round(np.std(holder_dicemetric),4))
             if self.options["use_test_augm"] and "test" in dataset.lower():
+                print("running test-time augmentation with", len(self.options["test_time_augm"]), "augmentation functions for", dataset.lower(), "set")
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm):", np.round(np.mean(holder_dicemetric_augm),4))
 
             if use_isles22_metrics and "test" in dataset.lower():
