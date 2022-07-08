@@ -19,9 +19,10 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     print("Experiment using the ", datapath, "dataset")
     tmp_test = []
     tmp_valid = []
+    tmp_external = []
 
     #fetch the files paths, create the data loading/augmentation routines
-    partitions_paths, partitions_paths_add_mod = dataPreprocessing(datapath, modality, clients, additional_modalities, folder_struct, multi_label)
+    partitions_paths, partitions_paths_add_mod, external_test, external_test_add_mod = dataPreprocessing(datapath, modality, clients, additional_modalities, folder_struct, multi_label)
 
     if len(clients)<1:
         print("Must have at least one client")
@@ -30,6 +31,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     for i, conf in enumerate(networks_config):
         test_dicemetric = []
         valid_dicemetric = []
+        external_dicemetric = []
 
         #verify that the config parameters are coherent
         check_config(conf)
@@ -40,6 +42,8 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             
             conf["partitions_paths"]=partitions_paths
             conf["partitions_paths_add_mod"]=partitions_paths_add_mod
+            conf["external_test"]=external_test
+            conf["external_test_add_mod"]=external_test_add_mod
                 
             #add number to differentiate replicates
             if exp_name!=None:
@@ -68,8 +72,13 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best", save_pred=False))
             test_dicemetric.append(network.full_volume_metric(dataset="test", network="best", save_pred=True))
 
+            if len(external_test)>0:
+                external_dicemetric.append(network.full_volume_metric(dataset="external_test", network="best", save_pred=False))
+
         tmp_valid.append(valid_dicemetric)
         tmp_test.append(test_dicemetric)
+        if len(external_test)>0:
+            tmp_test.append(external_dicemetric)
 
     print("*** Summary for the experiment metrics ***")
 
@@ -77,7 +86,8 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     for k, (valid_metrics, test_metrics) in enumerate(zip(tmp_valid, tmp_test)):
         print(f"{networks_name[k]} valid avg dice: {mean([tmp[0] for tmp in valid_metrics])} ({[tmp[0] for tmp in valid_metrics]}, std: {[tmp[1] for tmp in valid_metrics]}) global std: {std(valid_metrics)}")
         print(f"{networks_name[k]} test avg dice: {mean([tmp[0] for tmp in test_metrics])} ({[tmp[0] for tmp in test_metrics]}, std: {[tmp[1] for tmp in test_metrics]}) global std: {std(test_metrics)}")
-
+        if len(external_test)>0:
+            print(f"{networks_name[k]} external avg dice: {mean([tmp[0] for tmp in external_metrics])} ({[tmp[0] for tmp in external_metrics]}, std: {[tmp[1] for tmp in external_metrics]}) global std: {std(external_metrics)}")
     return tmp_valid, tmp_test
 
 if __name__ == '__main__':
