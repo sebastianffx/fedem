@@ -424,6 +424,18 @@ class Fedem:
 
         return np.mean(holder_dicemetric), np.std(holder_dicemetric)
 
+    def load_inputs(self, batch_data):
+        if self.options["use_torchio"]:
+            #2D Net, potentially multi-channel
+            if self.options["space_cardinality"]==2:
+                #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                return batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+            #3D Net, potentially multi-channel
+            elif self.options["space_cardinality"]==3:
+                return batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+        else:
+            return batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+
 class FedAvg(Fedem):
     def __init__(self, options):
         super(FedAvg, self).__init__(options)
@@ -478,16 +490,7 @@ class FedAvg(Fedem):
 
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
-                if self.options["use_torchio"]:
-                    #2D Net, potentially multi-channel
-                    if self.options["space_cardinality"]==2:
-                        #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                        inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                    #3D Net, potentially multi-channel
-                    elif self.options["space_cardinality"]==3:
-                        inputs, labels = batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                else:
-                    inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                inputs, labels = self.load_inputs(batch_data)
                 y_pred = ann(inputs)
                 loss = self.loss_function(y_pred, labels)
                 optimizer.zero_grad()        
@@ -556,16 +559,7 @@ class Scaffold(Fedem):
 
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
-                if self.options["use_torchio"]:
-                    #2D Net, potentially multi-channel
-                    if self.options["space_cardinality"]==2:
-                        #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                        inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                    #3D Net, potentially multi-channel
-                    elif self.options["space_cardinality"]==3:
-                        inputs, labels = batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                else:
-                    inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                inputs, labels = self.load_inputs(batch_data)
                 y_pred = ann(inputs)
                 loss = self.loss_function(y_pred, labels)
                 optimizer.zero_grad()
@@ -738,17 +732,7 @@ class FedRod(Fedem):
                 for k, v in ann.named_parameters(): #Transfering data from the generic head is done in dispatch()
                     v.requires_grad = True #deriving gradients to all the generic layers
                 
-                if self.options["use_torchio"]:
-                    #2D Net, potentially multi-channel
-                    if self.options["space_cardinality"]==2:
-                        #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                        inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                    #3D Net, potentially multi-channel
-                    elif self.options["space_cardinality"]==3:
-                        inputs, labels = batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                else:
-                    inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
-
+                inputs, labels = self.load_inputs(batch_data)
                 y_pred_generic = ann(inputs)
                 loss_generic   = self.loss_function(y_pred_generic, labels)
                 optimizer.zero_grad()
@@ -857,16 +841,7 @@ class Centralized(Fedem):
                     v.requires_grad = True
                 
                 step += 1
-                if self.options["use_torchio"]:
-                    #2D Net, potentially multi-channel
-                    if self.options["space_cardinality"]==2:
-                        #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                        inputs, labels = batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                    #3D Net, potentially multi-channel
-                    elif self.options["space_cardinality"]==3:
-                        inputs, labels = batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                else:
-                    inputs, labels = batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+                inputs, labels = self.load_inputs(batch_data)
 
                 y_pred_generic = self.nn(inputs)
                 loss = self.loss_function(input=y_pred_generic, target=labels) #average over the batch after computing it for each slice
