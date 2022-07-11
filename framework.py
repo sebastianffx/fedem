@@ -239,6 +239,14 @@ class Fedem:
                 print("Loading best validation model weights: ")
                 print(model_path)
 
+        elif network=="pre_trained":
+            if "pretrain_weights" not in self.options.keys():
+                print("You forgot to provide the pretrained weights!")
+                return 
+            checkpoint = torch.load(self.options["pretrain_weights"], map_location=torch.device(device))
+            model.load_state_dict(checkpoint)
+            print("Pretrained Weights Loaded correctly!")
+
         elif network=="self":
             print("Using current network weights")
         else:
@@ -300,9 +308,9 @@ class Fedem:
                     if "external" in dataset.lower():
                         #using sliding window for external test because weird dimensions/different voxel spacing
                         out = sliding_window_inference(inputs=inputs[:,:,:,:,slice_selected],
-                                                       roi_size=self.options['patch_size'][:2], #last dimension is 1, equivalent to squeeze
-                                                       sw_batch_size=3,
-                                                       predictor=model)
+                                                        roi_size=self.options['patch_size'][:2], #last dimension is 1, equivalent to squeeze
+                                                        sw_batch_size=3,
+                                                        predictor=model)
                     else:
                         out = model(inputs[:,:,:,:,slice_selected])
                     
@@ -354,12 +362,12 @@ class Fedem:
             elif self.options["space_cardinality"]==3:
                 #must use sliding windows over small patches for 3D networks
                 out = sliding_window_inference(inputs=inputs,
-                                               roi_size=self.options['patch_size'],
-                                               sw_batch_size=5,
-                                               predictor=model)
+                                                roi_size=self.options['patch_size'],
+                                                sw_batch_size=5,
+                                                predictor=model)
                 #compute loss between output and label (loss function applies the sigmoid function itself)
                 loss_volume.append(loss_function(input=out,
-                                                 target=labels
+                                                    target=labels
                                                 ).item()
                                 )
 
