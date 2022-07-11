@@ -253,15 +253,6 @@ class Fedem:
 
         loss_function = monai.losses.DiceLoss(sigmoid=True)
 
-        if self.options['modality'] =='cbf':
-            max_intensity = 1200
-        if self.options['modality'] =='cbv':
-            max_intensity = 200
-        if self.options['modality'] =='tmax' or self.options['modality'] =='mtt':
-            max_intensity = 30
-        if self.options['modality'] =='adc':
-            max_intensity = 4000
-
         holder_dicemetric = []
         holder_diceloss = []
         dice_metric.reset()
