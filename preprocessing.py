@@ -397,8 +397,8 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
     #old approach, was not always improving performance
     #rotation = tio.RandomAffine(degrees=360)
     rotation = tio.OneOf({
-                    tio.Affine(scales=0, degrees=90, translation=0): 0.5,
-                    tio.Affine(scales=0, degrees=180, translation=0): 0.5,
+                    tio.Affine(scales=1, degrees=90, translation=0): 0.5,
+                    tio.Affine(scales=1, degrees=180, translation=0): 0.5,
             },
             p=0.5,
         )
@@ -457,8 +457,11 @@ def isles22_torchio_create_transform(padding, patch_size, no_deformation):
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
 
     rotation = tio.OneOf({
-                    tio.Affine(scales=1, degrees=90, translation=0): 0.5, #change params
-                    tio.Affine(scales=1, degrees=180, translation=0): 0.5,
+                    tio.Affine(scales=1, degrees=(90,0,0), translation=0): 0.2,
+                    tio.Affine(scales=1, degrees=(0,90,0), translation=0): 0.2,
+                    tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.2,
+                    tio.Affine(scales=1, degrees=(180,0,0), translation=0): 0.2,
+                    tio.Affine(scales=1, degrees=(0,180,0), translation=0): 0.2,
             },
             p=0.5,
         )
@@ -471,7 +474,8 @@ def isles22_torchio_create_transform(padding, patch_size, no_deformation):
     resample = tio.Resample('ref_space') #using dwi since label were created based on them...
     #Resampling is used to project all the modalities (dwi, and eventually adc) to the same space (dwi space)
     padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
-    toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
+    #toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
+    #toCanon is not used, we trust the source of the volume and just resample to adjust the origin and affines across tio.Subject attributes 
 
     #due to tio.Lambda specifications, output must have input shape
     def normalize_multimodal(input):
@@ -503,7 +507,7 @@ def isles22_torchio_create_transform(padding, patch_size, no_deformation):
         return input
 
     #apply the normalization to the adc attribute only, not the labels
-    normalize_transformation = tio.Lambda(normalize_multimodal, types_to_apply=tio.INTENSITY)    
+    normalize_transformation = tio.Lambda(normalize_multimodal, types_to_apply=tio.INTENSITY)
 
     #normalization only, no spatial transformation or data augmentation
     transform_valid = tio.Compose([resample, normalize_transformation, rescale])
@@ -513,7 +517,7 @@ def isles22_torchio_create_transform(padding, patch_size, no_deformation):
         transform = tio.Compose([resample, normalize_transformation, rescale, padding])
         return transform, transform_valid
     else:
-        transform = tio.Compose([resample, normalize_transformation, resample, rescale, flipping, rotation, padding])
+        transform = tio.Compose([resample, normalize_transformation, rescale, flipping, rotation, padding])
         return transform, transform_valid
 
 def brats_torchio_create_transform(padding=(48,48,16), patch_size= (96,96,32)):
@@ -576,10 +580,8 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
     if no_deformation == "isles":
         transform, transform_valid = isles22_torchio_create_transform(padding=padding, patch_size=patch_size,
                                                         no_deformation=False)
-    if no_deformation == "brats":
+    elif no_deformation == "brats":
         transform, transform_valid = brats_torchio_create_transform(padding=padding, patch_size=patch_size)
-
-
     else:
         transform, transform_valid = torchio_create_transfo(clamp_min=clamp_min, clamp_max=clamp_max,
                                                         padding=padding, patch_size=patch_size,
