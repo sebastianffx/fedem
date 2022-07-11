@@ -1,4 +1,5 @@
 import os
+from requests import options
 import torch
 import numpy as np
 import nibabel as nb
@@ -445,7 +446,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
         transform = tio.Compose([select_channel, clamp, toCanon, rescale, flipping, rotation, padding])
         return transform, transform_valid
 
-def ISLES22_torchio_create_transfo(padding, patch_size, no_deformation):
+def ISLES22_torchio_create_transform(padding, patch_size, no_deformation):
     """Normalize each modality differently using hardcoded values.
        The order of the modalities in the channel dimensionsis assumed to be either:
        - dwi
@@ -515,6 +516,35 @@ def ISLES22_torchio_create_transfo(padding, patch_size, no_deformation):
         transform = tio.Compose([resample, normalize_transformation, resample, rescale, flipping, rotation, padding])
         return transform, transform_valid
 
+def brats_torchio_create_transform(padding, patch_size= (96,96,32)):
+    """Normalize each modality differently using hardcoded values.
+       The order of the modalities in the channel dimensionsis assumed to be either:
+       - dwi
+       - dwi, adc
+       - dwi, adc, flair
+    """
+    print("using BRATS custom preprocessing transformations")
+
+    convert_mask = tio.Lambda(lambda img: np.squeeze(torch.stack([(img == 1) | (img == 4), (img == 1) | (img == 4) | (img == 2), img == 4],dim=0)), types_to_apply=[tio.LABEL])
+    rescale = tio.RescaleIntensity(out_min_max=(0, 1))
+    toCanon = tio.ToCanonical()
+    flip = tio.RandomFlip(axes=('LR',))
+    pad = tio.Pad((48, 48, 16))
+    transforms = [convert_mask, rescale, flip, toCanon,pad]
+    transform = tio.Compose(transforms)
+
+    valid_transform = tio.Compose([convert_mask, rescale, toCanon])
+    rescale = tio.RescaleIntensity(out_min_max=(0, 1))
+
+    #Resampling is used to project all the modalities (dwi, and eventually adc) to the same space (dwi space)
+    padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
+    toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
+
+    #due to tio.Lambda specifications, output must have input shape
+
+    #just regular campling and normalization
+    return transform, valid_transform
+
 def torchio_create_test_transfo():
     """ Transform for test-time augmentation, the transformation should have been seen during the training.
         Here, we consider the 90, 180 and 270 rotation to be covered by the randomAffine(degrees=360)
@@ -551,8 +581,12 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
 
     print("Using TORCHIO dataloader")
     if no_deformation == "isles":
-        transform, transform_valid = ISLES22_torchio_create_transfo(padding=padding, patch_size=patch_size,
+        transform, transform_valid = ISLES22_torchio_create_transform(padding=padding, patch_size=patch_size,
                                                         no_deformation=False)
+    if no_deformation == "brats":
+        transform, transform_valid = brats_torchio_create_transform(padding=padding, patch_size=patch_size)
+
+
     else:
         transform, transform_valid = torchio_create_transfo(clamp_min=clamp_min, clamp_max=clamp_max,
                                                         padding=padding, patch_size=patch_size,

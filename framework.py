@@ -25,7 +25,7 @@ from monai.transforms import (
 )
 
 from utils.eval_utils import compute_dice, compute_absolute_volume_difference, compute_absolute_lesion_difference, compute_lesion_f1_score
-
+import torchio as tio
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
 
@@ -40,6 +40,9 @@ class Fedem:
         self.post_sigmoid = Compose([EnsureType(), Activations(sigmoid=True)])
 
         if self.options["use_torchio"]:
+            ##    convert_mask = tio.Lambda(lambda img: np.squeeze(torch.stack([(img == 1) | (img == 4), (img == 1) | (img == 4) | (img == 2), img == 4],dim=0)), types_to_apply=[tio.LABEL])
+
+
             self.dataloaders, \
                 self.all_test_loader, self.all_valid_loader, self.all_train_loader, \
                 self.external_loader = torchio_generate_loaders(partitions_paths=options["partitions_paths"],
@@ -102,7 +105,7 @@ class Fedem:
         early_stop_val = 0
         early_stop_count = 0
 
-        index = [0,1,2] #TODO: simplify in a expression list using the number of centers
+        index = [0,1,2,3] #TODO: simplify in a expression list using the number of centers
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
 
@@ -119,7 +122,7 @@ class Fedem:
 
             #Evaluation on validation (full volume) and saving model if needed
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
-                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False)
+                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False,use_isles22_metrics=self.options['use_isles22_metrics'])
                 if epoch_valid_dice_score > best_metric:
                     best_metric = epoch_valid_dice_score
                     best_metric_epoch = cur_epoch+1
@@ -206,7 +209,7 @@ class Fedem:
     def train():
         raise NotImplementedError
     
-    def full_volume_metric(self, dataset, network="best", benchmark_metric="dicescore", save_pred=False, verbose=True):
+    def full_volume_metric(self, dataset, network="best", benchmark_metric="dicescore", save_pred=False, verbose=True,use_isles22_metrics=False):
         """ Compute test metric for full volume of the test set
 
             network : if "best", the best model (dice loss on validation set) will be loaded and overwrite the current model
@@ -271,7 +274,7 @@ class Fedem:
         ### END TMP
 
         ### TMP : for ISLES22 metrics functions
-        use_isles22_metrics=True
+        
         isles_metrics = [[],[],[],[]]
         astral_voxel_size = 1.63*1.63*3
         ###                
@@ -922,7 +925,7 @@ class Centralized(Fedem):
 
             #Evaluation on validation and saving model if needed, on full volume
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
-                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False)
+                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False, use_isles22_metrics=self.options['use_isles22_metrics'])
 
                 #using dice score to save best model
                 if epoch_valid_dice_score > best_metric:
