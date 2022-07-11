@@ -1,4 +1,6 @@
 import os
+import gc
+
 import copy
 import itertools
 from pandas import options
@@ -440,6 +442,8 @@ class Fedem:
                 nib.save(nib.Nifti1Image(prediction3d.squeeze(), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_post_segpred_"+benchmark_metric+".nii.gz")))
                 if self.options["use_test_augm"] and "test" in dataset.lower():
                     nib.save(nib.Nifti1Image(avg_augm_pred.squeeze(), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_augm_segpred_"+benchmark_metric+".nii.gz")))
+                del inputs, labels, out, prediction3d
+                gc.collect()
 
             #retain each volume scores (dice loss and dice score)
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
