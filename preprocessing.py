@@ -446,7 +446,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
         transform = tio.Compose([select_channel, clamp, toCanon, rescale, flipping, rotation, padding])
         return transform, transform_valid
 
-def ISLES22_torchio_create_transform(padding, patch_size, no_deformation):
+def isles22_torchio_create_transform(padding, patch_size, no_deformation):
     """Normalize each modality differently using hardcoded values.
        The order of the modalities in the channel dimensionsis assumed to be either:
        - dwi
@@ -457,8 +457,8 @@ def ISLES22_torchio_create_transform(padding, patch_size, no_deformation):
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
 
     rotation = tio.OneOf({
-                    tio.Affine(scales=0, degrees=90, translation=0): 0.5,
-                    tio.Affine(scales=0, degrees=180, translation=0): 0.5,
+                    tio.Affine(scales=1, degrees=90, translation=0): 0.5, #change params
+                    tio.Affine(scales=1, degrees=180, translation=0): 0.5,
             },
             p=0.5,
         )
@@ -516,7 +516,7 @@ def ISLES22_torchio_create_transform(padding, patch_size, no_deformation):
         transform = tio.Compose([resample, normalize_transformation, resample, rescale, flipping, rotation, padding])
         return transform, transform_valid
 
-def brats_torchio_create_transform(padding, patch_size= (96,96,32)):
+def brats_torchio_create_transform(padding=(48,48,16), patch_size= (96,96,32)):
     """Normalize each modality differently using hardcoded values.
        The order of the modalities in the channel dimensionsis assumed to be either:
        - dwi
@@ -529,18 +529,11 @@ def brats_torchio_create_transform(padding, patch_size= (96,96,32)):
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
     toCanon = tio.ToCanonical()
     flip = tio.RandomFlip(axes=('LR',))
-    pad = tio.Pad((48, 48, 16))
-    transforms = [convert_mask, rescale, flip, toCanon,pad]
+    pad = tio.Pad(padding)
+    transforms = [convert_mask, rescale, flip, toCanon, pad]
     transform = tio.Compose(transforms)
 
     valid_transform = tio.Compose([convert_mask, rescale, toCanon])
-    rescale = tio.RescaleIntensity(out_min_max=(0, 1))
-
-    #Resampling is used to project all the modalities (dwi, and eventually adc) to the same space (dwi space)
-    padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
-    toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
-
-    #due to tio.Lambda specifications, output must have input shape
 
     #just regular campling and normalization
     return transform, valid_transform
@@ -581,7 +574,7 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
 
     print("Using TORCHIO dataloader")
     if no_deformation == "isles":
-        transform, transform_valid = ISLES22_torchio_create_transform(padding=padding, patch_size=patch_size,
+        transform, transform_valid = isles22_torchio_create_transform(padding=padding, patch_size=patch_size,
                                                         no_deformation=False)
     if no_deformation == "brats":
         transform, transform_valid = brats_torchio_create_transform(padding=padding, patch_size=patch_size)
