@@ -37,6 +37,7 @@ class Fedem:
 
         #routine to convert U-Net output to segmentation mask
         self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
+        self.post_sigmoid = Compose([EnsureType(), Activations(sigmoid=True)])
 
         if self.options["use_torchio"]:
             self.dataloaders, \
@@ -264,7 +265,9 @@ class Fedem:
 
         #### TMP : used to test the best approach to average the output
         dice_metric_augm = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+        dice_metric_augm_no_thres = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
         holder_dicemetric_augm = []
+        holder_dicemetric_augm_no_thres = []
         ### END TMP
 
         ### TMP : for ISLES22 metrics functions
@@ -288,6 +291,7 @@ class Fedem:
                 test_time_images = [augm(inputs.clone().cpu()[0,:,:,:,:]).to(device) for augm in self.options["test_time_augm"]]
                 inverse_test_augm = [augm.inverse() for augm in self.options["test_time_augm"]]
                 augm_pred_holder = []
+                augm_pred_holder_no_thres = []
 
             #raw_pred_holder = []
             post_pred_holder = []
@@ -325,6 +329,7 @@ class Fedem:
                     if self.options["use_test_augm"] and "test" in dataset.lower():
                         #initialized with the original image output (before/after post_pred routine)
                         augm_preds = [pred] #pred is already on the device
+                        augm_preds_no_thres = [pred] #pred is already on the device
                         for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
                             augm_out = sliding_window_inference(inputs=inputs[:,:,:,:,slice_selected],
                                                                 roi_size=self.options['patch_size'][:2], #last dimension is 1, equivalent to squeeze
@@ -336,19 +341,34 @@ class Fedem:
 
                             #apply sigmoid and threshold BEFORE averaging
                             augm_preds.append(self.post_pred(augm_out_inv).to(device))
+                            #applying ONLY the sigmoid BEFORE averaging
+                            augm_preds_no_thres.append(self.post_sigmoid(augm_out_inv).to(device))
 
+                        ## TEST TIME AUGMENT IS PERFORMED SLICE WISE
                         #average must discretized, using a simple threshold at 0.5
                         avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
                         avg_augm_pred = avg_augm_pred >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
                         avg_augm_pred = avg_augm_pred.int() #convert bool to int
 
+                        #perfom the average over the augmented outputs WITHOUT THRESHOLD (probabilities, output of sigmoid), using agreement threshold to discretise
+                        avg_augm_pred_no_thres = torch.mean(torch.stack(augm_preds_no_thres, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
+                        avg_augm_pred_no_thres = avg_augm_pred_no_thres >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
+                        avg_augm_pred_no_thres = avg_augm_pred_no_thres.int() #convert bool to int
+
                         dice_metric_augm(avg_augm_pred, labels[:,:,:,:,slice_selected])
+                        dice_metric_augm_no_thres(avg_augm_pred_no_thres, labels[:,:,:,:,slice_selected])
 
                         augm_pred_holder.append(avg_augm_pred[0,0,:,:].cpu().numpy())
+                        augm_pred_holder_no_thres.append(avg_augm_pred_no_thres[0,0,:,:].cpu().numpy())
 
+                #stack the 2D prediction into a 3D volume
                 prediction3d = np.stack(post_pred_holder, axis=-1)
                 if self.options["use_test_augm"] and "test" in dataset.lower():
                     avg_augm_pred = np.stack(augm_pred_holder, axis=-1)
+                    avg_augm_pred = avg_augm_pred.squeeze()
+
+                    avg_augm_pred_no_thres = np.stack(augm_pred_holder_no_thres, axis=-1)
+                    avg_augm_pred_no_thres = avg_augm_pred.squeeze()
 
             #3D networks
             elif self.options["space_cardinality"]==3:
@@ -372,6 +392,7 @@ class Fedem:
                 if self.options["use_test_augm"] and "test" in dataset.lower():
                     #initialized with the original image output (before/after post_pred routine)
                     augm_preds = [prediction3d] #pred is already on the device
+                    augm_preds_no_thres = [prediction3d]
                     for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
                         augm_out = sliding_window_inference(inputs=augmented_test_img,
                                                             roi_size=self.options['patch_size'],
@@ -381,19 +402,30 @@ class Fedem:
 
                         #apply sigmoid and threshold BEFORE averaging
                         augm_preds.append(self.post_pred(augm_out_inv).to(device))
+                        #applying ONLY the sigmoid BEFORE averaging
+                        augm_preds_no_thres.append(self.post_sigmoid(augm_out_inv).to(device))
 
-                    #average must discretized, using a simple threshold at 0.5
+                    #perfom the average over the augmented outputs, using agreement threshold to discretise
                     avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
                     avg_augm_pred = avg_augm_pred >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
                     avg_augm_pred = avg_augm_pred.int() #convert bool to int
 
+                    #perfom the average over the augmented outputs WITHOUT THRESHOLD (probabilities, output of sigmoid), using agreement threshold to discretise
+                    avg_augm_pred_no_thres = torch.mean(torch.stack(augm_preds_no_thres, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
+                    avg_augm_pred_no_thres = avg_augm_pred_no_thres >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
+                    avg_augm_pred_no_thres = avg_augm_pred_no_thres.int() #convert bool to int
+
                     dice_metric_augm(avg_augm_pred, labels)
+                    dice_metric_augm_no_thres(avg_augm_pred_no_thres, labels)
+                    avg_augm_pred = avg_augm_pred.detach().cpu().numpy().squeeze()
+                    avg_augm_pred_no_thres = avg_augm_pred_no_thres.detach().cpu().numpy().squeeze()
 
                 #should apply the revert transform of toCanonical so that the prediction and the ground truch are in the same space
                 #specially for the leaderboard, where our preprocessing pipeline won't be applied to the ground truth for the test set!
                 prediction3d = prediction3d.detach().cpu().numpy().squeeze()
                 if self.options["use_test_augm"] and "test" in dataset.lower():
                     avg_augm_pred = avg_augm_pred.cpu().numpy()
+                    avg_augm_pred_no_thres = avg_augm_pred.cpu().numpy()
 
             if save_pred:
                 affine = batch_data['label']['affine'][0,:,:].detach().cpu().numpy()
@@ -416,6 +448,8 @@ class Fedem:
             if self.options["use_test_augm"] and "test" in dataset.lower():
                 holder_dicemetric_augm.append(dice_metric_augm.aggregate().item())
                 dice_metric_augm.reset()
+                holder_dicemetric_augm_no_thres.append(dice_metric_augm_no_thres.aggregate().item())
+                dice_metric_augm_no_thres.reset()
 
             #call the metrics functions from ISLES22 repo
             if use_isles22_metrics:
@@ -432,6 +466,7 @@ class Fedem:
             if self.options["use_test_augm"] and "test" in dataset.lower():
                 print("running test-time augmentation with", len(self.options["test_time_augm"]), "augmentation functions for", dataset.lower(), "set")
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm):", np.round(np.mean(holder_dicemetric_augm),4))
+                print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm no thres):", np.round(np.mean(holder_dicemetric_augm_no_thres),4))
 
             if use_isles22_metrics and "test" in dataset.lower():
                 print("ISLES22 metrics")
