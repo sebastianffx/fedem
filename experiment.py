@@ -13,7 +13,7 @@ def check_config(config):
     #TODO: verify more parameters
 
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
-                  additional_modalities= [], multi_label=False,
+                  additional_modalities= [], additional_labels=False, multi_label=False,
                   clients=[], size_crop=100, folder_struct="site_nested", train=True):
 
     print("Experiment using the ", datapath, "dataset")
@@ -22,7 +22,16 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     tmp_external = []
 
     #fetch the files paths, create the data loading/augmentation routines
-    partitions_paths, partitions_paths_add_mod, external_test, external_test_add_mod = get_train_valid_test_partitions(datapath, modality, clients, folder_struct, multi_label, additional_modalities)
+    centers_partitions, \
+    partitions_paths_add_mod, partitions_paths_add_lbl, \
+    external_test, external_test_add_mod = get_train_valid_test_partitions(path=datapath,
+                                                                           modality=modality,
+                                                                           clients=clients,
+                                                                           folder_struct=folder_struct,
+                                                                           multi_label=multi_label,
+                                                                           additional_modalities=additional_modalities,
+                                                                           additional_labels=additional_labels)
+
     if len(clients)<1:
         print("Must have at least one client")
         return None, None
@@ -39,8 +48,9 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             print(f"{networks_name[i]} iteration {rep+1}")
             print(conf)
             
-            conf["partitions_paths"]=partitions_paths
+            conf["partitions_paths"]=centers_partitions
             conf["partitions_paths_add_mod"]=partitions_paths_add_mod
+            conf["partitions_paths_add_lbl"]=partitions_paths_add_lbl
             conf["external_test"]=external_test
             conf["external_test_add_mod"]=external_test_add_mod
                 
