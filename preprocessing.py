@@ -433,6 +433,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
     if no_deformation:
         #still require padding for the label based patches creation
         transform = tio.Compose([select_channel, clamp, toCanon, resample, rescale, padding])
+        print("no deformation, only scaling and padding")
         return transform, transform_valid
     #more transformation: affine, rotation, elastic deformation and planar symmetry
     else:
@@ -442,6 +443,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
 
         #removed the random affine and elastic deformation
         transform = tio.Compose([select_channel, clamp, toCanon, resample, rescale, flipping, rotation, padding])
+        print("flipping and rotation in addition to scaling and padding")
         return transform, transform_valid
 
 def isles22_torchio_create_transform(padding, patch_size, no_deformation):
@@ -609,6 +611,7 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
         # get the subject, create subject datatset, feed it to a queue for the path creation, then converted to a dataloader
         if no_deformation == "isles" or no_deformation == "brats" :
             #using channels to encode the several modality into one map
+            print("additional modalities are encoded in the channel axis")
             site_train_subjects = torchio_get_loader_partition(partitions_paths[i][0][0],
                                                                partitions_paths[i][1][0],
                                                                partitions_paths_add_mod[i][0],
@@ -625,6 +628,7 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                             partitions_paths_add_lbl[i][2]
                                                             )
         else:
+            print("additional modalities are encoded in synthetic subjects")
             #additionnal modalities are used to create "new subjects"
             site_train_subjects = torchio_get_loader_partition(partitions_paths[i][0][0], #volume
                                                                partitions_paths[i][1][0], #labels
@@ -633,18 +637,19 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
             if len(partitions_paths_add_mod[i][0]) > 0:
                 for additional_modality, additional_labels in zip(partitions_paths_add_mod[i][0],partitions_paths_add_lbl[i][0]):
                     site_train_subjects += torchio_get_loader_partition(additional_modality, #volume
-                                                                        additional_labels, #labels
+                                                                        additional_labels if len(additional_labels)>0 else partitions_paths[i][1][0], #labels
                                                                         )
 
             site_valid_subjects = torchio_get_loader_partition(partitions_paths[i][0][1], #volume
                                                                partitions_paths[i][1][1], #labels
                                                                )
-
+            """ not creating the false subject for validation, to avoid biais for model selection
             if len(partitions_paths_add_mod[i][1]) > 0:
                 for additional_modality, additional_labels in zip(partitions_paths_add_mod[i][1],partitions_paths_add_lbl[i][1]):
                     site_valid_subjects += torchio_get_loader_partition(additional_modality, #volume
-                                                                        additional_labels, #labels
+                                                                        additional_labels if len(additional_labels)>0 else partitions_paths[i][1][1], #labels
                                                                         )
+            """
             
             site_test_subjects = torchio_get_loader_partition(partitions_paths[i][0][2], #volume
                                                               partitions_paths[i][1][2], #labels
@@ -653,7 +658,7 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
             if len(partitions_paths_add_mod[i][2]) > 0:
                 for additional_modality, additional_labels in zip(partitions_paths_add_mod[i][2],partitions_paths_add_lbl[i][2]):
                     site_test_subjects += torchio_get_loader_partition(additional_modality, #volume
-                                                                       additional_labels, #labels
+                                                                       additional_labels if len(additional_labels)>0 else partitions_paths[i][1][2], #labels
                                                                        )
             """
         
