@@ -310,7 +310,7 @@ def monai_unet(args, unet_name="unet_synthetic", spatial_dims=2,in_channels=1,ou
     return model
 
 def brats_segmentation_network(args):
-    device =  'cuda' if args.gpu else 'cpu'
+    device =  'cuda' if args.gpu == "True" else 'cpu'
     model = SegResNet(
     blocks_down=[1, 2, 2, 4],
     blocks_up=[1, 1, 1],

@@ -1,4 +1,6 @@
 import os
+import gc
+
 import copy
 import itertools
 from pandas import options
@@ -243,6 +245,14 @@ class Fedem:
                 print("Loading best validation model weights: ")
                 print(model_path)
 
+        elif network=="pre_trained":
+            if "pretrain_weights" not in self.options.keys():
+                print("You forgot to provide the pretrained weights!")
+                return 
+            checkpoint = torch.load(self.options["pretrain_weights"], map_location=torch.device(device))
+            model.load_state_dict(checkpoint)
+            print("Pretrained Weights Loaded correctly!")
+
         elif network=="self":
             print("Using current network weights")
         else:
@@ -298,9 +308,9 @@ class Fedem:
                     if "external" in dataset.lower():
                         #using sliding window for external test because weird dimensions/different voxel spacing
                         out = sliding_window_inference(inputs=inputs[:,:,:,:,slice_selected],
-                                                       roi_size=self.options['patch_size'][:2], #last dimension is 1, equivalent to squeeze
-                                                       sw_batch_size=3,
-                                                       predictor=model)
+                                                        roi_size=self.options['patch_size'][:2], #last dimension is 1, equivalent to squeeze
+                                                        sw_batch_size=3,
+                                                        predictor=model)
                     else:
                         out = model(inputs[:,:,:,:,slice_selected])
                     
@@ -368,12 +378,12 @@ class Fedem:
             elif self.options["space_cardinality"]==3:
                 #must use sliding windows over small patches for 3D networks
                 out = sliding_window_inference(inputs=inputs,
-                                               roi_size=self.options['patch_size'],
-                                               sw_batch_size=5,
-                                               predictor=model)
+                                                roi_size=self.options['patch_size'],
+                                                sw_batch_size=5,
+                                                predictor=model)
                 #compute loss between output and label (loss function applies the sigmoid function itself)
                 loss_volume.append(loss_function(input=out,
-                                                 target=labels
+                                                    target=labels
                                                 ).item()
                                 )
 
@@ -432,6 +442,8 @@ class Fedem:
                 nib.save(nib.Nifti1Image(prediction3d.squeeze(), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_post_segpred_"+benchmark_metric+".nii.gz")))
                 if self.options["use_test_augm"] and "test" in dataset.lower():
                     nib.save(nib.Nifti1Image(avg_augm_pred.squeeze(), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_augm_segpred_"+benchmark_metric+".nii.gz")))
+                del inputs, labels, out, prediction3d
+                gc.collect()
 
             #retain each volume scores (dice loss and dice score)
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
