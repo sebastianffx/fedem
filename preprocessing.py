@@ -383,18 +383,15 @@ def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels, pa
 def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deformation=False, forced_channel=-1):
     clamp = tio.Clamp(out_min=clamp_min, out_max=clamp_max)
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
-    spatial = tio.OneOf({
-            tio.RandomAffine(): 0.6,
-            tio.RandomElasticDeformation(): 0.2,        
-            tio.RandomAffine(degrees=180): 0.2
-            },
-            p=0.75,
-        )
-    #old approach, was not always improving performance
-    #rotation = tio.RandomAffine(degrees=360)
     rotation = tio.OneOf({
-                    tio.Affine(scales=1, degrees=90, translation=0): 0.5,
-                    tio.Affine(scales=1, degrees=180, translation=0): 0.5,
+                    tio.Affine(scales=1, degrees=(90,0,0), translation=0): 0.125,
+                    tio.Affine(scales=1, degrees=(0,90,0), translation=0): 0.125,
+                    tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.125,
+                    tio.Affine(scales=1, degrees=(180,0,0), translation=0): 0.125,
+                    tio.Affine(scales=1, degrees=(0,180,0), translation=0): 0.125,
+                    tio.Affine(scales=1, degrees=(0,0,180), translation=0): 0.125,
+                    tio.Affine(scales=1.2, degrees=(0,0,0), translation=0): 0.125,
+                    tio.Affine(scales=0.8, degrees=(0,0,0), translation=0): 0.125,
             },
             p=0.5,
         )
@@ -543,16 +540,17 @@ def torchio_create_test_transfo():
         Here, we consider the 90, 180 and 270 rotation to be covered by the randomAffine(degrees=360)
     """
     #lossless
-    #default axes for RandomFlip (training) is 0
     Right_flip = tio.Flip(axes="R") #symmetry plane = right plane of the brain
-    Superior_flip = tio.Flip(axes="S") #symmetry plane = superior plane of the brain --> index engineering when iterating over full volume
 
     #lossly, tio.Affine was found directly in the source code
     #scale < 1 means dezooming, 0.1 means zooming/dezooming of at most 10%
-    #using scale = 0 to avoid any zooming and prevent interpolation prior to prediction averaging
-    rotation90 = tio.Affine(scales=0, degrees=90, translation=0)
-    rotation180 = tio.Affine(scales=0, degrees=180, translation=0) #this transformation is geometrically VERY close to Anterior Flipping due to the symmetry of the brain
-    rotation270 = tio.Affine(scales=0, degrees=270, translation=0)
+    #using scale = 1 to avoid any zooming and prevent interpolation prior to prediction averaging
+    rotation90x = tio.Affine(scales=1, degrees=(90,0,0), translation=0)
+    rotation90y = tio.Affine(scales=1, degrees=(0,90,0), translation=0)
+    rotation90z = tio.Affine(scales=1, degrees=(0,0,90), translation=0)
+    rotation180x = tio.Affine(scales=1, degrees=(180,0,0), translation=0)
+    rotation180y = tio.Affine(scales=1, degrees=(0,180,0), translation=0)
+    rotation180z = tio.Affine(scales=1, degrees=(0,0,180), translation=0)
 
     gaussian = tio.RandomNoise()
     gamma = tio.RandomGamma()
@@ -565,7 +563,7 @@ def torchio_create_test_transfo():
     #return [h_flip, v_flip, rotation90, rotation180, rotation270]
 
     #proof of work with reduced number of augmentation
-    return [Right_flip, rotation90, rotation180]
+    return [Right_flip, rotation90x, rotation90y, rotation90z, rotation180x, rotation180y, rotation180z]
 
 def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_max=4000, padding=(50,50,1), patch_size=(128,128,1),
                              max_queue_length=16, patches_per_volume=4, no_deformation=False,
