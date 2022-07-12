@@ -1,4 +1,6 @@
 import os
+import gc
+
 import copy
 import itertools
 from pandas import options
@@ -7,6 +9,7 @@ import random
 import monai
 import numpy as np
 import nibabel as nib
+from monai.inferers import sliding_window_inference
 
 from network import generate_nn
 from utils.blob_loss import BlobLoss
@@ -24,7 +27,7 @@ from monai.transforms import (
 )
 
 from utils.eval_utils import compute_dice, compute_absolute_volume_difference, compute_absolute_lesion_difference, compute_lesion_f1_score
-
+import torchio as tio
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
 
@@ -36,19 +39,27 @@ class Fedem:
 
         #routine to convert U-Net output to segmentation mask
         self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
+        self.post_sigmoid = Compose([EnsureType(), Activations(sigmoid=True)])
 
         if self.options["use_torchio"]:
-            self.dataloaders, self.all_test_loader, self.all_valid_loader, self.all_train_loader = torchio_generate_loaders(partitions_paths=options["partitions_paths"],
-                                                                                                                            batch_size=self.options["batch_size"],
-                                                                                                                            clamp_min=self.options["clamp_min"],
-                                                                                                                            clamp_max=self.options["clamp_max"],
-                                                                                                                            padding=self.options["padding"],
-                                                                                                                            patch_size=self.options["patch_size"],
-                                                                                                                            max_queue_length=self.options["max_queue_length"],
-                                                                                                                            patches_per_volume=self.options["patches_per_volume"],
-                                                                                                                            no_deformation=self.options["no_deformation"],
-                                                                                                                            partitions_paths_add_mod=self.options["partitions_paths_add_mod"]
-                                                                                                                            )
+            ##    convert_mask = tio.Lambda(lambda img: np.squeeze(torch.stack([(img == 1) | (img == 4), (img == 1) | (img == 4) | (img == 2), img == 4],dim=0)), types_to_apply=[tio.LABEL])
+
+
+            self.dataloaders, \
+                self.all_test_loader, self.all_valid_loader, self.all_train_loader, \
+                self.external_loader = torchio_generate_loaders(partitions_paths=options["partitions_paths"],
+                                                                     batch_size=self.options["batch_size"],
+                                                                     clamp_min=self.options["clamp_min"],
+                                                                     clamp_max=self.options["clamp_max"],
+                                                                     padding=self.options["padding"],
+                                                                     patch_size=self.options["patch_size"],
+                                                                     max_queue_length=self.options["max_queue_length"],
+                                                                     patches_per_volume=self.options["patches_per_volume"],
+                                                                     no_deformation=self.options["no_deformation"],
+                                                                     partitions_paths_add_mod=self.options["partitions_paths_add_mod"],
+                                                                     partitions_paths_add_lbl=self.options["partitions_paths_add_lbl"],
+                                                                     external_test=self.options["external_test"],
+                                                                     external_test_add_mod=self.options["external_test_add_mod"])
 
         if self.options["use_test_augm"]:
             self.options["test_time_augm"] = torchio_create_test_transfo()
@@ -97,7 +108,7 @@ class Fedem:
         early_stop_val = 0
         early_stop_count = 0
 
-        index = [0,1,2] #TODO: simplify in a expression list using the number of centers
+        index = [0,1,2,3] #TODO: simplify in a expression list using the number of centers
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
 
@@ -114,7 +125,7 @@ class Fedem:
 
             #Evaluation on validation (full volume) and saving model if needed
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
-                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False)
+                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False,use_isles22_metrics=self.options['use_isles22_metrics'])
                 if epoch_valid_dice_score > best_metric:
                     best_metric = epoch_valid_dice_score
                     best_metric_epoch = cur_epoch+1
@@ -201,7 +212,7 @@ class Fedem:
     def train():
         raise NotImplementedError
     
-    def full_volume_metric(self, dataset, network="best", benchmark_metric="dicescore", save_pred=False, verbose=True):
+    def full_volume_metric(self, dataset, network="best", benchmark_metric="dicescore", save_pred=False, verbose=True,use_isles22_metrics=False):
         """ Compute test metric for full volume of the test set
 
             network : if "best", the best model (dice loss on validation set) will be loaded and overwrite the current model
@@ -213,6 +224,8 @@ class Fedem:
             dataset_loader = self.all_test_loader
         elif dataset=="valid":
             dataset_loader = self.all_valid_loader
+        elif dataset=="external_test":
+            dataset_loader = self.external_loader
         else:
             print("invalid dataset type, possible value are train, valid and test")
             return -1
@@ -233,6 +246,14 @@ class Fedem:
                 print("Loading best validation model weights: ")
                 print(model_path)
 
+        elif network=="pre_trained":
+            if "pretrain_weights" not in self.options.keys():
+                print("You forgot to provide the pretrained weights!")
+                return 
+            checkpoint = torch.load(self.options["pretrain_weights"], map_location=torch.device(device))
+            model.load_state_dict(checkpoint)
+            print("Pretrained Weights Loaded correctly!")
+
         elif network=="self":
             print("Using current network weights")
         else:
@@ -243,46 +264,39 @@ class Fedem:
 
         loss_function = monai.losses.DiceLoss(sigmoid=True)
 
-        if self.options['modality'] =='cbf':
-            max_intensity = 1200
-        if self.options['modality'] =='cbv':
-            max_intensity = 200
-        if self.options['modality'] =='tmax' or self.options['modality'] =='mtt':
-            max_intensity = 30
-        if self.options['modality'] =='adc':
-            max_intensity = 4000
-
         holder_dicemetric = []
         holder_diceloss = []
         dice_metric.reset()
 
         #### TMP : used to test the best approach to average the output
         dice_metric_augm = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+        dice_metric_augm_no_thres = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
         holder_dicemetric_augm = []
+        holder_dicemetric_augm_no_thres = []
         ### END TMP
 
         ### TMP : for ISLES22 metrics functions
-        use_isles22_metrics=True
+        
         isles_metrics = [[],[],[],[]]
         astral_voxel_size = 1.63*1.63*3
-        ###
+        ###                
 
         #during validation and testing, the batch_data size should be 1, last dimension is number of slice in original volume
         for batch_data in dataset_loader: 
             #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
-            inputs, labels = batch_data['adc']['data'][:,:,:,:].float().to(device),batch_data['label']['data'][:,:,:,:].to(device)
-
+            inputs, labels = batch_data['feature_map']['data'].float().to(device),batch_data['label']['data'].to(device)
 
             if self.options["multi_label"]:
                 #must convert the labels to binary for dice score computation
                 labels = labels > 0
 
-            if self.options["use_test_augm"] and dataset=="test":
+            if self.options["use_test_augm"] and "test" in dataset.lower():
                 #apply the transformation on the entire 3D volume, to avoid transfer between cpu and gpu for each slice
                 #computationnaly faster, might just require more memory but since bact size is equal to 1, should be ok
                 test_time_images = [augm(inputs.clone().cpu()[0,:,:,:,:]).to(device) for augm in self.options["test_time_augm"]]
                 inverse_test_augm = [augm.inverse() for augm in self.options["test_time_augm"]]
                 augm_pred_holder = []
+                augm_pred_holder_no_thres = []
 
             #raw_pred_holder = []
             post_pred_holder = []
@@ -292,7 +306,14 @@ class Fedem:
             if self.options["space_cardinality"]==2:
                 #iterate over all the slices present in the volume
                 for slice_selected in range(inputs.shape[-1]):
-                    out = model(inputs[:,:,:,:,slice_selected])
+                    if "external" in dataset.lower():
+                        #using sliding window for external test because weird dimensions/different voxel spacing
+                        out = sliding_window_inference(inputs=inputs[:,:,:,:,slice_selected],
+                                                        roi_size=self.options['patch_size'][:2], #last dimension is 1, equivalent to squeeze
+                                                        sw_batch_size=3,
+                                                        predictor=model)
+                    else:
+                        out = model(inputs[:,:,:,:,slice_selected])
                     
                     #compute loss between output and label (loss function applies the sigmoid function itself)
                     loss_volume.append(loss_function(input=out,
@@ -310,85 +331,120 @@ class Fedem:
                     post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
 
                     #perform test-time augmentation slice-wise
-                    if self.options["use_test_augm"] and dataset=="test":
+                    if self.options["use_test_augm"] and "test" in dataset.lower():
                         #initialized with the original image output (before/after post_pred routine)
                         augm_preds = [pred] #pred is already on the device
+                        augm_preds_no_thres = [pred] #pred is already on the device
                         for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
-                            augm_out = model(augmented_test_img[None,:,:,:,slice_selected])
+                            augm_out = sliding_window_inference(inputs=inputs[:,:,:,:,slice_selected],
+                                                                roi_size=self.options['patch_size'][:2], #last dimension is 1, equivalent to squeeze
+                                                                sw_batch_size=3,
+                                                                predictor=model)
                             augm_out_inv = inverse_augm(augm_out.detach().cpu()) #happens on cpu
 
                             #would probably be good to manually re-check that the inverse augmentation are well applied
 
                             #apply sigmoid and threshold BEFORE averaging
                             augm_preds.append(self.post_pred(augm_out_inv).to(device))
-                            #tried applying sigmoid and threshold AFTER averaging UNet output but the negative values overcome the positive prior to the sigmoid
+                            #applying ONLY the sigmoid BEFORE averaging
+                            augm_preds_no_thres.append(self.post_sigmoid(augm_out_inv).to(device))
 
+                        ## TEST TIME AUGMENT IS PERFORMED SLICE WISE
                         #average must discretized, using a simple threshold at 0.5
                         avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
                         avg_augm_pred = avg_augm_pred >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
                         avg_augm_pred = avg_augm_pred.int() #convert bool to int
 
+                        #perfom the average over the augmented outputs WITHOUT THRESHOLD (probabilities, output of sigmoid), using agreement threshold to discretise
+                        avg_augm_pred_no_thres = torch.mean(torch.stack(augm_preds_no_thres, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
+                        avg_augm_pred_no_thres = avg_augm_pred_no_thres >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
+                        avg_augm_pred_no_thres = avg_augm_pred_no_thres.int() #convert bool to int
+
                         dice_metric_augm(avg_augm_pred, labels[:,:,:,:,slice_selected])
+                        dice_metric_augm_no_thres(avg_augm_pred_no_thres, labels[:,:,:,:,slice_selected])
 
                         augm_pred_holder.append(avg_augm_pred[0,0,:,:].cpu().numpy())
+                        augm_pred_holder_no_thres.append(avg_augm_pred_no_thres[0,0,:,:].cpu().numpy())
 
+                #stack the 2D prediction into a 3D volume
                 prediction3d = np.stack(post_pred_holder, axis=-1)
-                if self.options["use_test_augm"] and dataset=="test":
+                if self.options["use_test_augm"] and "test" in dataset.lower():
                     avg_augm_pred = np.stack(augm_pred_holder, axis=-1)
+                    avg_augm_pred = avg_augm_pred.squeeze()
+
+                    avg_augm_pred_no_thres = np.stack(augm_pred_holder_no_thres, axis=-1)
+                    avg_augm_pred_no_thres = avg_augm_pred.squeeze()
 
             #3D networks
             elif self.options["space_cardinality"]==3:
-                out = model(inputs[:,:,:,:,slice_selected])
-                    
+                #must use sliding windows over small patches for 3D networks
+                out = sliding_window_inference(inputs=inputs,
+                                                roi_size=self.options['patch_size'],
+                                                sw_batch_size=5,
+                                                predictor=model)
                 #compute loss between output and label (loss function applies the sigmoid function itself)
                 loss_volume.append(loss_function(input=out,
-                                                 target=labels[:,:,:,:,slice_selected]
+                                                    target=labels
                                                 ).item()
                                 )
 
-                #saving the raw output of the network
-                #raw_pred_holder.append(out[0,0,:,:].detach().cpu().numpy())
                 #apply sigmoid then activation threshold to obtain a discrete segmentation mask
                 prediction3d = self.post_pred(out)
                 #compute dice score between the processed prediction and the labels (single slice)
                 dice_metric(prediction3d, labels)
 
                 #perform test-time augmentation
-                if self.options["use_test_augm"] and dataset=="test":
+                if self.options["use_test_augm"] and "test" in dataset.lower():
                     #initialized with the original image output (before/after post_pred routine)
                     augm_preds = [prediction3d] #pred is already on the device
+                    augm_preds_no_thres = [prediction3d]
                     for augmented_test_img, inverse_augm in zip(test_time_images, inverse_test_augm):
-                        augm_out = model(augmented_test_img)
+                        augm_out = sliding_window_inference(inputs=augmented_test_img,
+                                                            roi_size=self.options['patch_size'],
+                                                            sw_batch_size=5,
+                                                            predictor=model)
                         augm_out_inv = inverse_augm(augm_out.detach().cpu()) #happens on cpu
-
-                        #would probably be good to manually re-check that the inverse augmentation are well applied
 
                         #apply sigmoid and threshold BEFORE averaging
                         augm_preds.append(self.post_pred(augm_out_inv).to(device))
-                        #tried applying sigmoid and threshold AFTER averaging UNet output but the negative values overcome the positive prior to the sigmoid
+                        #applying ONLY the sigmoid BEFORE averaging
+                        augm_preds_no_thres.append(self.post_sigmoid(augm_out_inv).to(device))
 
-                    #average must discretized, using a simple threshold at 0.5
+                    #perfom the average over the augmented outputs, using agreement threshold to discretise
                     avg_augm_pred = torch.mean(torch.stack(augm_preds, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
                     avg_augm_pred = avg_augm_pred >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
                     avg_augm_pred = avg_augm_pred.int() #convert bool to int
 
-                    dice_metric_augm(avg_augm_pred, labels)
+                    #perfom the average over the augmented outputs WITHOUT THRESHOLD (probabilities, output of sigmoid), using agreement threshold to discretise
+                    avg_augm_pred_no_thres = torch.mean(torch.stack(augm_preds_no_thres, dim=0), dim=0).to(device) # stack into X, 1, 1, 144, 144, mean into 1, 1, 144, 144
+                    avg_augm_pred_no_thres = avg_augm_pred_no_thres >= self.options["test_augm_threshold"] #threshold for positive labeling after augmentation prediction avg
+                    avg_augm_pred_no_thres = avg_augm_pred_no_thres.int() #convert bool to int
 
-                prediction3d = prediction3d.detach().cpu().numpy()
-                if self.options["use_test_augm"] and dataset=="test":
+                    dice_metric_augm(avg_augm_pred, labels)
+                    dice_metric_augm_no_thres(avg_augm_pred_no_thres, labels)
+                    avg_augm_pred = avg_augm_pred.detach().cpu().numpy().squeeze()
+                    avg_augm_pred_no_thres = avg_augm_pred_no_thres.detach().cpu().numpy().squeeze()
+
+                #should apply the revert transform of toCanonical so that the prediction and the ground truch are in the same space
+                #specially for the leaderboard, where our preprocessing pipeline won't be applied to the ground truth for the test set!
+                prediction3d = prediction3d.detach().cpu().numpy().squeeze()
+                if self.options["use_test_augm"] and "test" in dataset.lower():
                     avg_augm_pred = avg_augm_pred.cpu().numpy()
+                    avg_augm_pred_no_thres = avg_augm_pred.cpu().numpy()
 
             if save_pred:
                 affine = batch_data['label']['affine'][0,:,:].detach().cpu().numpy()
-                filestem = batch_data['label']['stem'][0]
+                filestem = batch_data['label']['stem'][0][0]
                 if self.options["multi_label"]:
                     suffix = "_msk_labeled"
                 else:
                     suffix = "_msk"
                 #nib.save(nib.Nifti1Image(np.stack(raw_pred_holder, axis=-1), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace("_msk", "_raw_segpred_"+benchmark_metric+".nii.gz")))
                 nib.save(nib.Nifti1Image(prediction3d.squeeze(), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_post_segpred_"+benchmark_metric+".nii.gz")))
-                if self.options["use_test_augm"] and dataset=="test":
+                if self.options["use_test_augm"] and "test" in dataset.lower():
                     nib.save(nib.Nifti1Image(avg_augm_pred.squeeze(), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_augm_segpred_"+benchmark_metric+".nii.gz")))
+                del inputs, labels, out, prediction3d
+                gc.collect()
 
             #retain each volume scores (dice loss and dice score)
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
@@ -396,9 +452,11 @@ class Fedem:
             # reset the status for next computation round
             dice_metric.reset()
 
-            if self.options["use_test_augm"] and dataset=="test":
+            if self.options["use_test_augm"] and "test" in dataset.lower():
                 holder_dicemetric_augm.append(dice_metric_augm.aggregate().item())
                 dice_metric_augm.reset()
+                holder_dicemetric_augm_no_thres.append(dice_metric_augm_no_thres.aggregate().item())
+                dice_metric_augm_no_thres.reset()
 
             #call the metrics functions from ISLES22 repo
             if use_isles22_metrics:
@@ -410,31 +468,33 @@ class Fedem:
 
         #print average over all the volumes
         if verbose:
-            print(f"Global (all sites, all slices) {dataset} DICE LOSS :", np.round(np.mean(holder_diceloss),4))
+            print(f"Global (all sites, all slices) {dataset} LOSS :", np.round(np.mean(holder_diceloss),4))
             print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4), "std:", np.round(np.std(holder_dicemetric),4))
-            if self.options["use_test_augm"] and dataset=="test":
+            if self.options["use_test_augm"] and "test" in dataset.lower():
+                print("running test-time augmentation with", len(self.options["test_time_augm"]), "augmentation functions for", dataset.lower(), "set")
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm):", np.round(np.mean(holder_dicemetric_augm),4))
+                print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm no thres):", np.round(np.mean(holder_dicemetric_augm_no_thres),4))
 
-            if use_isles22_metrics and dataset=="test":
+            if use_isles22_metrics and "test" in dataset.lower():
                 print("ISLES22 metrics")
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(isles_metrics[0]),4), "std:", np.round(np.std(isles_metrics[0]),4))
                 print(f"Global (all sites, all slices) {dataset} ABS VOLUME DIFF :", np.round(np.mean(isles_metrics[1]),4))
                 print(f"Global (all sites, all slices) {dataset} ABS LESION DIFF :", np.round(np.mean(isles_metrics[2]),4))
                 print(f"Global (all sites, all slices) {dataset} LESION F1 :", np.round(np.mean(isles_metrics[3]),4))
 
-        return np.mean(holder_dicemetric), np.std(holder_dicemetric)
+        return np.round(np.mean(holder_dicemetric), 4), np.round(np.std(holder_dicemetric),4)
 
     def load_inputs(self, batch_data):
         if self.options["use_torchio"]:
             #2D Net, potentially multi-channel
             if self.options["space_cardinality"]==2:
                 #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                return batch_data['adc']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                return batch_data['feature_map']['data'][:,:,:,:,0].float().to(device), batch_data['label']['data'][:,:,:,:,0].to(device)
             #3D Net, potentially multi-channel
             elif self.options["space_cardinality"]==3:
-                return batch_data['adc']['data'][:,:,:,:,:].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                return batch_data['feature_map']['data'].float().to(device), batch_data['label']['data'].to(device)
         else:
-            return batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+            return batch_data[0][:,:,:,:,0].float().to(device), batch_data[1][:,:,:,:,0].to(device)
 
 class FedAvg(Fedem):
     def __init__(self, options):
@@ -869,7 +929,7 @@ class Centralized(Fedem):
 
             #Evaluation on validation and saving model if needed, on full volume
             if (cur_epoch + 1) % self.options['val_interval'] == 0:
-                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False)
+                epoch_valid_dice_score, epoch_valid_dice_loss = self.full_volume_metric(dataset="valid", network="self", save_pred=False, use_isles22_metrics=self.options['use_isles22_metrics'])
 
                 #using dice score to save best model
                 if epoch_valid_dice_score > best_metric:

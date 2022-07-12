@@ -1,5 +1,5 @@
 from framework import Scaffold, FedAvg, FedRod, Fedem, Centralized
-from preprocessing import dataPreprocessing, check_dataset
+from preprocessing import get_train_valid_test_partitions, check_dataset
 from numpy import std, mean
 import numpy as np
 
@@ -13,15 +13,24 @@ def check_config(config):
     #TODO: verify more parameters
 
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
-                  additional_modalities= [], multi_label=False,
+                  additional_modalities= [], additional_labels=False, multi_label=False,
                   clients=[], size_crop=100, folder_struct="site_nested", train=True):
 
     print("Experiment using the ", datapath, "dataset")
     tmp_test = []
     tmp_valid = []
+    tmp_external = []
 
     #fetch the files paths, create the data loading/augmentation routines
-    partitions_paths, partitions_paths_add_mod = dataPreprocessing(datapath, modality, clients, additional_modalities, folder_struct, multi_label)
+    centers_partitions, \
+    partitions_paths_add_mod, partitions_paths_add_lbl, \
+    external_test, external_test_add_mod = get_train_valid_test_partitions(path=datapath,
+                                                                           modality=modality,
+                                                                           clients=clients,
+                                                                           folder_struct=folder_struct,
+                                                                           multi_label=multi_label,
+                                                                           additional_modalities=additional_modalities,
+                                                                           additional_labels=additional_labels)
 
     if len(clients)<1:
         print("Must have at least one client")
@@ -30,6 +39,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     for i, conf in enumerate(networks_config):
         test_dicemetric = []
         valid_dicemetric = []
+        external_dicemetric = []
 
         #verify that the config parameters are coherent
         check_config(conf)
@@ -38,8 +48,11 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             print(f"{networks_name[i]} iteration {rep+1}")
             print(conf)
             
-            conf["partitions_paths"]=partitions_paths
+            conf["partitions_paths"]=centers_partitions
             conf["partitions_paths_add_mod"]=partitions_paths_add_mod
+            conf["partitions_paths_add_lbl"]=partitions_paths_add_lbl
+            conf["external_test"]=external_test
+            conf["external_test_add_mod"]=external_test_add_mod
                 
             #add number to differentiate replicates
             if exp_name!=None:
@@ -67,17 +80,24 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             # compute validation and test dice loss/score using full volume (instead of slice-wise) and the best possible model
             valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best", save_pred=False))
             test_dicemetric.append(network.full_volume_metric(dataset="test", network="best", save_pred=True))
+            if len(external_test)>0:
+                external_dicemetric.append(network.full_volume_metric(dataset="external_test", network="best", save_pred=False))
+            #network="best" is redundant, we are reloading the same network for validation, test and external validation
 
         tmp_valid.append(valid_dicemetric)
         tmp_test.append(test_dicemetric)
+        if len(external_test)>0:
+            tmp_external.append(external_dicemetric)
+        else:
+            tmp_external.append(None)
 
     print("*** Summary for the experiment metrics ***")
-
     #average over the repetition of the same network
-    for k, (valid_metrics, test_metrics) in enumerate(zip(tmp_valid, tmp_test)):
-        print(f"{networks_name[k]} valid avg dice: {mean([tmp[0] for tmp in valid_metrics])} ({[tmp[0] for tmp in valid_metrics]}, std: {[tmp[1] for tmp in valid_metrics]}) global std: {std(valid_metrics)}")
-        print(f"{networks_name[k]} test avg dice: {mean([tmp[0] for tmp in test_metrics])} ({[tmp[0] for tmp in test_metrics]}, std: {[tmp[1] for tmp in test_metrics]}) global std: {std(test_metrics)}")
-
+    for k, (valid_metrics, test_metrics, external_metrics) in enumerate(zip(tmp_valid, tmp_test, tmp_external)):
+        print(f"{networks_name[k]} valid avg dice: {mean([tmp[0] for tmp in valid_metrics])} ({[tmp[0] for tmp in valid_metrics]}, std: {[tmp[1] for tmp in valid_metrics]}) global std: {np.round(std(valid_metrics),4)}")
+        print(f"{networks_name[k]} test avg dice: {mean([tmp[0] for tmp in test_metrics])} ({[tmp[0] for tmp in test_metrics]}, std: {[tmp[1] for tmp in test_metrics]}) global std: {np.round(std(test_metrics),4)}")
+        if len(external_test)>0:
+            print(f"{networks_name[k]} external avg dice: {mean([tmp[0] for tmp in external_metrics])} ({[tmp[0] for tmp in external_metrics]}, std: {[tmp[1] for tmp in external_metrics]}) global std: {np.round(std(external_metrics),4)}")
     return tmp_valid, tmp_test
 
 if __name__ == '__main__':

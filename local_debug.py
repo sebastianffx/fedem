@@ -8,10 +8,10 @@ from experiment import runExperiment
 import warnings
 
 if __name__ == '__main__':
-    path, clients, folder_struct = 'debug_dataset/', ["center1", "center2"], "site_simple"
-    #path, clients, folder_struct = '../../../../../downloads/dataset_ISLES22_rel1/', ["center1"], "OTHER"
+    #path, clients, folder_struct = 'debug_dataset/', ["center1", "center2"], "site_simple"
+    path, clients, folder_struct = '../../../../../../../../../media/jonathan/DATA_SSD/dataset-ISLES22_public_unzipped_version/', ["center1"], "OTHER"
 
-    experience_name = "debug" 
+    experience_name = "debug_only_adc" 
     modality="ADC"
 
     number_site=len(clients)
@@ -25,21 +25,24 @@ if __name__ == '__main__':
                 "kernel_size":(3,3),
                 "num_res_units":2}
 
+
+
+
     default = {#federation parameters
-               "g_epoch":2,
-               "l_epoch":2,
+               "g_epoch":200,
+               "l_epoch":1,
                "g_lr":0.001,
                "l_lr":0.001,
                "K":len(clients),
                "clients":clients,
                #network parameters
-               "nn_class":"unet",
+               "nn_class":"unet", ## swin_unetr, unetr
                "nn_params":nn_params,
                "loss_fun":"dicelossCE", #"blob_dicelossCE", #"dicelossCE", #diceloss_CE
                "hybrid_loss_weights":[1.4,0.6],
                "suffix":"exp5",
                #training parameters
-               "val_interval":2,
+               "val_interval":1,
                "modality":modality.lower(),
                "space_cardinality":2, #or 3, depending if you have a 2D or 3D network
                "batch_size":2,
@@ -52,7 +55,7 @@ if __name__ == '__main__':
                "padding":(32,32,0), #typically half the dimensions of the patch_size
                "max_queue_length":16,
                "patches_per_volume":4,
-               "no_deformation":True,
+               "no_deformation":True, # Re used for the pre processing
                "additional_modalities": [[]], #[[],[],[]] #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
                #test time augmentation
                "use_test_augm":False,
@@ -60,7 +63,23 @@ if __name__ == '__main__':
                }
 
     if "isle" in path.lower():
-        default["additional_modalities"] = [["adc"]] #the adc maps will be used in addition to the dwi (default)
+
+        # 3D Unet, used for all Antoine's experiments
+        default["padding"]    = (32,32,16)
+        default["patch_size"] = (64,64,32)
+        default["space_cardinality"] = 3
+        nn_params= {"img_size":default["patch_size"],
+                    "in_channels":1,
+                    "out_channels":1,
+                    "feature_size":48}
+
+
+        default["nn_params"] = nn_params
+        default["nn_class"]  = "swin_unetr"
+        default["additional_modalities"] = [[]] # "adc" the adc maps will be used in addition to the dwi (default) to add "flair"
+        default["no_deformation"] = 'isles'
+        
+
     else:
         default["additional_modalities"] = [[] for i in range(number_site)]
 
