@@ -57,6 +57,7 @@ class Fedem:
                                                                      patches_per_volume=self.options["patches_per_volume"],
                                                                      no_deformation=self.options["no_deformation"],
                                                                      partitions_paths_add_mod=self.options["partitions_paths_add_mod"],
+                                                                     partitions_paths_add_lbl=self.options["partitions_paths_add_lbl"],
                                                                      external_test=self.options["external_test"],
                                                                      external_test_add_mod=self.options["external_test_add_mod"])
 
@@ -433,7 +434,7 @@ class Fedem:
 
             if save_pred:
                 affine = batch_data['label']['affine'][0,:,:].detach().cpu().numpy()
-                filestem = batch_data['label']['stem'][0]
+                filestem = batch_data['label']['stem'][0][0]
                 if self.options["multi_label"]:
                     suffix = "_msk_labeled"
                 else:
@@ -488,12 +489,12 @@ class Fedem:
             #2D Net, potentially multi-channel
             if self.options["space_cardinality"]==2:
                 #inputs, labels = batch_data[self.options['modality']]['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
-                return batch_data['feature_map']['data'][:,:,:,:,0].to(device),batch_data['label']['data'][:,:,:,:,0].to(device)
+                return batch_data['feature_map']['data'][:,:,:,:,0].float().to(device), batch_data['label']['data'][:,:,:,:,0].to(device)
             #3D Net, potentially multi-channel
             elif self.options["space_cardinality"]==3:
-                return batch_data['feature_map']['data'].to(device),batch_data['label']['data'].to(device)
+                return batch_data['feature_map']['data'].float().to(device), batch_data['label']['data'].to(device)
         else:
-            return batch_data[0][:,:,:,:,0].to(device), batch_data[1][:,:,:,:,0].to(device)
+            return batch_data[0][:,:,:,:,0].float().to(device), batch_data[1][:,:,:,:,0].to(device)
 
 class FedAvg(Fedem):
     def __init__(self, options):
