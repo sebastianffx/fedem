@@ -169,7 +169,7 @@ if __name__ == '__main__':
                "max_queue_length":16,
                "patches_per_volume":4,
                "no_deformation":False,
-               "additional_modalities": [[],[],[]] #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
+               "additional_modalities": [[],[],[]], #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
                #test time augmentation
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
