@@ -31,9 +31,6 @@ def get_train_valid_test_partitions(path, modality, clients, folder_struct="site
        Handle two dataset folder herarchy, nested (one folder per subject) or not (all subjects volume are in a single folder)
     """
     centers_partitions_add_mod = []
-    centers_partitions_add_lbl = [[[],[],[]] for i in range(len(clients))]
-    external_test = []
-    external_test_add_mod = []
     #original implementation, does not support mutly modality or multi label masks
     if folder_struct=="site_nested":
         centers_partitions = partition_multisite_nested(path, modality, clients)
