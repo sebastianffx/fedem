@@ -1,5 +1,5 @@
 from framework import Scaffold, FedAvg, FedRod, Fedem, Centralized
-from preprocessing import dataPreprocessing, check_dataset
+from preprocessing import get_train_valid_test_partitions, check_dataset
 from numpy import std, mean
 import numpy as np
 
@@ -22,8 +22,7 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     tmp_external = []
 
     #fetch the files paths, create the data loading/augmentation routines
-    partitions_paths, partitions_paths_add_mod, external_test, external_test_add_mod = dataPreprocessing(datapath, modality, clients, additional_modalities, folder_struct, multi_label)
-
+    partitions_paths, partitions_paths_add_mod, external_test, external_test_add_mod = get_train_valid_test_partitions(datapath, modality, clients, folder_struct, multi_label, additional_modalities)
     if len(clients)<1:
         print("Must have at least one client")
         return None, None

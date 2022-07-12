@@ -26,10 +26,6 @@ from monai.transforms import (
 
 from debug_util import get_same_res_paths
 
-def dataPreprocessing(path, modality, clients, additional_modalities=[], folder_struct="site_nested", multi_label=False):
-
-    return get_train_valid_test_partitions(path, modality, clients, folder_struct, multi_label, additional_modalities)
-
 def get_train_valid_test_partitions(path, modality, clients, folder_struct="site_nested", multi_label=False, additional_modalities=[]):
     """Retrieve paths to the modality map and the corresponding labels.
        Handle two dataset folder herarchy, nested (one folder per subject) or not (all subjects volume are in a single folder)
