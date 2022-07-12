@@ -130,7 +130,7 @@ if __name__ == '__main__':
 
     #regular 2D Unet, used for all Antoine's experiments
     nn_params= {"spatial_dims":2,
-                "in_channes":1,
+                "in_channels":1,
                 "out_channels":1,
                 "channels":(16, 32, 64, 128),
                 "strides":(2, 2, 2),
@@ -169,6 +169,7 @@ if __name__ == '__main__':
                #test time augmentation
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
+               "use_isles22_metrics":True #compute isles22 metrics during validation
                }
 
     #only used when using blob loss, labels are used to identify the blob
