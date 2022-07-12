@@ -20,25 +20,32 @@ def crop2seg(path, r_low, r_high):
     img = img.get_fdata()[:,:,r_low:r_high]
     nb.save(nb.Nifti1Image(img, img_affine), path.replace("adc.", "msk."))
 
-def replace_masks(path_to_dataset, path_mask_archive):
+def replace_masks(path_to_dataset, path_mask_archive, origin_mask, target_mask=None, sites_subset=[]):
     """ Replace one dataset mask with new masks, using the name of the subject
     """
     #TODO: also copy the labels with component labeling, could be useful for the blob loss
 
     count_missing = 0
-    for center in os.listdir(path_to_dataset):
+    if target_mask==None:
+        target_mask=origin_askm
+    if sites_subset==[]:
+        centers=os.listdir(path_to_dataset)
+    else:
+        centers=sites_subset
+
+    for center in centers:
         print("processing", str(center))
         for split in ["train", "valid", "test"]:
             #extract te subjects using the adc file
             split_subjects = [f for f in os.listdir(os.path.join(path_to_dataset, center, split)) if "adc." in f]
             for subject in split_subjects:
-                source_file = os.path.join(path_mask_archive, subject.replace("_adc.", "_ANTS_HDBET_FAST_smooth_concomp_defuseSeg."))
+                source_file = os.path.join(path_mask_archive, subject.replace("_adc.", "_"+origin_mask+"."))
                 if os.path.exists(source_file):
                     #overwrite the existing mask with the new mask
                     new_mask = nb.load(source_file)
                     affine = new_mask.affine
                     new_mask = new_mask.get_fdata()[2:146, 2:146, -42:]#same redim as applied to the adc and orginal mask
-                    nb.save(nb.Nifti1Image(new_mask, affine), os.path.join(path_to_dataset, center, split, subject.replace("_adc.","_msk.")))
+                    nb.save(nb.Nifti1Image(new_mask, affine), os.path.join(path_to_dataset, center, split, subject.replace("_adc.","_"+target_mask+".")))
                     """
                     shutil.copy(source_file,
                                 os.path.join(path_to_dataset, center, split, subject))
@@ -49,18 +56,35 @@ def replace_masks(path_to_dataset, path_mask_archive):
 
     print(count_missing, "subjects could not have updates with the new labels")
 
-def adding_modalities(path_to_dataset, path_to_modality, name_modality):
+def adding_modalities(path_to_dataset, path_to_modality, origin_modality, target_modality=None, nested=True, sites_subset=[]):
     """ Replace one dataset mask with new masks, using the name of the subject
     """
     count_missing = 0
-    for center in os.listdir(path_to_dataset):
+    if target_modality==None:
+        target_modality=origin_modality
+    if sites_subset==[]:
+        centers=os.listdir(path_to_dataset)
+    else:
+        centers=sites_subset
+
+    for center in centers:
         print("processing", str(center))
         for split in ["train", "valid", "test"]:
             #extract the subjects using the mask file
             split_subjects = [f for f in os.listdir(os.path.join(path_to_dataset, center, split)) if "msk." in f]
             for subject in split_subjects:
-                shutil.copy(os.path.join(path_to_modality, center, split, subject.replace("msk.","adc.")),
-                            os.path.join(path_to_dataset, center, split, subject.replace("msk.", name_modality+".")))
+                if nested:
+                    shutil.copy(os.path.join(path_to_modality, center, split, subject.replace("msk.", origin_modality+".")),
+                                os.path.join(path_to_dataset, center, split, subject.replace("msk.", target_modality+".")))
+                else:
+                    new_vol = nb.load(os.path.join(path_to_modality, subject.replace("msk.", origin_modality+".")))
+                    affine = new_vol.affine
+                    new_vol = new_vol.get_fdata()[2:146, 2:146, -42:]#same redim as applied to the adc and orginal mask
+                    nb.save(nb.Nifti1Image(new_vol, affine), os.path.join(path_to_dataset, center, split, subject.replace("msk.", target_modality+".")))
+                    """
+                    shutil.copy(os.path.join(path_to_modality, subject.replace("msk.", origin_modality+".")),
+                                os.path.join(path_to_dataset, center, split, subject.replace("msk.", target_modality+".")))
+                    """
 
     print(count_missing, "subjects could not have updates with the new labels")
 

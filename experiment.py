@@ -108,9 +108,12 @@ if __name__ == '__main__':
     #path = 'astral_fedem_dti_newlabels/'
     #path = 'astral_fedem_dti_noempty_newlabels/'
     #path = 'astral_fedem_4dir_1/'
-    path = 'astral_fedem_20dir/'
+    #path = 'astral_fedem_20dir/'
     #path = 'astral_fedem_multiadc_newlabels/'
     #path = 'astral_fedem_ABC/'
+    #path = 'astral_fedem_ABC_harmonized/'
+    path = 'astral_fedem_ABC_propermask/'
+    #path = 'astral_fedem_ABC_harmonized_propermask/'
 
     #experience_name = "astral_no_empty_mask"
     #experience_name = "no_empty_torchio_DLCE"
@@ -118,14 +121,15 @@ if __name__ == '__main__':
     #experience_name = "no_empty_DLCE_multiadc_transfo"
     #experience_name = "singlesite1_transfo"
     #experience_name = "singlesite2_no_transfo_blobloss"
-    experience_name = "allsite_transfo_v2"
-    #experience_name = "singlerep_siteB"
+    #experience_name = "allsite_transfo_v1"
+    experience_name = "multirep_siteB_propermaskv2"
+    #experience_name = "singlerep_siteB_harmonized_propermask"
     
     modality="ADC"
     #modality="20dir"
 
-    #clients=["center1", "center2", "center3"]
-    clients=["center1"]
+    clients=["center1", "center2", "center3"]
+    #clients=["center1"]
     number_site=len(clients)
 
     #regular 2D Unet, used for all Antoine's experiments
@@ -165,7 +169,7 @@ if __name__ == '__main__':
                "max_queue_length":16,
                "patches_per_volume":4,
                "no_deformation":False,
-               "additional_modalities": [[]], #[[],[],[]] #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
+               "additional_modalities": [[],[],[]] #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
                #test time augmentation
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
@@ -194,7 +198,6 @@ if __name__ == '__main__':
     #for lr in [0.00994]:
          
     for lr in [0.00994, 0.0116]:
-    
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
@@ -203,11 +206,14 @@ if __name__ == '__main__':
         #networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
     """
     #for g_lr, l_lr in zip([0.01, 0.001, 0.0001], [0.001]*3):
-    for g_lr, l_lr in zip([0.001, 0.0001], [0.001]*2):
-        tmp = default.copy()
-        tmp.update({"weighting_scheme":"FEDAVG", "l_lr":l_lr, "g_lr":g_lr})
-        networks_config.append(tmp)
-        networks_name.append(f"{experience_name}_FEDAVG_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
+    for g_lr in [0.001, 0.0005, 0.0001]:
+        for l_lr in [0.01, 0.001, 0.0001]:
+            tmp = default.copy()
+            #tmp.update({"fedrod":True, "l_lr":l_lr, "g_lr":g_lr})
+            #tmp.update({"weighting_scheme":"BETA", "l_lr":l_lr, "g_lr":g_lr, "beta_val":0.9})
+            tmp.update({"weighting_scheme":"FEDAVG", "l_lr":l_lr, "g_lr":g_lr})
+            networks_config.append(tmp)
+            networks_name.append(f"{experience_name}_FEDAVG_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
     """    
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
