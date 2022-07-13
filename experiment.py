@@ -51,8 +51,11 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             conf["partitions_paths"]=centers_partitions
             conf["partitions_paths_add_mod"]=partitions_paths_add_mod
             conf["partitions_paths_add_lbl"]=partitions_paths_add_lbl
-            conf["external_test"]=external_test
+            external_test = []
+            external_test_add_mod = []
+            conf["external_test"]= external_test 
             conf["external_test_add_mod"]=external_test_add_mod
+
                 
             #add number to differentiate replicates
             if exp_name!=None:

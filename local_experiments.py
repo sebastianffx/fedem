@@ -9,7 +9,7 @@ if __name__ == '__main__':
     #path, clients, folder_struct = 'debug_dataset/', ["center1", "center2"], "site_simple"
     path, clients, folder_struct = '../../../../../../../../../media/jonathan/DATA_SSD/dataset-ISLES22_public_unzipped_version/', ["center1"], "OTHER"
 
-    experience_name = "debug_only_dwi_pretarined_weights" 
+    experience_name = "dwi_pretarined_weights_data_augm" 
     modality="ADC"
 
     number_site=len(clients)
@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
 
     default = {#federation parameters
-               "g_epoch":2,
+               "g_epoch":200,
                "l_epoch":1,
                "g_lr":0.001,
                "l_lr":0.001,
@@ -38,7 +38,7 @@ if __name__ == '__main__':
                "hybrid_loss_weights":[1.4,0.6],
                "suffix":"exp5",
                #training parameters
-               "val_interval":1,
+               "val_interval":3,
                "modality":modality.lower(),
                "space_cardinality":2, #or 3, depending if you have a 2D or 3D network
                "batch_size":2,
@@ -51,7 +51,7 @@ if __name__ == '__main__':
                "padding":(32,32,0), #typically half the dimensions of the patch_size
                "max_queue_length":16,
                "patches_per_volume":4,
-               "no_deformation":True, # Re used for the pre processing
+               "no_deformation":False, # Re used for the pre processing
                "additional_modalities": [[]], #[[],[],[]] #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
                #test time augmentation
                "use_test_augm":False,
@@ -104,26 +104,7 @@ if __name__ == '__main__':
             tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
             networks_config.append(tmp)
             networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
-            #legacy network naming, no lambdas (valid for v1 to v4)
-            #networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
 
-    fedrod = default.copy()
-    fedrod.update({"fedrod":True})
-
-    scaff = default.copy()
-    scaff.update({"scaff":True})
-
-    fedavg = default.copy()
-    fedavg.update({"weighting_scheme":"FEDAVG"})
-
-    fedbeta = default.copy()
-    fedbeta.update({"weighting_scheme":"BETA",
-                    "beta_val":0.9})
-
-    #networks_name = ["CENTRALIZED", "FEDROD", "SCAFFOLD", "FEDAVG", "FEDBETA"]
-    #networks_config = [centralized, fedrod, scaff, fedavg, fedbeta]
-
-     
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
                                                 networks_config=networks_config,
