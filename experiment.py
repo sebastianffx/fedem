@@ -120,10 +120,11 @@ if __name__ == '__main__':
     #experience_name = "no_empty_tio_DLCE_newlabels" 
     #experience_name = "no_empty_DLCE_multiadc_transfo"
     #experience_name = "singlesite1_transfo"
-    #experience_name = "singlesite2_no_transfo_blobloss"
+    #experience_name = "all20dir_deformation"
     #experience_name = "allsite_transfo_v1"
-    experience_name = "multirep_siteB_propermaskv2"
+    #experience_name = "ABC_propermask_deformation"
     #experience_name = "singlerep_siteB_harmonized_propermask"
+    experience_name = "multirep_siteB_propermask"
     
     modality="ADC"
     #modality="20dir"
@@ -134,7 +135,7 @@ if __name__ == '__main__':
 
     #regular 2D Unet, used for all Antoine's experiments
     nn_params= {"spatial_dims":2,
-                "in_channes":1,
+                "in_channels":1,
                 "out_channels":1,
                 "channels":(16, 32, 64, 128),
                 "strides":(2, 2, 2),
@@ -169,10 +170,11 @@ if __name__ == '__main__':
                "max_queue_length":16,
                "patches_per_volume":4,
                "no_deformation":False,
-               "additional_modalities": [[],[],[]] #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
+               "additional_modalities": [[],["4dir_1", "4dir_2"],[]], #list the extension of each additionnal modality you want to use for each site
                #test time augmentation
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
+               "use_isles22_metrics":True
                }
 
     #only used when using blob loss, labels are used to identify the blob
@@ -243,4 +245,5 @@ if __name__ == '__main__':
                                                 folder_struct="site_simple",
                                                 train=True,
                                                 additional_modalities=default["additional_modalities"],
+                                                additional_labels=True,
                                                 multi_label=default["multi_label"]) 

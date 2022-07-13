@@ -49,7 +49,13 @@ def get_train_valid_test_partitions(path, modality, clients, folder_struct="site
         if len(centers_partitions_add_mod)==0:
             centers_partitions_add_mod = add_modalities(path, additional_modalities, clients)
             if additional_labels:
-                centers_partitions_add_lbl = add_modalities(path, [add_mod+"_mask" for add_mod in additional_modalities], clients)
+                add_labels = []
+                for site in additional_modalities:
+                    if len(site)==0:
+                        add_labels.append([])
+                    else:
+                        add_labels.append([add_mod+"_mask" for add_mod in site])
+                centers_partitions_add_lbl = add_modalities(path, add_labels, clients)
     else:
         centers_partitions_add_mod = [[[],[],[]] for i in range(len(clients))]
 
@@ -433,6 +439,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
     if no_deformation:
         #still require padding for the label based patches creation
         transform = tio.Compose([select_channel, clamp, toCanon, resample, rescale, padding])
+        print("no transfo")
         return transform, transform_valid
     #more transformation: affine, rotation, elastic deformation and planar symmetry
     else:
@@ -442,6 +449,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
 
         #removed the random affine and elastic deformation
         transform = tio.Compose([select_channel, clamp, toCanon, resample, rescale, flipping, rotation, padding])
+        print("transfo")
         return transform, transform_valid
 
 def isles22_torchio_create_transform(padding, patch_size, no_deformation):
@@ -631,7 +639,10 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                                )
             #additionnal modalities are used as separate subject, with their own truth map when available
             if len(partitions_paths_add_mod[i][0]) > 0:
+                print("adding training subject based on the additionnal modalities")
                 for additional_modality, additional_labels in zip(partitions_paths_add_mod[i][0],partitions_paths_add_lbl[i][0]):
+                    print(len(additional_modality))
+                    print(len(additional_labels))
                     site_train_subjects += torchio_get_loader_partition(additional_modality, #volume
                                                                         additional_labels, #labels
                                                                         )
@@ -656,7 +667,7 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                                        additional_labels, #labels
                                                                        )
             """
-        
+        print("site "+str(i), len(site_train_subjects))
         allsites_train_subjects+= site_train_subjects
         allsites_valid_subjects+= site_valid_subjects
         allsites_test_subjects += site_test_subjects
@@ -686,6 +697,7 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                                  ),
                                     ])
 
+    print(len(allsites_train_subjects))
     #aggreate for centralized model and validation/testing across sites
     all_train_subjects = tio.SubjectsDataset(allsites_train_subjects,
                                              transform=transform)
