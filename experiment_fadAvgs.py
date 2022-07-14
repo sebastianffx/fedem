@@ -22,7 +22,6 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     tmp_test = []
     tmp_valid = []
     tmp_external = []
-
     #fetch the files paths, create the data loading/augmentation routines
     centers_partitions, \
     partitions_paths_add_mod, partitions_paths_add_lbl, \
@@ -69,17 +68,22 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             if exp_name!=None:
                 conf["suffix"]="_"+exp_name+"_"
             if "scaff" in conf.keys() and conf["scaff"]:
+                conf['summary_writer_name']= (f"runs/scaffold_llr{conf['l_lr']}_glr{conf['g_lr']}_le{conf['l_epoch']}_ge{conf['g_epoch']}_{conf['K']}sites_{conf['network_name']}_{conf['suffix']}_{rep}")
                 network = Scaffold(conf)
             elif "fedrod" in conf.keys() and conf["fedrod"]:
+                conf['summary_writer_name']= (f"runs/fedrod_llr{conf['l_lr']}_glr{conf['g_lr']}_le{conf['l_epoch']}_ge{conf['g_epoch']}_{conf['K']}sites__{conf['network_name']}_{conf['suffix']}_{rep}")
                 network = FedRod(conf)
             elif 'weighting_scheme' in conf.keys():
+                conf['summary_writer_name']= (f"runs/{conf['weighting_scheme']}_llr{conf['l_lr']}_glr{conf['g_lr']}_le{conf['l_epoch']}_ge{conf['g_epoch']}_{conf['K']}sites_{conf['network_name']}_{conf['suffix']}_{rep}")
                 network = FedAvg(conf)
             elif "centralized" in conf.keys() and conf["centralized"]:
+                conf['summary_writer_name']= (f"runs/central_llr{conf['l_lr']}_glr{conf['g_lr']}_le{conf['l_epoch']}_ge{conf['g_epoch']}_{conf['K']}sites_{conf['network_name']}_{conf['suffix']}_{rep}")
                 network = Centralized(conf)
             else:
                 print("missing argument for network type")
-
+            #updating the summary writer name 
             if train:
+                print("Writing tensorboard log to: "+conf['summary_writer_name'])
                 #train the network, each batch contain one ranodm slice for each subject
                 network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'], early_stop_limit=conf['early_stop_limit'])
 
@@ -118,7 +122,7 @@ if __name__ == '__main__':
     #path = 'astral_fedem_multiadc_newlabels/'
     #path = 'astral_fedem_ABC/'
     #path = 'astral_fedem_ABC_harmonized/'
-    path = '../../../../../../../../../../../home/diffusion/Desktop/isles_centers/'
+    path = '/Users/sebastianotalora/work/postdoc/data/ISLES/federated/'
     #path = 'astral_fedem_ABC_harmonized_propermask/'
 
     #experience_name = "astral_no_empty_mask"
@@ -128,10 +132,10 @@ if __name__ == '__main__':
     #experience_name = "singlesite1_transfo"
     #experience_name = "singlesite2_no_transfo_blobloss"
     #experience_name = "allsite_transfo_v1"
-    experience_name = "ISLES_Brainless_paper"
+    experience_name = "BETA"
     #experience_name = "singlerep_siteB_harmonized_propermask"
     
-    modality="Tmax"
+    modality="CBV"
     #modality="20dir"
 
     clients=["center1", "center2", "center4"]
@@ -160,7 +164,7 @@ if __name__ == '__main__':
                "nn_params":nn_params,
                "loss_fun":"dicelossCE", #"blob_dicelossCE", #"dicelossCE", #diceloss_CE
                "hybrid_loss_weights":[1.999,0.0001],
-               "suffix":"exp5",
+               "suffix":"CBV",
                #training parameters
                "val_interval":2,
                "modality":modality,
@@ -180,8 +184,9 @@ if __name__ == '__main__':
                #test time augmentation
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
-               "use_isles22_metrics":False #compute isles22 metrics during validation
-               }
+               "use_isles22_metrics":False, #compute isles22 metrics during validation
+               "weighting_scheme": "BETA",
+               "beta_val": 0.99}
 
     #thres_lesion_vol indicate the minimum number of 1 label in the mask required to avoid elimination from the dataset
     #check_dataset(path, number_site, dim=(144,144,42), delete=True, thres_neg_val=-1e-6, thres_lesion_vol=5)
@@ -211,14 +216,15 @@ if __name__ == '__main__':
         dt = datetime.now()
         ts = datetime.timestamp(dt)
         # getting the timestamp
-        tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
+        tmp.update({"centralized":False, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
-        networks_name.append(f"{ts}_{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
+        networks_name.append(f"{ts}_{experience_name}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
         #legacy network naming, no lambdas (valid for v1 to v4)
-
+            
+   
 
     valid_metrics, test_metrics = runExperiment(datapath=path,
-                                                num_repetitions=1,
+                                                num_repetitions=4,
                                                 networks_config=networks_config,
                                                 networks_name=networks_name,
                                                 exp_name=experience_name,
