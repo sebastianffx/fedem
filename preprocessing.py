@@ -387,15 +387,13 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
     print("using generic preprocessing transformations")
     clamp = tio.Clamp(out_min=clamp_min, out_max=clamp_max)
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
-    rotation = tio.OneOf({
-                    tio.Affine(scales=1, degrees=(90,0,0), translation=0): 0.125,
-                    tio.Affine(scales=1, degrees=(0,90,0), translation=0): 0.125,
-                    tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.125,
-                    tio.Affine(scales=1, degrees=(180,0,0), translation=0): 0.125,
-                    tio.Affine(scales=1, degrees=(0,180,0), translation=0): 0.125,
-                    tio.Affine(scales=1, degrees=(0,0,180), translation=0): 0.125,
-                    tio.Affine(scales=1.2, degrees=(0,0,0), translation=0): 0.125,
-                    tio.Affine(scales=0.8, degrees=(0,0,0), translation=0): 0.125,
+    #rotation on the 3rd axis in Canonical view correspond to z axis; axial view is preserved!
+    affine = tio.OneOf({
+                    tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.2,
+                    tio.Affine(scales=1, degrees=(0,0,180), translation=0): 0.2,
+                    tio.Affine(scales=1, degrees=(0,0,270), translation=0): 0.2,
+                    tio.Affine(scales=1.2, degrees=(0,0,0), translation=0): 0.2,
+                    tio.Affine(scales=0.8, degrees=(0,0,0), translation=0): 0.2,
             },
             p=0.5,
         )
@@ -428,11 +426,11 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
     select_channel = tio.Lambda(sample_channel, types_to_apply=None) #None == applied to both tio.INTENSITY and tio.LABEL
 
     #normalization only, no spatial transformation or data augmentation
-    transform_valid = tio.Compose([select_channel, clamp, toCanon, resample, rescale])
+    transform_valid = tio.Compose([select_channel, toCanon, resample, clamp, rescale])
     #just regular campling and normalization
     if no_deformation:
         #still require padding for the label based patches creation
-        transform = tio.Compose([select_channel, clamp, toCanon, resample, rescale, padding])
+        transform = tio.Compose([select_channel, toCanon, resample, clamp, rescale, padding])
         print("no deformation, only scaling and padding")
         return transform, transform_valid
     #more transformation: affine, rotation, elastic deformation and planar symmetry
@@ -442,7 +440,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
         #transform = tio.Compose([select_channel, clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation])
 
         #removed the random affine and elastic deformation
-        transform = tio.Compose([select_channel, clamp, toCanon, resample, rescale, flipping, rotation, padding])
+        transform = tio.Compose([select_channel, toCanon, resample, flipping, rotation, clamp, rescale, padding])
         print("flipping and rotation in addition to scaling and padding")
         return transform, transform_valid
 
