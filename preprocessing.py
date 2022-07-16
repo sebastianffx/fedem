@@ -454,21 +454,42 @@ def isles22_torchio_create_transform(padding, patch_size, no_deformation):
     print("using isles custom preprocessing transformations")
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
 
+    # rotation = tio.OneOf({
+    #                 tio.Affine(scales=1, degrees=(90,0,0), translation=0): 0.2,
+    #                 tio.Affine(scales=1, degrees=(0,90,0), translation=0): 0.2,
+    #                 tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.2,
+    #                 tio.Affine(scales=1, degrees=(180,0,0), translation=0): 0.2,
+    #                 tio.Affine(scales=1, degrees=(0,180,0), translation=0): 0.2,
+    #         },
+    #         p=0.5,
+    #     )
+    # flipping = tio.OneOf({
+    #                 tio.Flip(axes="R"): 0.5, #¶ight flipping
+    #                 tio.Flip(axes="P"): 0.5, #posterior flipping
+    #         },
+    #         p=0.5,
+    #     )
+
+
     rotation = tio.OneOf({
-                    tio.Affine(scales=1, degrees=(90,0,0), translation=0): 0.2,
-                    tio.Affine(scales=1, degrees=(0,90,0), translation=0): 0.2,
-                    tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.2,
-                    tio.Affine(scales=1, degrees=(180,0,0), translation=0): 0.2,
-                    tio.Affine(scales=1, degrees=(0,180,0), translation=0): 0.2,
-            },
-            p=0.5,
-        )
+                tio.Affine(scales=1, degrees=(90,0,0), translation=0): 0.125,
+                tio.Affine(scales=1, degrees=(0,90,0), translation=0): 0.125,
+                tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.125,
+                tio.Affine(scales=1, degrees=(180,0,0), translation=0): 0.125,
+                tio.Affine(scales=1, degrees=(0,180,0), translation=0): 0.125,
+                tio.Affine(scales=1, degrees=(0,0,180), translation=0): 0.125,
+                tio.Affine(scales=1.2, degrees=(0,0,0), translation=0): 0.125,
+                tio.Affine(scales=0.8, degrees=(0,0,0), translation=0): 0.125,
+        },
+        p=0.5,
+    )
     flipping = tio.OneOf({
-                    tio.Flip(axes="R"): 0.5, #¶ight flipping
-                    tio.Flip(axes="P"): 0.5, #posterior flipping
-            },
-            p=0.5,
-        )
+                tio.Flip(axes="R"): 0.5, #¶ight flipping
+                tio.Flip(axes="P"): 0.5, #posterior flipping
+        },
+        p=0.5,
+    )
+
     resample = tio.Resample('ref_space') #using dwi since label were created based on them...
     #Resampling is used to project all the modalities (dwi, and eventually adc) to the same space (dwi space)
     padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
