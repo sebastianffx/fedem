@@ -1,5 +1,5 @@
 from framework import Scaffold, FedAvg, FedRod, Fedem, Centralized
-from preprocessing import dataPreprocessing, check_dataset
+from preprocessing import check_dataset
 from numpy import std, mean
 import numpy as np
 from experiment import runExperiment
@@ -9,7 +9,7 @@ import warnings
 
 if __name__ == '__main__':
     #path, clients, folder_struct = 'debug_dataset/', ["center1", "center2"], "site_simple"
-    path, clients, folder_struct = '../../../../../../../../../media/jonathan/DATA_SSD/dataset-ISLES22_public_unzipped_version/', ["center1"], "OTHER"
+    path, clients, folder_struct = '../../../../../downloads/dataset_ISLES22_rel1/', ["center1"], "OTHER"
 
     experience_name = "debug_only_adc" 
     modality="ADC"
@@ -25,12 +25,9 @@ if __name__ == '__main__':
                 "kernel_size":(3,3),
                 "num_res_units":2}
 
-
-
-
     default = {#federation parameters
-               "g_epoch":200,
-               "l_epoch":1,
+               "g_epoch":1,
+               "l_epoch":10,
                "g_lr":0.001,
                "l_lr":0.001,
                "K":len(clients),
@@ -57,13 +54,15 @@ if __name__ == '__main__':
                "patches_per_volume":4,
                "no_deformation":True, # Re used for the pre processing
                "additional_modalities": [[]], #[[],[],[]] #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
+               "additional_labels":False,
                #test time augmentation
-               "use_test_augm":False,
-               "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
+               "use_test_augm":True,
+               "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive,
+               "use_isles22_metrics":True
                }
 
     if "isle" in path.lower():
-
+        """
         # 3D Unet, used for all Antoine's experiments
         default["padding"]    = (32,32,16)
         default["patch_size"] = (64,64,32)
@@ -76,12 +75,12 @@ if __name__ == '__main__':
 
         default["nn_params"] = nn_params
         default["nn_class"]  = "swin_unetr"
+        """
         default["additional_modalities"] = [[]] # "adc" the adc maps will be used in addition to the dwi (default) to add "flair"
         default["no_deformation"] = 'isles'
-        
-
     else:
-        default["additional_modalities"] = [[] for i in range(number_site)]
+        #default["additional_modalities"] = [[] for i in range(number_site)]
+        default["additional_modalities"] = [[],["tra4_1", "tra4_2"]]
 
     #only used when using blob loss, labels are used to identify the blob
     default["multi_label"] = "blob" in default["loss_fun"]
@@ -134,5 +133,6 @@ if __name__ == '__main__':
                                                 size_crop=144,
                                                 folder_struct=folder_struct,
                                                 train=True,
+                                                additional_labels=default["additional_labels"],
                                                 additional_modalities=default["additional_modalities"],
                                                 multi_label=default["multi_label"])
