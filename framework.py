@@ -108,7 +108,8 @@ class Fedem:
         early_stop_val = 0
         early_stop_count = 0
 
-        index = [0,1,3] #TODO: simplify in a expression list using the number of centers
+        index = np.arange(len(self.dataloaders))
+
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
 
