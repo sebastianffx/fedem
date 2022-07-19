@@ -113,7 +113,7 @@ class Fedem:
         early_stop_val = 0
         early_stop_count = 0
 
-        index = [0,1,2,3] #TODO: simplify in a expression list using the number of centers
+        index = list(range(len(self.options["clients"])))
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
 
