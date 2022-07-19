@@ -57,9 +57,9 @@ class Fedem:
                                                                      patches_per_volume=self.options["patches_per_volume"],
                                                                      no_deformation=self.options["no_deformation"],
                                                                      partitions_paths_add_mod=self.options["partitions_paths_add_mod"],
-                                                                     partitions_paths_add_lbl=self.options["partitions_paths_add_lbl"],
-                                                                     external_test=self.options["external_test"],
-                                                                     external_test_add_mod=self.options["external_test_add_mod"])
+                                                                     partitions_paths_add_lbl=self.options["partitions_paths_add_lbl"],)
+                                                                     #external_test=self.options["external_test"],
+                                                                     #external_test_add_mod=self.options["external_test_add_mod"])
 
         print("centralized model contains:")
         print("\t", len(self.all_train_loader), "training subjects")
@@ -113,7 +113,8 @@ class Fedem:
         early_stop_val = 0
         early_stop_count = 0
 
-        index = list(range(len(self.options["clients"])))
+        index = np.arange(len(self.dataloaders))
+
         for cur_epoch in range(global_epoch):
             print("*** global_epoch:", cur_epoch+1, "***")
 
@@ -236,6 +237,7 @@ class Fedem:
             return -1
 
         model = self.nn
+
         if network=="best":
             if benchmark_metric == "diceloss":
                 model_path = os.path.join(".", "models", self.options["network_name"]+"_"+self.options['modality']+'_'+self.options['suffix']+'_best_metric_model_segmentation2d_array.pth')
@@ -244,8 +246,8 @@ class Fedem:
             else:
                 model_path = ""
                 print("option for benchmarking metric is not valid")
-            checkpoint = torch.load(model_path)
-            model.load_state_dict(checkpoint)
+            #checkpoint = torch.load(model_path)
+            model.load_state_dict(torch.load(model_path))
 
             if verbose:
                 print("Loading best validation model weights: ")
@@ -255,7 +257,8 @@ class Fedem:
             if "pretrain_weights" not in self.options.keys():
                 print("You forgot to provide the pretrained weights!")
                 return 
-            checkpoint = torch.load(self.options["pretrain_weights"], map_location=torch.device(device))
+            #checkpoint = torch.load(self.options["pretrain_weights"], map_location=torch.device(device))
+            checkpoint = torch.load(self.options["pretrain_weights"])
             model.load_state_dict(checkpoint)
             print("Pretrained Weights Loaded correctly!")
 
@@ -387,6 +390,7 @@ class Fedem:
                                                 roi_size=self.options['patch_size'],
                                                 sw_batch_size=5,
                                                 predictor=model)
+                torch.cuda.empty_cache()
                 #compute loss between output and label (loss function applies the sigmoid function itself)
                 loss_volume.append(loss_function(input=out,
                                                     target=labels
@@ -448,8 +452,7 @@ class Fedem:
                 nib.save(nib.Nifti1Image(prediction3d.squeeze(), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_post_segpred_"+benchmark_metric+".nii.gz")))
                 if self.options["use_test_augm"] and "test" in dataset.lower():
                     nib.save(nib.Nifti1Image(avg_augm_pred.squeeze(), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_augm_segpred_"+benchmark_metric+".nii.gz")))
-                del inputs, labels, out, prediction3d
-                gc.collect()
+
 
             #retain each volume scores (dice loss and dice score)
             holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
@@ -471,6 +474,9 @@ class Fedem:
                 isles_metrics[2].append(compute_absolute_lesion_difference(prediction3d, ground_truth))
                 isles_metrics[3].append(compute_lesion_f1_score(prediction3d, ground_truth))
 
+            del inputs, labels, out, prediction3d
+            gc.collect()
+            torch.cuda.empty_cache() 
         #print average over all the volumes
         if verbose:
             print(f"Global (all sites, all slices) {dataset} LOSS :", np.round(np.mean(holder_diceloss),4))
@@ -487,6 +493,7 @@ class Fedem:
                 print(f"Global (all sites, all slices) {dataset} ABS LESION DIFF :", np.round(np.mean(isles_metrics[2]),4))
                 print(f"Global (all sites, all slices) {dataset} LESION F1 :", np.round(np.mean(isles_metrics[3]),4))
 
+        torch.cuda.empty_cache() 
         return np.round(np.mean(holder_dicemetric), 4), np.round(np.std(holder_dicemetric),4)
 
     def load_inputs(self, batch_data):
@@ -967,6 +974,7 @@ class Centralized(Fedem):
 
         ## DEBUG: save the prediction for the training set
         #self.full_volume_metric(dataset="training", network="self", save_pred=True)
+        torch.cuda.empty_cache()
         return self.nn
 
 #optimizer

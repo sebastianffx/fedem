@@ -393,15 +393,13 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
     print("using generic preprocessing transformations")
     clamp = tio.Clamp(out_min=clamp_min, out_max=clamp_max)
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
-    rotation = tio.OneOf({
-                    tio.Affine(scales=1, degrees=(90,0,0), translation=0): 0.125,
-                    tio.Affine(scales=1, degrees=(0,90,0), translation=0): 0.125,
-                    tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.125,
-                    tio.Affine(scales=1, degrees=(180,0,0), translation=0): 0.125,
-                    tio.Affine(scales=1, degrees=(0,180,0), translation=0): 0.125,
-                    tio.Affine(scales=1, degrees=(0,0,180), translation=0): 0.125,
-                    tio.Affine(scales=1.2, degrees=(0,0,0), translation=0): 0.125,
-                    tio.Affine(scales=0.8, degrees=(0,0,0), translation=0): 0.125,
+    #rotation on the 3rd axis in Canonical view correspond to z axis; axial view is preserved!
+    affine = tio.OneOf({
+                    tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.2,
+                    tio.Affine(scales=1, degrees=(0,0,180), translation=0): 0.2,
+                    tio.Affine(scales=1, degrees=(0,0,270), translation=0): 0.2,
+                    tio.Affine(scales=1.2, degrees=(0,0,0), translation=0): 0.2,
+                    tio.Affine(scales=0.8, degrees=(0,0,0), translation=0): 0.2,
             },
             p=0.5,
         )
@@ -411,7 +409,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
             },
             p=0.5,
         )
-    padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
+    padding = tio.Pad(padding=padding, padding_mode="edge") #padding is typicaly equals to half the size of the patch_size
     toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
     resample = tio.Resample("ref_space")
 
@@ -434,12 +432,13 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
     select_channel = tio.Lambda(sample_channel, types_to_apply=None) #None == applied to both tio.INTENSITY and tio.LABEL
 
     #normalization only, no spatial transformation or data augmentation
-    transform_valid = tio.Compose([select_channel, clamp, toCanon, resample, rescale])
+    transform_valid = tio.Compose([select_channel, toCanon, resample, clamp, rescale])
     #just regular campling and normalization
     if no_deformation:
         #still require padding for the label based patches creation
-        transform = tio.Compose([select_channel, clamp, toCanon, resample, rescale, padding])
-        print("no transfo")
+
+        transform = tio.Compose([select_channel, toCanon, resample, clamp, rescale, padding])
+        print("no deformation, only scaling and padding")
         return transform, transform_valid
     #more transformation: affine, rotation, elastic deformation and planar symmetry
     else:
@@ -448,8 +447,8 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
         #transform = tio.Compose([select_channel, clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation])
 
         #removed the random affine and elastic deformation
-        transform = tio.Compose([select_channel, clamp, toCanon, resample, rescale, flipping, rotation, padding])
-        print("transfo")
+        transform = tio.Compose([select_channel, toCanon, resample, flipping, rotation, clamp, rescale, padding])
+        print("flipping and rotation in addition to scaling and padding")
         return transform, transform_valid
 
 def isles22_torchio_create_transform(padding, patch_size, no_deformation):
@@ -462,24 +461,45 @@ def isles22_torchio_create_transform(padding, patch_size, no_deformation):
     print("using isles custom preprocessing transformations")
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
 
+    # rotation = tio.OneOf({
+    #                 tio.Affine(scales=1, degrees=(90,0,0), translation=0): 0.2,
+    #                 tio.Affine(scales=1, degrees=(0,90,0), translation=0): 0.2,
+    #                 tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.2,
+    #                 tio.Affine(scales=1, degrees=(180,0,0), translation=0): 0.2,
+    #                 tio.Affine(scales=1, degrees=(0,180,0), translation=0): 0.2,
+    #         },
+    #         p=0.5,
+    #     )
+    # flipping = tio.OneOf({
+    #                 tio.Flip(axes="R"): 0.5, #¶ight flipping
+    #                 tio.Flip(axes="P"): 0.5, #posterior flipping
+    #         },
+    #         p=0.5,
+    #     )
+
+
     rotation = tio.OneOf({
-                    tio.Affine(scales=1, degrees=(90,0,0), translation=0): 0.2,
-                    tio.Affine(scales=1, degrees=(0,90,0), translation=0): 0.2,
-                    tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.2,
-                    tio.Affine(scales=1, degrees=(180,0,0), translation=0): 0.2,
-                    tio.Affine(scales=1, degrees=(0,180,0), translation=0): 0.2,
-            },
-            p=0.5,
-        )
+                tio.Affine(scales=1, degrees=(90,0,0), translation=0): 0.125,
+                tio.Affine(scales=1, degrees=(0,90,0), translation=0): 0.125,
+                tio.Affine(scales=1, degrees=(0,0,90), translation=0): 0.125,
+                tio.Affine(scales=1, degrees=(180,0,0), translation=0): 0.125,
+                tio.Affine(scales=1, degrees=(0,180,0), translation=0): 0.125,
+                tio.Affine(scales=1, degrees=(0,0,180), translation=0): 0.125,
+                tio.Affine(scales=1.2, degrees=(0,0,0), translation=0): 0.125,
+                tio.Affine(scales=0.8, degrees=(0,0,0), translation=0): 0.125,
+        },
+        p=0.5,
+    )
     flipping = tio.OneOf({
-                    tio.Flip(axes="R"): 0.5, #¶ight flipping
-                    tio.Flip(axes="P"): 0.5, #posterior flipping
-            },
-            p=0.5,
-        )
+                tio.Flip(axes="R"): 0.5, #¶ight flipping
+                tio.Flip(axes="P"): 0.5, #posterior flipping
+        },
+        p=0.5,
+    )
+
     resample = tio.Resample('ref_space') #using dwi since label were created based on them...
     #Resampling is used to project all the modalities (dwi, and eventually adc) to the same space (dwi space)
-    padding = tio.Pad(padding=padding) #padding is typicaly equals to half the size of the patch_size
+    padding = tio.Pad(padding=padding,padding_mode="edge") #padding is typicaly equals to half the size of the patch_size
     #toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
     #toCanon is not used, we trust the source of the volume and just resample to adjust the origin and affines across tio.Subject attributes 
 
@@ -539,7 +559,7 @@ def brats_torchio_create_transform(padding=(48,48,16), patch_size= (96,96,32)):
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
     toCanon = tio.ToCanonical()
     flip = tio.RandomFlip(axes=('LR',))
-    pad = tio.Pad(padding)
+    pad = tio.Pad(padding,padding_mode="edge")
     transforms = [convert_mask, rescale, flip, toCanon, pad]
     transform = tio.Compose(transforms)
 
@@ -617,6 +637,7 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
         # get the subject, create subject datatset, feed it to a queue for the path creation, then converted to a dataloader
         if no_deformation == "isles" or no_deformation == "brats" :
             #using channels to encode the several modality into one map
+            print("additional modalities are encoded in the channel axis")
             site_train_subjects = torchio_get_loader_partition(partitions_paths[i][0][0],
                                                                partitions_paths[i][1][0],
                                                                partitions_paths_add_mod[i][0],
@@ -633,6 +654,7 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                             partitions_paths_add_lbl[i][2]
                                                             )
         else:
+            print("additional modalities are encoded in synthetic subjects")
             #additionnal modalities are used to create "new subjects"
             site_train_subjects = torchio_get_loader_partition(partitions_paths[i][0][0], #volume
                                                                partitions_paths[i][1][0], #labels
@@ -644,18 +666,19 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                     print(len(additional_modality))
                     print(len(additional_labels))
                     site_train_subjects += torchio_get_loader_partition(additional_modality, #volume
-                                                                        additional_labels, #labels
+                                                                        additional_labels if len(additional_labels)>0 else partitions_paths[i][1][0], #labels
                                                                         )
 
             site_valid_subjects = torchio_get_loader_partition(partitions_paths[i][0][1], #volume
                                                                partitions_paths[i][1][1], #labels
                                                                )
-
+            """ not creating the false subject for validation, to avoid biais for model selection
             if len(partitions_paths_add_mod[i][1]) > 0:
                 for additional_modality, additional_labels in zip(partitions_paths_add_mod[i][1],partitions_paths_add_lbl[i][1]):
                     site_valid_subjects += torchio_get_loader_partition(additional_modality, #volume
-                                                                        additional_labels, #labels
+                                                                        additional_labels if len(additional_labels)>0 else partitions_paths[i][1][1], #labels
                                                                         )
+            """
             
             site_test_subjects = torchio_get_loader_partition(partitions_paths[i][0][2], #volume
                                                               partitions_paths[i][1][2], #labels
@@ -664,7 +687,7 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
             if len(partitions_paths_add_mod[i][2]) > 0:
                 for additional_modality, additional_labels in zip(partitions_paths_add_mod[i][2],partitions_paths_add_lbl[i][2]):
                     site_test_subjects += torchio_get_loader_partition(additional_modality, #volume
-                                                                       additional_labels, #labels
+                                                                       additional_labels if len(additional_labels)>0 else partitions_paths[i][1][2], #labels
                                                                        )
             """
         print("site "+str(i), len(site_train_subjects))

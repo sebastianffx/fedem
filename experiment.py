@@ -51,8 +51,11 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             conf["partitions_paths"]=centers_partitions
             conf["partitions_paths_add_mod"]=partitions_paths_add_mod
             conf["partitions_paths_add_lbl"]=partitions_paths_add_lbl
-            conf["external_test"]=external_test
+            external_test = []
+            external_test_add_mod = []
+            conf["external_test"]= external_test 
             conf["external_test_add_mod"]=external_test_add_mod
+
                 
             #add number to differentiate replicates
             if exp_name!=None:
@@ -170,11 +173,11 @@ if __name__ == '__main__':
                "max_queue_length":16,
                "patches_per_volume":4,
                "no_deformation":False,
-               "additional_modalities": [[],["4dir_1", "4dir_2"],[]], #list the extension of each additionnal modality you want to use for each site
+               "additional_modalities": [[],[],[]], #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
                #test time augmentation
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
-               "use_isles22_metrics":True
+               "use_isles22_metrics":True #compute isles22 metrics during validation
                }
 
     #only used when using blob loss, labels are used to identify the blob
