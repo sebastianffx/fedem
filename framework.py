@@ -40,7 +40,7 @@ class Fedem:
         #routine to convert U-Net output to segmentation mask
         self.post_pred = Compose([EnsureType(), Activations(sigmoid=True), AsDiscrete(threshold=0.5)])
         self.post_sigmoid = Compose([EnsureType(), Activations(sigmoid=True)])
-
+        self.writer = SummaryWriter(self.options['summary_writer_name'])
         if self.options["use_torchio"]:
             ##    convert_mask = tio.Lambda(lambda img: np.squeeze(torch.stack([(img == 1) | (img == 4), (img == 1) | (img == 4) | (img == 2), img == 4],dim=0)), types_to_apply=[tio.LABEL])
 
@@ -107,7 +107,6 @@ class Fedem:
         
         early_stop_val = 0
         early_stop_count = 0
-
         index = np.arange(len(self.dataloaders))
 
         for cur_epoch in range(global_epoch):
@@ -506,11 +505,7 @@ class Fedem:
 class FedAvg(Fedem):
     def __init__(self, options):
         super(FedAvg, self).__init__(options)
-
         self.weighting_scheme = options['weighting_scheme']
-        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options['weighting_scheme']+options['suffix'])
-
-
         if options['weighting_scheme'] == 'BETA':
             self.beta_val = options['beta_val']
             #extract length of trianing loader for each site
@@ -569,9 +564,6 @@ class FedAvg(Fedem):
 class Scaffold(Fedem):
     def __init__(self, options):
         super(Scaffold, self).__init__(options)
-
-        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"SCAFFOLD"+options['suffix'])
-
         self.K = options['K']
         
         #server model
@@ -660,7 +652,6 @@ class Scaffold(Fedem):
 class FedRod(Fedem):
     def __init__(self, options):
         super(FedRod, self).__init__(options)
-        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"FEDROD"+options['suffix'])
         self.K = options['K']
         #self.name_encoder_layers = ["model.0", "model.1.submodule.0", "model.1.submodule.1.submodule.2.0",
         #                            "model.1.submodule.1.submodule.0", "model.1.submodule.1.submodule.1"]
@@ -872,8 +863,6 @@ class Centralized(Fedem):
         #could verify that space_cardinality == spatial_dims!
 
         self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], scaff=False, fed_rod=False).to(device)
-
-        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 
         #overwrite the argument to free space?
         self.dataloaders = [[] for i in range(len(self.options["clients"]))]

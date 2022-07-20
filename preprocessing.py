@@ -92,6 +92,8 @@ def partition_multisite_nested(path, modality, clients):
         if (len(center_paths_train), len(center_paths_valid), len(center_paths_test)) != (len(center_lbl_paths_train), len(center_lbl_paths_valid), len(center_lbl_paths_test)):
             print("not same number of images and masks!")
 
+    return centers_partitions
+
 def partition_single_folder(path, modality, clients, additional_modalities):
     """Retrieve paths to the modality map and the corresponding labels.
        Handle two dataset folder herarchy, nested (one folder per subject) or not (all subjects volume are in a single folder)
@@ -242,6 +244,8 @@ def create_transfo(modality, size_crop):
     #For tmax we'll window 0-60
     #For CBV we'll window 0-200
     max_intensity=30
+
+    
     if modality =='CBF':
         max_intensity = 1200
     elif modality =='CBV':

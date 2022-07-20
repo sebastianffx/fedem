@@ -16,8 +16,11 @@ def generate_nn(nn_name, nn_class, nn_params={}, scaff=False, fed_rod=False):
     elif nn_class.lower()=="segresnet":
         nn = monai.networks.nets.SegResNet(**nn_params)
         print("Using SEGRESNET as segmentation network")
+    #elif nn_class.lower() == 'unetd2d':
+
     else:
         print("network name not supported", nn_class.lower())
+
 
     if scaff:
         #control variables for SCAFFOLD
