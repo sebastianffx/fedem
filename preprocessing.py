@@ -28,7 +28,7 @@ from debug_util import get_same_res_paths
 
 def get_train_valid_test_partitions(path, modality, clients, folder_struct="site_nested", multi_label=False, additional_modalities=[], additional_labels=False):
     """Retrieve paths to the modality map and the corresponding labels.
-       Handle two dataset folder herarchy, nested (one folder per subject) or not (all subjects volume are in a single folder)
+       Handle 
     """
     centers_partitions_add_mod = []
     centers_partitions_add_lbl = [[[],[],[]] for i in range(len(clients))]
@@ -41,6 +41,8 @@ def get_train_valid_test_partitions(path, modality, clients, folder_struct="site
     elif folder_struct=="site_simple":
         centers_partitions = partition_multisite(path, modality, clients, multi_label)
     #coded specially for ISLES22, data-set have 2 folder; derived and rawdata, with one folder for each subject, containing respectively the mask or adc/flair/dwi
+    elif folder_struct=="instance22":
+        centers_partitions, centers_partitions_add_mod, external_test, external_test_add_mod = partition_instance22(path)
     else:
         centers_partitions, centers_partitions_add_mod, external_test, external_test_add_mod = partition_single_folder(path, modality, clients, additional_modalities)
 
@@ -93,6 +95,30 @@ def partition_multisite_nested(path, modality, clients):
             print("not same number of images and masks!")
 
     return centers_partitions
+
+
+def partition_instance22(path):
+    """Retrieve center structure for the instance22 challenge dataset    """
+    ct_paths_train, label_paths_train = sorted(glob(path+"INSTANCE22/train/images/*nii.gz")),sorted(glob(path+"/INSTANCE22/train/labels/*nii.gz"))
+    ct_paths_valid, label_paths_valid = sorted(glob(path+"INSTANCE22/valid/images/*nii.gz")),sorted(glob(path+"/INSTANCE22/valid/labels/*nii.gz"))
+    ct_paths_test, label_paths_test =  sorted(glob(path+"INSTANCE22/test/images/*nii.gz")),sorted(glob(path+"/INSTANCE22/test/labels/*nii.gz"))
+    centers_partitions=[
+                [
+                    [
+                        ct_paths_train,
+                        ct_paths_valid,
+                        ct_paths_test
+                    ]
+                    ,
+                    [   
+                        label_paths_train,
+                        label_paths_valid,
+                        label_paths_test
+                    ]
+                ]
+                ]
+    external_test, external_test_add_mod,centers_partitions_add_mod = [],[],[] #not having an external dataset
+    return centers_partitions, centers_partitions_add_mod, external_test, external_test_add_mod
 
 def partition_single_folder(path, modality, clients, additional_modalities):
     """Retrieve paths to the modality map and the corresponding labels.
