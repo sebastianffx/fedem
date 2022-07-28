@@ -459,11 +459,11 @@ class Fedem:
 
             #save volume metrics
             #dice score
-            holder_dicemetric.append(dice_metric(torch.from_numpy(prediction3d), labels).item()) #computed on the 3D volume, stacked 2D pred when necessary
+            holder_dicemetric.append(dice_metric(torch.from_numpy(prediction3d).to(device), labels).item()) #computed on the 3D volume, stacked 2D pred when necessary
             #dice loss
             holder_diceloss.append(np.mean(loss_volume)) #average per volume
             #hausdroff distance (95-percentile)
-            holder_hausdorff_dist.append(hausdorff(torch.from_numpy(prediction3d), labels).item())
+            holder_hausdorff_dist.append(hausdorff(torch.from_numpy(prediction3d).to(device), labels).item())
 
             # reset the metrics for next computation round
             dice_metric.reset()
