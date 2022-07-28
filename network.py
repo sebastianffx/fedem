@@ -1,6 +1,7 @@
 import monai
 
-def generate_nn(nn_name, nn_class, nn_params={}, scaff=False, fed_rod=False):
+def generate_nn(nn_name, nn_class, nn_params={}, scaff=False, fedrod=False, fedprox=False):
+
     if nn_class.lower()=="unet":
         nn=monai.networks.nets.UNet(**nn_params)
         print("Using UNET as segmentation network")
@@ -25,11 +26,15 @@ def generate_nn(nn_name, nn_class, nn_params={}, scaff=False, fed_rod=False):
         nn.delta_control = {}
         nn.delta_y = {}
 
-    if fed_rod:
+    if fedrod:
         #params sets for FedRod
         nn.encoder_generic = {}
         nn.decoder_generic = {}
         nn.decoder_personalized = {}
+
+    if fedprox:
+        #params sets for FedRod
+        print("do nothing")
 
     nn.name = nn_name
     
