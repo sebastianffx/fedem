@@ -13,7 +13,7 @@ from monai.inferers import sliding_window_inference
 
 from network import generate_nn
 from utils.blob_loss import BlobLoss
-from monai.metrics import DiceMetric
+from monai.metrics import DiceMetric, HausdorffDistanceMetric
 from torch.optim import Optimizer, Adam
 from preprocessing import generate_loaders, torchio_generate_loaders, torchio_create_test_transfo
 from torch.utils.tensorboard import SummaryWriter
@@ -284,10 +284,17 @@ class Fedem:
         ### END TMP
 
         ### TMP : for ISLES22 metrics functions
-        
         isles_metrics = [[],[],[],[]]
         astral_voxel_size = 1.63*1.63*3
-        ###                
+        ###
+
+        hausdorff = HausdorffDistanceMetric(include_background=False,
+                                            distance_metric='euclidean',
+                                            percentile=95,
+                                            directed=False,
+                                            reduction="mean",
+                                            get_not_nans=False)
+        holder_hausdorff_dist = []
 
         #during validation and testing, the batch_data size should be 1, last dimension is number of slice in original volume
         for batch_data in dataset_loader: 
@@ -308,7 +315,7 @@ class Fedem:
 
             #raw_pred_holder = []
             post_pred_holder = []
-            loss_volume= []
+            loss_volume = []
 
             #2D networks
             if self.options["space_cardinality"]==2:
@@ -317,15 +324,15 @@ class Fedem:
                     if "external" in dataset.lower():
                         #using sliding window for external test because weird dimensions/different voxel spacing
                         out = sliding_window_inference(inputs=inputs[:,:,:,:,slice_selected],
-                                                        roi_size=self.options['patch_size'][:2], #last dimension is 1, equivalent to squeeze
-                                                        sw_batch_size=3,
-                                                        predictor=model)
+                                                       roi_size=self.options['patch_size'][:2], #last dimension is 1, equivalent to squeeze
+                                                       sw_batch_size=3,
+                                                       predictor=model)
                     else:
                         out = model(inputs[:,:,:,:,slice_selected])
                     
                     #compute loss between output and label (loss function applies the sigmoid function itself)
                     loss_volume.append(loss_function(input=out,
-                                                    target=labels[:,:,:,:,slice_selected]
+                                                     target=labels[:,:,:,:,slice_selected]
                                                     ).item()
                                     )
 
@@ -333,10 +340,9 @@ class Fedem:
                     #raw_pred_holder.append(out[0,0,:,:].detach().cpu().numpy())
                     #apply sigmoid then activation threshold to obtain a discrete segmentation mask
                     pred = self.post_pred(out)
-                    #compute dice score between the processed prediction and the labels (single slice)
-                    dice_metric(pred,labels[:,:,:,:,slice_selected])
+                    
                     #save the prediction slice to rebuild a 3D prediction volume
-                    post_pred_holder.append(pred[0,0,:,:].cpu().numpy())
+                    post_pred_holder.append(pred.cpu().numpy())
 
                     #perform test-time augmentation slice-wise
                     if self.options["use_test_augm"] and "test" in dataset.lower():
@@ -387,20 +393,18 @@ class Fedem:
             elif self.options["space_cardinality"]==3:
                 #must use sliding windows over small patches for 3D networks
                 out = sliding_window_inference(inputs=inputs,
-                                                roi_size=self.options['patch_size'],
-                                                sw_batch_size=5,
-                                                predictor=model)
+                                               roi_size=self.options['patch_size'],
+                                               sw_batch_size=5,
+                                               predictor=model)
                 torch.cuda.empty_cache()
                 #compute loss between output and label (loss function applies the sigmoid function itself)
                 loss_volume.append(loss_function(input=out,
-                                                    target=labels
+                                                 target=labels
                                                 ).item()
                                 )
 
                 #apply sigmoid then activation threshold to obtain a discrete segmentation mask
                 prediction3d = self.post_pred(out)
-                #compute dice score between the processed prediction and the labels (single slice)
-                dice_metric(prediction3d, labels)
 
                 #perform test-time augmentation
                 if self.options["use_test_augm"] and "test" in dataset.lower():
@@ -453,12 +457,17 @@ class Fedem:
                 if self.options["use_test_augm"] and "test" in dataset.lower():
                     nib.save(nib.Nifti1Image(avg_augm_pred.squeeze(), affine), os.path.join(".", "output_viz", self.options["network_name"], filestem.replace(suffix, "_augm_segpred_"+benchmark_metric+".nii.gz")))
 
-
-            #retain each volume scores (dice loss and dice score)
-            holder_dicemetric.append(dice_metric.aggregate().item()) #average per volume
+            #save volume metrics
+            #dice score
+            holder_dicemetric.append(dice_metric(torch.from_numpy(prediction3d), labels).item()) #computed on the 3D volume, stacked 2D pred when necessary
+            #dice loss
             holder_diceloss.append(np.mean(loss_volume)) #average per volume
-            # reset the status for next computation round
+            #hausdroff distance (95-percentile)
+            holder_hausdorff_dist.append(hausdorff(torch.from_numpy(prediction3d), labels).item())
+
+            # reset the metrics for next computation round
             dice_metric.reset()
+            hausdorff.reset()
 
             if self.options["use_test_augm"] and "test" in dataset.lower():
                 holder_dicemetric_augm.append(dice_metric_augm.aggregate().item())
@@ -469,18 +478,22 @@ class Fedem:
             #call the metrics functions from ISLES22 repo
             if use_isles22_metrics:
                 ground_truth = labels[0,0,:,:,:].cpu().numpy()
-                isles_metrics[0].append(compute_dice(prediction3d, ground_truth))
-                isles_metrics[1].append(compute_absolute_volume_difference(prediction3d, ground_truth, astral_voxel_size))
-                isles_metrics[2].append(compute_absolute_lesion_difference(prediction3d, ground_truth))
-                isles_metrics[3].append(compute_lesion_f1_score(prediction3d, ground_truth))
+                isles_metrics[0].append(compute_dice(prediction3d.squeeze(), ground_truth))
+                isles_metrics[1].append(compute_absolute_volume_difference(prediction3d.squeeze(), ground_truth, astral_voxel_size))
+                isles_metrics[2].append(compute_absolute_lesion_difference(prediction3d.squeeze(), ground_truth))
+                isles_metrics[3].append(compute_lesion_f1_score(prediction3d.squeeze(), ground_truth))
 
+            #avoid memory leaks
             del inputs, labels, out, prediction3d
             gc.collect()
-            torch.cuda.empty_cache() 
+            torch.cuda.empty_cache()
+
         #print average over all the volumes
         if verbose:
             print(f"Global (all sites, all slices) {dataset} LOSS :", np.round(np.mean(holder_diceloss),4))
             print(f"Global (all sites, all slices) {dataset} DICE SCORE :", np.round(np.mean(holder_dicemetric),4), "std:", np.round(np.std(holder_dicemetric),4))
+            print(f"Global (all sites, all slices) {dataset} HD95 :", np.round(np.mean(holder_hausdorff_dist),4), "std:", np.round(np.std(holder_hausdorff_dist),4))
+
             if self.options["use_test_augm"] and "test" in dataset.lower():
                 print("running test-time augmentation with", len(self.options["test_time_augm"]), "augmentation functions for", dataset.lower(), "set")
                 print(f"Global (all sites, all slices) {dataset} DICE SCORE (test-augm):", np.round(np.mean(holder_dicemetric_augm),4))
