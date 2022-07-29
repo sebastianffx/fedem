@@ -521,6 +521,19 @@ class Fedem:
         else:
             return batch_data[0][:,:,:,:,0].float().to(device), batch_data[1][:,:,:,:,0].to(device)
 
+    def global_test(self, aggreg_dataloader_test):
+        model = self.nn
+        model.eval()
+        
+        #test the global model on each individual dataloader
+        for k, client in enumerate(self.nns):
+            print("testing on", client.name, "dataloader")
+            test(model, self.dataloaders[k][2])
+        
+        #test the global model on aggregated dataloaders
+        print("testing on all the data")
+        test(model, aggreg_dataloader_test)
+
 class FedAvg(Fedem):
     def __init__(self, options):
         super(FedAvg, self).__init__(options)
@@ -538,7 +551,7 @@ class FedAvg(Fedem):
             self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
         
         #server model
-        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], scaff=False, fed_rod=False).to(device)
+        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"]).to(device)
         
         #create clients
         self.nns = []
@@ -593,7 +606,7 @@ class Scaffold(Fedem):
         self.K = options['K']
         
         #server model
-        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], scaff=True, fed_rod=False).to(device)
+        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], scaff=True).to(device)
         
         #control variables
         for k, v in self.nn.named_parameters():
@@ -662,18 +675,70 @@ class Scaffold(Fedem):
             ann.delta_control[k] = ann.control[k] - x.control[k]
         return ann, loss.item()
 
-    def global_test(self, aggreg_dataloader_test):
-        model = self.nn
-        model.eval()
-        
-        #test the global model on each individual dataloader
-        for k, client in enumerate(self.nns):
-            print("testing on", client.name, "dataloader")
-            test(model, self.dataloaders[k][2])
-        
-        #test the global model on aggregated dataloaders
-        print("testing on all the data")
-        test(model, aggreg_dataloader_test)
+class FedProx(Fedem):
+    """ Heavily inspired from this implementation: https://github.com/ki-ljl/FedProx-PyTorch
+    """
+    def __init__(self, options):
+        super(FedProx, self).__init__(options)
+        self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"FEDPROX"+options['suffix'])
+
+        #parameter specific to FedProx, copy the dict to avoid border effect
+        self.mu = options["nn_params"]["mu"]
+        cleaned_nn_params = options["nn_params"].copy()
+        cleaned_nn_params.pop("mu")
+
+        #server model
+        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=cleaned_nn_params, fedprox=True).to(device)
+                    
+        #clients of the federation
+        self.nns = []
+        for i in range(len(options['clients'])):
+            temp = copy.deepcopy(self.nn)
+            temp.name = options['clients'][i]
+            temp.len = len(self.dataloaders[i][0]) #length of the dataloader of i-th client
+            self.nns.append(temp)
+            
+    def aggregation(self, index, global_lr, **kwargs):
+        s = 0.0
+        for j in index:
+            # normal
+            s += self.nns[j].len
+
+        params = {}
+        for k, v in self.nns[0].named_parameters():
+            params[k] = torch.zeros_like(v.data)
+
+        for j in index:
+            for k, v in self.nns[j].named_parameters():
+                params[k] += v.data * (self.nns[j].len / s) #looks like a regular fed avg...
+
+        for k, v in self.nn.named_parameters():
+            v.data = params[k].data.clone()
+
+
+    def train(self, ann, dataloader_train, local_epoch, local_lr):
+        #set client model to train mode
+        ann.train()
+                
+        optimizer = Adam(ann.parameters(), local_lr)
+
+        for epoch in range(local_epoch):
+            for batch_data in dataloader_train:
+                inputs, labels = self.load_inputs(batch_data)
+                y_pred = ann(inputs)
+                optimizer.zero_grad()
+
+                # compute proximal_term
+                proximal_term = 0.0
+                for w, w_t in zip(ann.parameters(), self.nn.parameters()):
+                    proximal_term += (w - w_t).norm(2)
+
+                loss = self.loss_function(y_pred, labels) + (self.mu / 2) * proximal_term
+
+                loss.backward()
+                optimizer.step()
+                            
+        return ann, loss.item()
 
 class FedRod(Fedem):
     def __init__(self, options):
@@ -738,7 +803,7 @@ class FedRod(Fedem):
         self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
         print(self.trainloaders_lengths)
         #server model
-        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], scaff=False, fed_rod=True).to(device)
+        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], fedrod=True).to(device)
         
         #Global encoder - decoder (inlcuding personalized) layers init
         for k, v in self.nn.named_parameters():
@@ -870,26 +935,13 @@ class FedRod(Fedem):
                             ann.decoder_personalized[k].data = copy.deepcopy(v.data) #Saving the personalized head values                            
         return ann, loss_generic.item(), loss_personalized.item()
 
-    def global_test(self, aggreg_dataloader_test):
-        model = self.nn
-        model.eval()
-        
-        #test the global model on each individual dataloader
-        for k, client in enumerate(self.nns):
-            print("testing on", client.name, "dataloader")
-            test(model, self.dataloaders[k][2])
-        
-        #test the global model on aggregated dataloaders
-        print("testing on all the data")
-        test(model, aggreg_dataloader_test)
-        
 class Centralized(Fedem):
     def __init__(self, options):
         super(Centralized, self).__init__(options)
 
         #could verify that space_cardinality == spatial_dims!
 
-        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], scaff=False, fed_rod=False).to(device)
+        self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"]).to(device)
 
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 

@@ -1,4 +1,4 @@
-from framework import Scaffold, FedAvg, FedRod, Fedem, Centralized
+from framework import Fedem, Scaffold, FedAvg, FedRod, FedProx, Centralized
 from preprocessing import get_train_valid_test_partitions, check_dataset
 from numpy import std, mean
 import numpy as np
@@ -69,6 +69,8 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
                 network = Scaffold(conf)
             elif "fedrod" in conf.keys() and conf["fedrod"]:
                 network = FedRod(conf)
+            elif "fedprox" in conf.keys() and conf["fedprox"]:
+                network = FedProx(conf)
             elif 'weighting_scheme' in conf.keys():
                 network = FedAvg(conf)
             elif "centralized" in conf.keys() and conf["centralized"]:
