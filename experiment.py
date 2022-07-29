@@ -111,9 +111,9 @@ if __name__ == '__main__':
     #path = 'astral_fedem_dti_newlabels/'
     #path = 'astral_fedem_dti_noempty_newlabels/'
     #path = 'astral_fedem_4dir_1/'
-    path = 'astral_fedem_20dir/'
+    #path = 'astral_fedem_20dir/'
     #path = 'astral_fedem_multiadc_newlabels/'
-    #path = 'astral_fedem_ABC/'
+    path = 'astral_fedem_ABC/'
     #path = 'astral_fedem_ABC_harmonized/'
     #path = 'astral_fedem_ABC_propermask/'
     #path = 'astral_fedem_ABC_harmonized_propermask/'
@@ -123,7 +123,8 @@ if __name__ == '__main__':
     #experience_name = "no_empty_tio_DLCE_newlabels" 
     #experience_name = "no_empty_DLCE_multiadc_transfo"
     #experience_name = "singlesite1_transfo"
-    experience_name = "all20dir_deformation"
+    #experience_name = "all20dir_deformation"
+    experience_name = "ABC_nodeformation"
     #experience_name = "allsite_transfo_v1"
     #experience_name = "ABC_propermask_nodeformation"
     #experience_name = "singlerep_siteB_harmonized_propermask"
@@ -133,7 +134,7 @@ if __name__ == '__main__':
     #modality="20dir"
 
     clients=["center1", "center2", "center3"]
-    #clients=["center1"]
+    #clients=["center3"]
     number_site=len(clients)
 
     #regular 2D Unet, used for all Antoine's experiments
@@ -172,8 +173,8 @@ if __name__ == '__main__':
                "padding":(64,64,0), #typically half the dimensions of the patch_size
                "max_queue_length":16,
                "patches_per_volume":4,
-               "no_deformation":False,
-               "additional_modalities": [[],[],[]], #[[],["4dir_1", "4dir_2"],[]] #list the extension of each additionnal modality you want to use for each site
+               "no_deformation":True,
+               "additional_modalities": [[],[],[]], #[[],["4dir_1", "4dir_2"],[]], #list the extension of each additionnal modality you want to use for each site
                #test time augmentation
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
@@ -200,9 +201,9 @@ if __name__ == '__main__':
     #for lr in np.linspace(1e-5, 1e-2, 5):
     #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
     #for weight_comb in [[1, 1], [1.4,0.6], [1.6,0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
-    #for lr in [0.00994]:
-    """     
-    for lr in [0.00994, 0.0116]:
+    """
+    for lr in [0.00994]:
+    #for lr in [0.00994, 0.0116]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
@@ -211,8 +212,11 @@ if __name__ == '__main__':
         #networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
     """
     #for g_lr, l_lr in zip([0.01, 0.001, 0.0001], [0.001]*3):
-    for g_lr in [0.001, 0.0001]:
-        for l_lr in [0.01, 0.001]:
+    #for g_lr in [0.001, 0.0001]:
+    #    for l_lr in [0.01, 0.001]:
+    for g_lr in [0.0001]:
+        for l_lr in [0.01]:
+ 
             tmp = default.copy()
             #tmp.update({"scaff":True, "l_lr":l_lr, "g_lr":g_lr})
             #tmp.update({"fedrod":True, "l_lr":l_lr, "g_lr":g_lr})
