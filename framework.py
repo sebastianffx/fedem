@@ -31,6 +31,19 @@ import torchio as tio
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
 
+def nan_hook(self, inp, output):
+    if not isinstance(output, tuple):
+        outputs = [output]
+    else:
+        outputs = output
+
+    for i, out in enumerate(outputs):
+        nan_mask = torch.isnan(out)
+        if nan_mask.any():
+            print("In", self.__class__.__name__)
+            print(torch.nansum(out))
+            raise RuntimeError(f"Found NAN in output {i} at indices: ", nan_mask.nonzero(), "where:", out[nan_mask.nonzero()[:, 0].unique(sorted=True)])
+
 print(f"Using {device} as backend")
 
 class Fedem:
@@ -61,8 +74,8 @@ class Fedem:
                                                                      #external_test=self.options["external_test"],
                                                                      #external_test_add_mod=self.options["external_test_add_mod"])
 
-        print("centralized model contains:")
-        print("\t", len(self.all_train_loader), "training subjects")
+        print("Merged dataloader contains:")
+        print("\t", len(self.all_train_loader)*self.options["patches_per_volume"]/self.options["batch_size"], "training subjects")
         print("\t", len(self.all_valid_loader), "validation subjects")
         print("\t", len(self.all_test_loader), "testing subjects")
 
@@ -608,20 +621,27 @@ class Scaffold(Fedem):
         #server model
         self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], scaff=True).to(device)
         
-        #control variables
+        #control variables, all initialized at zero
         for k, v in self.nn.named_parameters():
-            self.nn.control[k] = torch.zeros_like(v.data)
+            self.nn.control[k]       = torch.zeros_like(v.data) # c
             self.nn.delta_control[k] = torch.zeros_like(v.data)
-            self.nn.delta_y[k] = torch.zeros_like(v.data)
+            self.nn.delta_y[k]       = torch.zeros_like(v.data)
         
         #clients
         self.nns = []
         for i in range(len(options['clients'])):
             temp = copy.deepcopy(self.nn)
             temp.name = options['clients'][i]
-            temp.control       = copy.deepcopy(self.nn.control)  # ci
-            temp.delta_control = copy.deepcopy(self.nn.delta_control)  # ci
+            temp.len = len(self.dataloaders[i][0]) #length of the dataloader of i-th client
+            #make sure the control variable are independent variables
+            temp.control       = copy.deepcopy(self.nn.control)  #ci
+            temp.delta_control = copy.deepcopy(self.nn.delta_control)
             temp.delta_y       = copy.deepcopy(self.nn.delta_y)
+
+            #debug purpose, used to detect NaN in forward pass
+            #for submodule in temp.modules():
+            #    submodule.register_forward_hook(nan_hook)
+
             self.nns.append(temp)
 
     def aggregation(self, index, global_lr, **kwargs):
@@ -629,6 +649,7 @@ class Scaffold(Fedem):
         for j in index:
             # normal
             s += self.nns[j].len
+
         # compute
         x = {}
         c = {}
@@ -637,42 +658,90 @@ class Scaffold(Fedem):
             x[k] = torch.zeros_like(v.data)
             c[k] = torch.zeros_like(v.data)
 
+        #sum clients updates
         for j in index:
             for k, v in self.nns[j].named_parameters():
-                x[k] += self.nns[j].delta_y[k] / len(index)  # averaging
-                c[k] += self.nns[j].delta_control[k] / len(index)  # averaging
+                #sum term in original publication equations (5)
+                x[k] += self.nns[j].delta_y[k]
+                c[k] += self.nns[j].delta_control[k]
 
-        # update x and c
+        # update x (global model) and c (server control variable)
         for k, v in self.nn.named_parameters():
-            v.data += x[k].data*global_lr
-            self.nn.control[k].data += c[k].data * (len(index) / self.K)
+            #affectation, equations (5) of original publication
+            v.data += global_lr / len(index) * x[k].data #len(index) = |S| in publication
+            self.nn.control[k].data += c[k].data / len(index) #len(index) = N in publication
 
     def train(self, ann, dataloader_train, local_epoch, local_lr):
+        #creating copy of the client model to update the control variable
+        #equals to the global model for the 1st client but then, server control variable are updated
+        x = copy.deepcopy(ann)
+
         #train client to train mode
         ann.train()
-        ann.len = len(dataloader_train)
-                
-        x = copy.deepcopy(ann)
-        optimizer = ScaffoldOptimizer(ann.parameters(), lr=local_lr, weight_decay=1e-4)
+
+        optimizer = ScaffoldOptimizer(ann.parameters(), lr=local_lr, weight_decay=0)
 
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
                 inputs, labels = self.load_inputs(batch_data)
                 y_pred = ann(inputs)
                 loss = self.loss_function(y_pred, labels)
+                #ann.params gradients are zeroed, gradients in x remain all None
                 optimizer.zero_grad()
-                loss.backward()          
+                #gradient is computed for the loss, w.r.t the inputs for the client model, stored in ann
+                loss.backward()
                 optimizer.step(self.nn.control, ann.control) #performing SGD on the control variables
-                            
-        # update c
-        # c+ <- ci - c + 1/(E * lr) * (x-yi)
-        temp = {}
-        for k, v in ann.named_parameters():
-            temp[k] = v.data.clone()
-        for k, v in x.named_parameters():
-            ann.control[k] = ann.control[k] - self.nn.control[k] + (v.data - temp[k]) / (local_epoch * local_lr)
-            ann.delta_y[k] = temp[k] - v.data
-            ann.delta_control[k] = ann.control[k] - x.control[k]
+
+        #equation (4), Option I
+        ann.control = {}
+        for epoch in range(local_epoch):
+            for batch_data in dataloader_train:
+                inputs, labels = self.load_inputs(batch_data)
+                #prediction using the global model
+                y_pred = self.nn(inputs)
+                loss = self.loss_function(y_pred, labels)
+                #gradient of local data, w.r.t the global model weights
+                gradients = torch.autograd.grad(loss, self.nn.parameters())
+
+                #sum the gradient over the local batches to obtain gradient of local data for global model
+                #TODO: might require normalization by the number of epochs?
+                for (k, v), grad in zip(ann.named_parameters(), gradients):
+                    if k in ann.control.keys():
+                        ann.control[k] += grad.data
+                    else:
+                        ann.control[k] = grad.data
+
+        for (k, v_old), (k_bis, v_new) in zip(x.named_parameters(), ann.named_parameters()):
+            ann.delta_y[k] = v_new.data - v_old.data #(y_i - x) from equation (5).1
+            ann.delta_control[k] = ann.control[k] - x.control[k] #(c+ - c_i) from equation (5).2
+
+        """
+        #equation (4), Option II
+
+        ### original implementation
+        #save the current model weights, including gradient
+        #temp = {}
+        #for k, v in ann.named_parameters():
+        #    temp[k] = v.data.clone() #temp[k] = y_i
+        #for k, v in x.named_parameters():
+        #    #v.data = x, local_epoch = K, ann.control[k] = c_i, self.nn.control[k] = c
+        #    ann.control[k] = ann.control[k] - self.nn.control[k] + (v.data - temp[k]) / (local_epoch * local_lr)
+        #    ann.delta_y[k] = temp[k] - v.data #(y_i - x) from equation (5).1
+        #    ann.delta_control[k] = ann.control[k] - x.control[k] #(c+ - c_i)from equation (5).2
+        ###
+
+        #using .data to prevent copy of the gradient
+        for (k, v_old), (k_bis, v_new) in zip(x.named_parameters(), ann.named_parameters()):
+            # c+ <- ci - c + (x - y_i)/(K * lr)
+            ann.control[k] = ann.control[k] - self.nn.control[k] + (v_old.data - v_new.data) / (local_epoch * local_lr)
+            ann.delta_y[k] = v_new.data - v_old.data #(y_i - x) from equation (5).1
+            ann.delta_control[k] = ann.control[k] - x.control[k] #(c+ - c_i) from equation (5).2
+        """
+        
+        #print("***")
+        #print("local control", ann.control[k])
+        #print("global control", self.nn.control[k])
+
         return ann, loss.item()
 
 class FedProx(Fedem):
@@ -1049,10 +1118,17 @@ class ScaffoldOptimizer(Optimizer):
         super(ScaffoldOptimizer, self).__init__(params, defaults)
 
     def step(self, server_controls, client_controls, closure=None):
+        loss = None
+        if closure is not None:
+            loss = closure
+
         for group in self.param_groups:
-            for p, c, ci in zip(group['params'], server_controls.values(), client_controls.values()):
+            for p, c, ci in zip(group['params'], server_controls.values(), client_controls.values()): #the keys are exactly in the same order
                 if p.grad is None:
                     continue
+                #equation (3)
                 dp = p.grad.data + c.data - ci.data
-                #local learning rate
-                p.data = p.data - dp.data * group['lr']
+                #update the local model
+                p.data = p.data - group['lr'] * dp.data
+
+        return loss

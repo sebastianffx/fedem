@@ -1,15 +1,17 @@
-from framework import Scaffold, FedAvg, FedRod, Fedem, Centralized
 from preprocessing import check_dataset
 from numpy import std, mean
 import numpy as np
 from experiment import runExperiment
+import torch
 
 #hide the warnings from torchio, because affine matrices are different for each sample
 import warnings
 
 if __name__ == '__main__':
-    #path, clients, folder_struct = 'debug_dataset/', ["center1", "center2"], "site_simple"
-    path, clients, folder_struct = '../../../../../downloads/dataset_ISLES22_rel1/', ["center1"], "OTHER"
+    torch.autograd.set_detect_anomaly(True)
+    
+    path, clients, folder_struct = 'debug_dataset/', ["center1", "center2"], "site_simple"
+    #path, clients, folder_struct = '../../../../../downloads/dataset_ISLES22_rel1/', ["center1"], "OTHER"
 
     experience_name = "debug_only_adc" 
     modality="ADC"
@@ -23,11 +25,13 @@ if __name__ == '__main__':
                 "channels":(16, 32, 64, 128),
                 "strides":(2, 2, 2),
                 "kernel_size":(3,3),
-                "num_res_units":2}
+                "num_res_units":2,
+                #"mu": 0.01, #{0.001, 0.01, 0.1, 0.5, 1}, must be optimized
+                }
 
     default = {#federation parameters
-               "g_epoch":1,
-               "l_epoch":10,
+               "g_epoch":30,
+               "l_epoch":5,
                "g_lr":0.001,
                "l_lr":0.001,
                "K":len(clients),
@@ -39,7 +43,7 @@ if __name__ == '__main__':
                "hybrid_loss_weights":[1.4,0.6],
                "suffix":"exp5",
                #training parameters
-               "val_interval":1,
+               "val_interval":30,
                "modality":modality.lower(),
                "space_cardinality":2, #or 3, depending if you have a 2D or 3D network
                "batch_size":2,
@@ -98,16 +102,23 @@ if __name__ == '__main__':
     weight_comb = [1,1]
     #for lr in np.linspace(1e-5, 1e-2, 5):
     #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
-    for weight_comb in [[1,1]]: #sum up to 2 to keep the same range as first experient with 1,1
+    for weight_comb in [[1.4,0.6]]: #sum up to 2 to keep the same range as first experient with 1,1
         tmp = default.copy()
-        tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
+        #tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
+        #tmp.update({"fedprox":True})
+        tmp.update({"scaff":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
-        networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
+        networks_name.append(f"{experience_name}_SCAFF_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
         #legacy network naming, no lambdas (valid for v1 to v4)
         #networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
 
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
+
+    fedprox = default.copy()
+    fedprox["nn_params"] = default["nn_params"].copy()
+    fedprox["nn_params"]["mu"] = 0.1
+    fedprox.update({"fedprox":True})
 
     scaff = default.copy()
     scaff.update({"scaff":True})
