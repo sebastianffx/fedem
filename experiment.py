@@ -216,16 +216,21 @@ if __name__ == '__main__':
     #for g_lr, l_lr in zip([0.01, 0.001, 0.0001], [0.001]*3):
     #for g_lr in [0.001, 0.0001]:
     #    for l_lr in [0.01, 0.001]:
-    for g_lr in [0.0001]:
-        for l_lr in [0.01]:
- 
-            tmp = default.copy()
-            #tmp.update({"scaff":True, "l_lr":l_lr, "g_lr":g_lr})
-            #tmp.update({"fedrod":True, "l_lr":l_lr, "g_lr":g_lr})
-            #tmp.update({"weighting_scheme":"BETA", "l_lr":l_lr, "g_lr":g_lr, "beta_val":0.9})
-            tmp.update({"weighting_scheme":"FEDAVG", "l_lr":l_lr, "g_lr":g_lr})
-            networks_config.append(tmp)
-            networks_name.append(f"{experience_name}_FEDAVG_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
+    for g_lr in [0.01, 0.001, 0.0001]:
+        for l_lr in [0.01, 0.001]:
+            for mu in [0.001, 0.01]: 
+                tmp = default.copy()
+                #tmp.update({"scaff":True, "l_lr":l_lr, "g_lr":g_lr})
+                #tmp.update({"fedrod":True, "l_lr":l_lr, "g_lr":g_lr})
+                tmp.update({"fedprox":True, "l_lr":l_lr, "g_lr":g_lr})
+                tmp["nn_params"] = default["nn_params"].copy()
+                tmp["nn_params"]["mu"] = mu 
+                #tmp.update({"weighting_scheme":"BETA", "l_lr":l_lr, "g_lr":g_lr, "beta_val":0.9})
+                #tmp.update({"weighting_scheme":"FEDAVG", "l_lr":l_lr, "g_lr":g_lr})
+                networks_config.append(tmp)
+                #networks_name.append(f"{experience_name}_FEDAVG_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
+                networks_name.append(f"{experience_name}_FEDPROX_mu{mu}_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
+
         
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
