@@ -639,8 +639,8 @@ class Scaffold(Fedem):
             temp.delta_y       = copy.deepcopy(self.nn.delta_y)
 
             #debug purpose, used to detect NaN in forward pass
-            for submodule in temp.modules():
-                submodule.register_forward_hook(nan_hook)
+            #for submodule in temp.modules():
+            #    submodule.register_forward_hook(nan_hook)
 
             self.nns.append(temp)
 
