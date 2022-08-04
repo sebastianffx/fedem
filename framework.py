@@ -226,7 +226,7 @@ class Fedem:
     def train():
         raise NotImplementedError
     
-    def full_volume_metric(self, dataset, network="best", benchmark_metric="dicescore", save_pred=False, verbose=True,use_isles22_metrics=False):
+    def full_volume_metric(self, dataset, network="best", benchmark_metric="dicescore", save_pred=False, verbose=True, use_isles22_metrics=False):
         """ Compute test metric for full volume of the test set
 
             network : if "best", the best model (dice loss on validation set) will be loaded and overwrite the current model
