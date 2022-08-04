@@ -21,20 +21,25 @@ def generate_nn(nn_name, nn_class, nn_params={}, scaff=False, fedrod=False, fedp
         print("network name not supported", nn_class.lower())
 
     if scaff:
+        print("using SCAFFOLD federated framework")
         #control variables for SCAFFOLD
         nn.control = {}
         nn.delta_control = {}
         nn.delta_y = {}
 
-    if fedrod:
+    elif fedrod:
+        print("using FEDROD federated framework")
         #params sets for FedRod
         nn.encoder_generic = {}
         nn.decoder_generic = {}
         nn.decoder_personalized = {}
 
-    if fedprox:
+    elif fedprox:
+        print("using FEDPROX federated framework")
         #params sets for FedRod
-        print("do nothing")
+
+    else:
+        print("using FEDAVG federated framework")
 
     nn.name = nn_name
     

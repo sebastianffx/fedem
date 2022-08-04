@@ -74,11 +74,6 @@ class Fedem:
                                                                      #external_test=self.options["external_test"],
                                                                      #external_test_add_mod=self.options["external_test_add_mod"])
 
-        print("Merged dataloader contains:")
-        print("\t", len(self.all_train_loader)*self.options["patches_per_volume"]/self.options["batch_size"], "training subjects")
-        print("\t", len(self.all_valid_loader), "validation subjects")
-        print("\t", len(self.all_test_loader), "testing subjects")
-
         if self.options["use_test_augm"]:
             self.options["test_time_augm"] = torchio_create_test_transfo()
 
