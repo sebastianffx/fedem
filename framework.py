@@ -715,6 +715,9 @@ class Scaffold(Fedem):
             ann.delta_y[k] = v_new.data - v_old.data #(y_i - x) from equation (5).1
             ann.delta_control[k] = ann.control[k] - x.control[k] #(c+ - c_i) from equation (5).2
 
+        #assert x.parameters() != ann.parameters()
+        #it seems to behave correctly when using cpu as backend, not so much when using gpu...
+
         """
         #equation (4), Option II
 

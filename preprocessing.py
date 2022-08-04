@@ -26,7 +26,8 @@ from monai.transforms import (
 
 from debug_util import get_same_res_paths
 
-def get_train_valid_test_partitions(path, modality, clients, folder_struct="site_nested", multi_label=False, additional_modalities=[], additional_labels=False):
+def get_train_valid_test_partitions(path, modality, clients, folder_struct="site_nested", multi_label=False, 
+                                    additional_modalities=[], additional_labels=False):
     """Retrieve paths to the modality map and the corresponding labels.
        Handle two dataset folder herarchy, nested (one folder per subject) or not (all subjects volume are in a single folder)
     """
@@ -45,17 +46,16 @@ def get_train_valid_test_partitions(path, modality, clients, folder_struct="site
         centers_partitions, centers_partitions_add_mod, external_test, external_test_add_mod = partition_single_folder(path, modality, clients, additional_modalities)
 
     #if using one of the multisite partition, additionnal modalities must be added separately
-    if max([len(site_addmod) for site_addmod in additional_modalities])>1:
-        if len(centers_partitions_add_mod)==0:
+    if max([len(site_addmod) for site_addmod in additional_modalities])>0:
+        if len(centers_partitions_add_mod)==0: #ugly test to make sure to not overwrite exisiting additionnal modalities
             centers_partitions_add_mod = add_modalities(path, additional_modalities, clients)
-            if additional_labels:
-                add_labels = []
-                for site in additional_modalities:
-                    if len(site)==0:
-                        add_labels.append([])
-                    else:
-                        add_labels.append([add_mod+"_mask" for add_mod in site])
-                centers_partitions_add_lbl = add_modalities(path, add_labels, clients)
+            add_labels = []
+            for site in additional_modalities:
+                if len(site)!=0 and additional_labels:
+                    add_labels.append([add_mod+"_mask" for add_mod in site])
+                else:
+                    add_labels.append([[] for i in range(len(site))])
+            centers_partitions_add_lbl = add_modalities(path, add_labels, clients)
     else:
         centers_partitions_add_mod = [[[],[],[]] for i in range(len(clients))]
 
@@ -372,7 +372,8 @@ def generate_loaders(partitions_paths, batch_size, modality, size_crop=224):
 
 # could get refractored tu a feature map with different "channels" for each modality
 
-def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels, partition_paths_additional_modalities=[], partition_paths_additional_labels=[]):
+def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels, 
+                                 partition_paths_additional_modalities=[], partition_paths_additional_labels=[]):
     subjects_list = []
 
     #TODO: compute connected component on the label map, so that the blob loss can take advantage of it
@@ -384,6 +385,7 @@ def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels, pa
                                 ref_space=tio.ScalarImage(path=[partition_paths_adc[i]]), #adc for ASTRAL, dwi for ISLES22
                                 #by default, tio load images as C,W,H,D: C is used to encode several ADC representations or modalities
                                 feature_map=tio.ScalarImage(path=[partition_paths_adc[i]]+[add_mod[i] for add_mod in partition_paths_additional_modalities]),
+                                #allow to have channel specific label map, but usually only one label image
                                 label=tio.LabelMap(path=[partition_paths_labels[i]]+[add_lbl[i] for add_lbl in partition_paths_additional_labels])
                                 )
                             )
@@ -654,17 +656,16 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                             partitions_paths_add_lbl[i][2]
                                                             )
         else:
-            print("additional modalities are encoded in synthetic subjects")
             #additionnal modalities are used to create "new subjects"
             site_train_subjects = torchio_get_loader_partition(partitions_paths[i][0][0], #volume
                                                                partitions_paths[i][1][0], #labels
                                                                )
             #additionnal modalities are used as separate subject, with their own truth map when available
             if len(partitions_paths_add_mod[i][0]) > 0:
-                print("adding training subject based on the additionnal modalities")
+                print("additional modalities are encoded in synthetic subjects")
+                #print("adding training subject based on the additionnal modalities")
                 for additional_modality, additional_labels in zip(partitions_paths_add_mod[i][0],partitions_paths_add_lbl[i][0]):
-                    print(len(additional_modality))
-                    print(len(additional_labels))
+                    print("adding", len(additional_modality), "synthetic subjects")
                     site_train_subjects += torchio_get_loader_partition(additional_modality, #volume
                                                                         additional_labels if len(additional_labels)>0 else partitions_paths[i][1][0], #labels
                                                                         )
