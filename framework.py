@@ -74,11 +74,6 @@ class Fedem:
                                                                      #external_test=self.options["external_test"],
                                                                      #external_test_add_mod=self.options["external_test_add_mod"])
 
-        print("Merged dataloader contains:")
-        print("\t", len(self.all_train_loader)*self.options["patches_per_volume"]/self.options["batch_size"], "training subjects")
-        print("\t", len(self.all_valid_loader), "validation subjects")
-        print("\t", len(self.all_test_loader), "testing subjects")
-
         if self.options["use_test_augm"]:
             self.options["test_time_augm"] = torchio_create_test_transfo()
 
@@ -231,7 +226,7 @@ class Fedem:
     def train():
         raise NotImplementedError
     
-    def full_volume_metric(self, dataset, network="best", benchmark_metric="dicescore", save_pred=False, verbose=True,use_isles22_metrics=False):
+    def full_volume_metric(self, dataset, network="best", benchmark_metric="dicescore", save_pred=False, verbose=True, use_isles22_metrics=False):
         """ Compute test metric for full volume of the test set
 
             network : if "best", the best model (dice loss on validation set) will be loaded and overwrite the current model

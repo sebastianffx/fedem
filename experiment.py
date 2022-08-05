@@ -14,7 +14,8 @@ def check_config(config):
 
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
                   additional_modalities= [], additional_labels=False, multi_label=False,
-                  clients=[], size_crop=100, folder_struct="site_nested", train=True):
+                  clients=[], size_crop=100, folder_struct="site_nested", train=True,
+                  use_isles22_metrics=False):
 
     print("Experiment using the ", datapath, "dataset")
     tmp_test = []
@@ -84,9 +85,13 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
             # compute validation and test dice loss/score using full volume (instead of slice-wise) and the best possible model
             valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best", save_pred=False))
-            test_dicemetric.append(network.full_volume_metric(dataset="test", network="best", save_pred=True))
+            test_dicemetric.append(network.full_volume_metric(dataset="test", network="best", save_pred=True,
+                                                              use_isles22_metrics=use_isles22_metrics)
+                                  )
             if len(external_test)>0:
-                external_dicemetric.append(network.full_volume_metric(dataset="external_test", network="best", save_pred=False))
+                external_dicemetric.append(network.full_volume_metric(dataset="external_test", network="best", save_pred=False,
+                                                                      use_isles22_metrics=use_isles22_metrics)
+                                          )
             #network="best" is redundant, we are reloading the same network for validation, test and external validation
 
         tmp_valid.append(valid_dicemetric)

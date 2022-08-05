@@ -721,7 +721,11 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                                  ),
                                     ])
 
-    print(len(allsites_train_subjects))
+    print("Merged dataloader contains:")
+    print("\t", len(allsites_train_subjects), "training subjects")
+    print("\t", len(allsites_valid_subjects), "validation subjects")
+    print("\t", len(allsites_test_subjects), "testing subjects")
+
     #aggreate for centralized model and validation/testing across sites
     all_train_subjects = tio.SubjectsDataset(allsites_train_subjects,
                                              transform=transform)
