@@ -126,7 +126,9 @@ if __name__ == '__main__':
     #experience_name = "no_empty_DLCE_multiadc_transfo"
     #experience_name = "singlesite1_transfo"
     #experience_name = "all20dir_deformation"
-    experience_name = "ABC_nodeformation"
+    experience_name = "ABC_nodeformation_subsampling"
+    #experience_name = "all20dir_nodeformation"
+    #experience_name = "B_nodeformation"
     #experience_name = "allsite_transfo_v1"
     #experience_name = "ABC_propermask_nodeformation"
     #experience_name = "singlerep_siteB_harmonized_propermask"
@@ -136,7 +138,7 @@ if __name__ == '__main__':
     #modality="20dir"
 
     clients=["center1", "center2", "center3"]
-    #clients=["center3"]
+    #clients=["center2"]
     number_site=len(clients)
 
     #regular 2D Unet, used for all Antoine's experiments
@@ -176,7 +178,8 @@ if __name__ == '__main__':
                "max_queue_length":16,
                "patches_per_volume":4,
                "no_deformation":True,
-               "additional_modalities": [[],[],[]], #[[],["4dir_1", "4dir_2"],[]], #list the extension of each additionnal modality you want to use for each site
+               "additional_modalities": [[],["4dir_1", "4dir_2"],[]], #list the extension of each additionnal modality you want to use for each site
+               "additional_labels":False,
                #test time augmentation
                "use_test_augm":False,
                "test_augm_threshold":0.5, #at least half of the augmented img segmentation must agree to be labelled positive
@@ -203,9 +206,9 @@ if __name__ == '__main__':
     #for lr in np.linspace(1e-5, 1e-2, 5):
     #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
     #for weight_comb in [[1, 1], [1.4,0.6], [1.6,0.4]]: #sum up to 2 to keep the same range as first experient with 1,1
-    """
+    
+    #for lr in [0.00994]:
     for lr in [0.00994]:
-    #for lr in [0.00994, 0.0116]:
         tmp = default.copy()
         tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
@@ -214,8 +217,16 @@ if __name__ == '__main__':
         #networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
     """
     #for g_lr, l_lr in zip([0.01, 0.001, 0.0001], [0.001]*3):
-    #for g_lr in [0.001, 0.0001]:
-    #    for l_lr in [0.01, 0.001]:
+    for g_lr in [0.001, 0.0001]:
+        for l_lr in [0.01, 0.001]:
+            tmp = default.copy()
+            tmp.update({"scaff":True, "l_lr":l_lr, "g_lr":g_lr})
+            #tmp.update({"weighting_scheme":"BETA", "l_lr":l_lr, "g_lr":g_lr, "beta_val":0.9})
+            #tmp.update({"weighting_scheme":"FEDAVG", "l_lr":l_lr, "g_lr":g_lr})
+            networks_config.append(tmp)
+            networks_name.append(f"{experience_name}_SCAFF_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
+    """ 
+    """
     for g_lr in [0.01, 0.001, 0.0001]:
         for l_lr in [0.01, 0.001]:
             for mu in [0.001, 0.01]: 
@@ -230,7 +241,7 @@ if __name__ == '__main__':
                 networks_config.append(tmp)
                 #networks_name.append(f"{experience_name}_FEDAVG_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
                 networks_name.append(f"{experience_name}_FEDPROX_mu{mu}_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
-
+    """
         
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
@@ -260,5 +271,5 @@ if __name__ == '__main__':
                                                 folder_struct="site_simple",
                                                 train=True,
                                                 additional_modalities=default["additional_modalities"],
-                                                additional_labels=True,
+                                                additional_labels=default["additional_labels"],
                                                 multi_label=default["multi_label"]) 
