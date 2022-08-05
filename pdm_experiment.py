@@ -150,7 +150,8 @@ if __name__ == '__main__':
                                                 additional_modalities=default["additional_modalities"],
                                                 additional_labels=default["additional_labels"],
                                                 multi_label=default["multi_label"],
-                                                use_isles22_metrics=True) 
+                                                use_isles22_metrics=True,
+                                                print_conf=False) 
  
     print("metrics for site 2 test set alone")
     valid_metrics, test_metrics = runExperiment(datapath=path,
@@ -166,7 +167,8 @@ if __name__ == '__main__':
                                                 additional_modalities=default["additional_modalities"],
                                                 additional_labels=default["additional_labels"],
                                                 multi_label=default["multi_label"],
-                                                use_isles22_metrics=True) 
+                                                use_isles22_metrics=True,
+                                                print_conf=False) 
     print("metrics for site 3 test set alone")
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
@@ -181,4 +183,5 @@ if __name__ == '__main__':
                                                 additional_modalities=default["additional_modalities"],
                                                 additional_labels=default["additional_labels"],
                                                 multi_label=default["multi_label"],
-                                                use_isles22_metrics=True) 
+                                                use_isles22_metrics=True,
+                                                print_conf=False) 
