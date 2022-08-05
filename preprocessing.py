@@ -449,7 +449,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
         #transform = tio.Compose([select_channel, clamp, toCanon, rescale, spatial, tio.RandomFlip(axes="R"), padding, rotation])
 
         #removed the random affine and elastic deformation
-        transform = tio.Compose([select_channel, toCanon, resample, flipping, rotation, clamp, rescale, padding])
+        transform = tio.Compose([select_channel, toCanon, resample, flipping, affine, clamp, rescale, padding])
         print("flipping and rotation in addition to scaling and padding")
         return transform, transform_valid
 
