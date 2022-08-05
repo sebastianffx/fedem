@@ -23,16 +23,8 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
     tmp_valid = []
     tmp_external = []
 
-    #fetch the files paths, create the data loading/augmentation routines
-    centers_partitions, \
-    partitions_paths_add_mod, partitions_paths_add_lbl, \
-    external_test, external_test_add_mod = get_train_valid_test_partitions(path=datapath,
-                                                                           modality=modality,
-                                                                           clients=clients,
-                                                                           folder_struct=folder_struct,
-                                                                           multi_label=multi_label,
-                                                                           additional_modalities=additional_modalities,
-                                                                           additional_labels=additional_labels)
+    if len(datapath) != num_repetitions:
+        print("datapath should be a vector containing all the path to the data split, one per repetition")
 
     if len(clients)<1:
         print("Must have at least one client")
@@ -46,7 +38,19 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
         #verify that the config parameters are coherent
         check_config(conf)
 
-        for rep in range(num_repetitions):
+        for rep in range(len(datapath)):
+
+            #fetch the files paths, create the data loading/augmentation routines
+            centers_partitions, \
+            partitions_paths_add_mod, partitions_paths_add_lbl, \
+            external_test, external_test_add_mod = get_train_valid_test_partitions(path=datapath[rep],
+                                                                                   modality=modality,
+                                                                                   clients=clients,
+                                                                                   folder_struct=folder_struct,
+                                                                                   multi_label=multi_label,
+                                                                                   additional_modalities=additional_modalities,
+                                                                                   additional_labels=additional_labels)
+
             print(f"{networks_name[i]} iteration {rep+1}")
             if print_conf:
                 print(conf)
