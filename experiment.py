@@ -15,7 +15,8 @@ def check_config(config):
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
                   additional_modalities= [], additional_labels=False, multi_label=False,
                   clients=[], size_crop=100, folder_struct="site_nested", train=True,
-                  use_isles22_metrics=False):
+                  use_isles22_metrics=False,
+                  print_conf=True):
 
     print("Experiment using the ", datapath, "dataset")
     tmp_test = []
@@ -47,7 +48,8 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
 
         for rep in range(num_repetitions):
             print(f"{networks_name[i]} iteration {rep+1}")
-            print(conf)
+            if print_conf:
+                print(conf)
             
             conf["partitions_paths"]=centers_partitions
             conf["partitions_paths_add_mod"]=partitions_paths_add_mod
@@ -56,7 +58,6 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             external_test_add_mod = []
             conf["external_test"]= external_test 
             conf["external_test_add_mod"]=external_test_add_mod
-
                 
             #add number to differentiate replicates
             if exp_name!=None:
@@ -67,14 +68,19 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             conf["network_name"] = networks_name[i]
 
             if "scaff" in conf.keys() and conf["scaff"]:
+                print("using SCAFFOLD federated framework")
                 network = Scaffold(conf)
             elif "fedrod" in conf.keys() and conf["fedrod"]:
+                print("using FEDROD federated framework")
                 network = FedRod(conf)
             elif "fedprox" in conf.keys() and conf["fedprox"]:
+                print("using FEDPROX federated framework")
                 network = FedProx(conf)
             elif 'weighting_scheme' in conf.keys():
+                print("using FEDAVG federated framework")
                 network = FedAvg(conf)
             elif "centralized" in conf.keys() and conf["centralized"]:
+                print("using CENTRALIZED framework")
                 network = Centralized(conf)
             else:
                 print("missing argument for network type")
