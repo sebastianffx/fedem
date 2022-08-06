@@ -132,6 +132,74 @@ def get_same_res_paths(nifti_labl_paths, spacing=(2.0, 2.0, 2.0), folder_label="
             other_adc_paths.append(path_to_modality.replace("_msk.nii.gz", "_adc.nii.gz"))
     return labels_paths, dwi_paths, flair_paths, adc_paths, other_labels_paths, other_dwi_paths, other_flair_paths, other_adc_paths
 
+def shuffle_dataset(path_to_dataset, new_folder_name, extensions=["_4dir_1", "_4dir_2"]):
+
+    nb_sites = len(glob(path_to_dataset+"/*"))
+
+    #find all the subjects
+    all_subjects = [file for file in glob(path_to_dataset+"/*/*/*") if "_adc" in file]
+    np.random.shuffle(all_subjects)
+
+    #master folder
+    os.makedirs(new_folder_name, exist_ok=True)
+
+    begin_checkpoint = 0
+    for center_num in range(1, nb_sites+1):
+        #site main folder
+        os.makedirs(os.path.join(new_folder_name, "center"+str(center_num)), exist_ok=True)
+        target_folder = os.path.join(new_folder_name, "center"+str(center_num))
+
+        os.makedirs(os.path.join(target_folder, "train"), exist_ok=True)
+        end_checkpoint = begin_checkpoint+len([file for file in glob(path_to_dataset+"/center"+str(center_num)+"/train/*") if "_adc" in file])
+        print(begin_checkpoint, end_checkpoint)
+        for f in all_subjects[begin_checkpoint:end_checkpoint]:
+            #adc
+            shutil.copy(f,
+                        os.path.join(target_folder, "train", f.split("/")[-1]))
+            #mask
+            shutil.copy(f.replace("_adc", "_msk"),
+                        os.path.join(target_folder, "train", f.split("/")[-1].replace("_adc", "_msk")))
+            #handle additionnal modalities
+            for ext in extensions:
+                if os.path.isfile(f.replace("_adc", ext)):
+                    shutil.copy(f.replace("_adc", ext),
+                        os.path.join(target_folder, "train", f.split("/")[-1].replace("_adc", ext)))
+
+        os.makedirs(os.path.join(target_folder, "valid"), exist_ok=True)
+        begin_checkpoint = end_checkpoint
+        end_checkpoint = begin_checkpoint+len([file for file in glob(path_to_dataset+"/center"+str(center_num)+"/valid/*") if "_adc" in file])
+        print(begin_checkpoint, end_checkpoint)
+        for f in all_subjects[begin_checkpoint:end_checkpoint]:
+            #adc
+            shutil.copy(f,
+                        os.path.join(target_folder, "valid", f.split("/")[-1]))
+            #mask
+            shutil.copy(f.replace("_adc", "_msk"),
+                        os.path.join(target_folder, "valid", f.split("/")[-1].replace("_adc", "_msk")))
+            #handle additionnal modalities
+            for ext in extensions:
+                if os.path.isfile(f.replace("_adc", ext)):
+                    shutil.copy(f.replace("_adc", ext),
+                        os.path.join(target_folder, "valid", f.split("/")[-1].replace("_adc", ext)))
+
+        os.makedirs(os.path.join(target_folder, "test") , exist_ok=True)
+        begin_checkpoint = end_checkpoint
+        end_checkpoint = begin_checkpoint+len([file for file in glob(path_to_dataset+"/center"+str(center_num)+"/test/*") if "_adc" in file])
+        print(begin_checkpoint, end_checkpoint)
+        for f in all_subjects[begin_checkpoint:end_checkpoint]:
+            #adc
+            shutil.copy(f,
+                        os.path.join(target_folder, "test", f.split("/")[-1]))
+            #mask
+            shutil.copy(f.replace("_adc", "_msk"),
+                        os.path.join(target_folder, "test", f.split("/")[-1].replace("_adc", "_msk")))
+            #handle additionnal modalities
+            for ext in extensions:
+                if os.path.isfile(f.replace("_adc", ext)):
+                    shutil.copy(f.replace("_adc", ext),
+                        os.path.join(target_folder, "test", f.split("/")[-1].replace("_adc", ext)))
+
+        begin_checkpoint = end_checkpoint
 
 def generateSPLIT(path_to_dataset, dataset_name, train_valid_test=[0.75,0.1,0.15], spacing=(2.0, 2.0, 2.0), gen_csv=False):
 
