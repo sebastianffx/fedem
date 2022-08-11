@@ -453,6 +453,19 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
         print("flipping and rotation in addition to scaling and padding")
         return transform, transform_valid
 
+def torchio_z_score_transfo(clamp_min, clamp_max, padding, patch_size, no_deformation=False, forced_channel=-1):
+    print("using z-score transformations")
+    clamp = tio.Clamp(out_min=clamp_min, out_max=clamp_max)
+    rescale = tio.ZNormalization()
+    padding = tio.Pad(padding=padding, padding_mode="edge") #padding is typicaly equals to half the size of the patch_size
+    toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
+    resample = tio.Resample("ref_space")
+
+    transform_valid = tio.Compose([toCanon, resample, clamp, rescale])
+    transform = tio.Compose([toCanon, resample, clamp, rescale, padding])
+    return transform, transform_valid
+
+
 def isles22_torchio_create_transform(padding, patch_size, no_deformation):
     """Normalize each modality differently using hardcoded values.
        The order of the modalities in the channel dimensionsis assumed to be either:
@@ -613,6 +626,13 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
     elif no_deformation == "brats":
         transform, transform_valid = brats_torchio_create_transform(padding=padding,
                                                                     patch_size=patch_size)
+    elif no_deformation == "z-score":
+        transform, transform_valid = torchio_z_score_transfo(clamp_min=clamp_min,
+                                                             clamp_max=clamp_max,
+                                                             padding=padding,
+                                                             patch_size=patch_size,
+                                                             no_deformation=no_deformation,
+                                                             forced_channel=forced_channel)
     else:
         transform, transform_valid = torchio_create_transfo(clamp_min=clamp_min,
                                                             clamp_max=clamp_max,
