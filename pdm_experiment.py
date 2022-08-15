@@ -5,8 +5,8 @@ if __name__ == '__main__':
     #path = 'astral_fedem_dti/'
     #path = 'astral_fedem_20dir/'
     #path = 'astral_fedem_multiadc_newlabels/'
-    path = 'astral_fedem_ABC/'
-    #path = 'astral_fedem_ABC_harmonized/'
+    #path = 'astral_fedem_ABC/'
+    path = 'astral_fedem_ABC_harmonized/'
     #path = 'astral_fedem_ABC_propermask/'
     #path = 'astral_fedem_ABC_harmonized_propermask/'
 
@@ -16,7 +16,7 @@ if __name__ == '__main__':
     #experience_name = "no_empty_DLCE_multiadc_transfo"
     #experience_name = "singlesite1_transfo"
     #experience_name = "all20dir_deformation"
-    experience_name = "ABC_nodeformation_subsampling"
+    experience_name = "ABC_harmonized_nodeformation"
     #experience_name = "all20dir_nodeformation"
     #experience_name = "B_nodeformation"
     #experience_name = "allsite_transfo_v1"
@@ -68,7 +68,7 @@ if __name__ == '__main__':
                "max_queue_length":16,
                "patches_per_volume":4,
                "no_deformation":True,
-               "additional_modalities": [[],["4dir_1", "4dir_2"],[]], #list the extension of each additionnal modality you want to use for each site
+               "additional_modalities": [[],[],[]], #[[],["4dir_1", "4dir_2"],[]], #list the extension of each additionnal modality you want to use for each site
                "additional_labels":False,
                #test time augmentation
                "use_test_augm":False,
@@ -97,7 +97,7 @@ if __name__ == '__main__':
         networks_config.append(tmp)
         networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
     """
-    """
+    
     for g_lr in [0.0001]:
         for l_lr in [0.01]:
             tmp = default.copy()
@@ -120,7 +120,7 @@ if __name__ == '__main__':
                 tmp["nn_params"]["mu"] = mu 
                 networks_config.append(tmp)
                 networks_name.append(f"{experience_name}_FEDPROX_mu{mu}_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
-    
+    """    
         
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
@@ -137,6 +137,7 @@ if __name__ == '__main__':
                                                 multi_label=default["multi_label"],
                                                 use_isles22_metrics=True) 
     print("metrics for site 1 test set alone")
+    networks_config[0]["clients"] = ["center1"]
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
                                                 networks_config=networks_config,
@@ -154,6 +155,7 @@ if __name__ == '__main__':
                                                 print_conf=False) 
  
     print("metrics for site 2 test set alone")
+    networks_config[0]["clients"] = ["center2"]
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
                                                 networks_config=networks_config,
@@ -170,6 +172,7 @@ if __name__ == '__main__':
                                                 use_isles22_metrics=True,
                                                 print_conf=False) 
     print("metrics for site 3 test set alone")
+    networks_config[0]["clients"] = ["center3"]
     valid_metrics, test_metrics = runExperiment(datapath=path,
                                                 num_repetitions=1,
                                                 networks_config=networks_config,

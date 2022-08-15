@@ -391,7 +391,7 @@ def torchio_get_loader_partition(partition_paths_adc, partition_paths_labels,
                             )
     return subjects_list
 
-def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deformation=False, forced_channel=-1):
+def torchio_create_transform(clamp_min, clamp_max, padding, patch_size, no_deformation=False, forced_channel=-1):
     print("using generic preprocessing transformations")
     clamp = tio.Clamp(out_min=clamp_min, out_max=clamp_max)
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
@@ -453,7 +453,7 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
         print("flipping and rotation in addition to scaling and padding")
         return transform, transform_valid
 
-def bern_torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deformation=False, forced_channel=-1):
+def bern_torchio_create_transform(clamp_min, clamp_max, padding, patch_size, no_deformation=False, forced_channel=-1):
     print("using generic preprocessing transformations")
     clamp = tio.Clamp(out_min=clamp_min, out_max=clamp_max)
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
@@ -467,6 +467,17 @@ def bern_torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_de
     transform = tio.Compose([select_channel, toCanon, resample, clamp, rescale, padding])
     return transform, transform_valid
 
+def torchio_z_score_transform(clamp_min, clamp_max, padding, patch_size, no_deformation=False, forced_channel=-1):
+    print("using z-score transformations")
+    clamp = tio.Clamp(out_min=clamp_min, out_max=clamp_max)
+    rescale = tio.ZNormalization()
+    padding = tio.Pad(padding=padding, padding_mode="edge") #padding is typicaly equals to half the size of the patch_size
+    toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
+    resample = tio.Resample("ref_space")
+
+    transform_valid = tio.Compose([toCanon, resample, clamp, rescale])
+    transform = tio.Compose([toCanon, resample, clamp, rescale, padding])
+    return transform, transform_valid
 
 def isles22_torchio_create_transform(padding, patch_size, no_deformation):
     """Normalize each modality differently using hardcoded values.
@@ -628,13 +639,27 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
     elif no_deformation == "brats":
         transform, transform_valid = brats_torchio_create_transform(padding=padding,
                                                                     patch_size=patch_size)
+    elif no_deformation == "z-score":
+        transform, transform_valid = torchio_z_score_transform(clamp_min=clamp_min,
+                                                               clamp_max=clamp_max,
+                                                               padding=padding,
+                                                               patch_size=patch_size,
+                                                               no_deformation=no_deformation,
+                                                               forced_channel=forced_channel)
+    elif no_deformation == "bern":
+        transform, transform_valid = bern_torchio_create_transform(clamp_min=clamp_min,
+                                                                   clamp_max=clamp_max,
+                                                                   padding=padding,
+                                                                   patch_size=patch_size,
+                                                                   no_deformation=no_deformation,
+                                                                   forced_channel=forced_channel)
     else:
-        transform, transform_valid = torchio_create_transfo(clamp_min=clamp_min,
-                                                            clamp_max=clamp_max,
-                                                            padding=padding,
-                                                            patch_size=patch_size,
-                                                            no_deformation=no_deformation,
-                                                            forced_channel=forced_channel)
+        transform, transform_valid = torchio_create_transform(clamp_min=clamp_min,
+                                                              clamp_max=clamp_max,
+                                                              padding=padding,
+                                                              patch_size=patch_size,
+                                                              no_deformation=no_deformation,
+                                                              forced_channel=forced_channel)
 
     #patch has 0.7 prob of being centered on a label=1
     labels_probabilities = {0: 0.3, 1: 0.7}
