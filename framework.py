@@ -31,23 +31,15 @@ import torchio as tio
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
 
-def nan_hook(self, inp, output):
-    if not isinstance(output, tuple):
-        outputs = [output]
-    else:
-        outputs = output
-
-    for i, out in enumerate(outputs):
-        nan_mask = torch.isnan(out)
-        if nan_mask.any():
-            print("In", self.__class__.__name__)
-            print(torch.nansum(out))
-            raise RuntimeError(f"Found NAN in output {i} at indices: ", nan_mask.nonzero(), "where:", out[nan_mask.nonzero()[:, 0].unique(sorted=True)])
-
 print(f"Using {device} as backend")
 
 class Fedem:
+    """ Abstract super class for all the federated algorithm; implement the methods common to all the frameworks.
+    """
     def __init__(self, options):
+        """ Class constructor, generate the dataloaders, the loss function and the operations applied to convert the model output to
+            binary mask.
+        """
         self.options = options
 
         #routine to convert U-Net output to segmentation mask
@@ -55,24 +47,23 @@ class Fedem:
         self.post_sigmoid = Compose([EnsureType(), Activations(sigmoid=True)])
 
         if self.options["use_torchio"]:
-            ##    convert_mask = tio.Lambda(lambda img: np.squeeze(torch.stack([(img == 1) | (img == 4), (img == 1) | (img == 4) | (img == 2), img == 4],dim=0)), types_to_apply=[tio.LABEL])
-
+            # convert_mask = tio.Lambda(lambda img: np.squeeze(torch.stack([(img == 1) | (img == 4), (img == 1) | (img == 4) | (img == 2), img == 4],dim=0)), types_to_apply=[tio.LABEL])
 
             self.dataloaders, \
                 self.all_test_loader, self.all_valid_loader, self.all_train_loader, \
                 self.external_loader = torchio_generate_loaders(partitions_paths=options["partitions_paths"],
-                                                                     batch_size=self.options["batch_size"],
-                                                                     clamp_min=self.options["clamp_min"],
-                                                                     clamp_max=self.options["clamp_max"],
-                                                                     padding=self.options["padding"],
-                                                                     patch_size=self.options["patch_size"],
-                                                                     max_queue_length=self.options["max_queue_length"],
-                                                                     patches_per_volume=self.options["patches_per_volume"],
-                                                                     no_deformation=self.options["no_deformation"],
-                                                                     partitions_paths_add_mod=self.options["partitions_paths_add_mod"],
-                                                                     partitions_paths_add_lbl=self.options["partitions_paths_add_lbl"],)
-                                                                     #external_test=self.options["external_test"],
-                                                                     #external_test_add_mod=self.options["external_test_add_mod"])
+                                                                batch_size=self.options["batch_size"],
+                                                                clamp_min=self.options["clamp_min"],
+                                                                clamp_max=self.options["clamp_max"],
+                                                                padding=self.options["padding"],
+                                                                patch_size=self.options["patch_size"],
+                                                                max_queue_length=self.options["max_queue_length"],
+                                                                patches_per_volume=self.options["patches_per_volume"],
+                                                                no_deformation=self.options["no_deformation"],
+                                                                partitions_paths_add_mod=self.options["partitions_paths_add_mod"],
+                                                                partitions_paths_add_lbl=self.options["partitions_paths_add_lbl"],)
+                                                                #external_test=self.options["external_test"],
+                                                                #external_test_add_mod=self.options["external_test_add_mod"])
 
         if self.options["use_test_augm"]:
             self.options["test_time_augm"] = torchio_create_test_transfo()
@@ -114,6 +105,11 @@ class Fedem:
                                                          )
 
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr, early_stop_limit=-1):
+        """ Method encapsulating the server and clients training, take care of the global model dispatch, the clients updates
+            and the models aggregation.
+            Also comprise of an early stop functionnality to interrupt the training if the validation dice score does not change
+            after a given number of epochs
+        """
         metric_values = list()
         best_metric = -1
         best_metric_epoch = -1
@@ -168,6 +164,8 @@ class Fedem:
         return NotImplementedError
     
     def client_update(self, index, local_epoch, local_lr, cur_epoch):
+        """ Call each client update function at each global epoch.
+        """
         tmp=0
         #round loss is assumed to be the generic model loss 
         for i in index:
@@ -183,12 +181,16 @@ class Fedem:
         self.writer.add_scalar('avg training loss', tmp, cur_epoch)
 
     def dispatch(self, index):
+        """ Copy the global model weights to the local models after each aggregation.
+        """
         for j in index:
             for old_params, new_params in zip(self.nns[j].parameters(), self.nn.parameters()):
                 old_params.data = new_params.data.clone()
 
 
     def test(self, dataloader_test, test=True, model_path=None):
+        """ Assess the global model performance on the test set (slice-wise).
+        """
         model=self.nn
 
         if model_path != None:
@@ -226,8 +228,10 @@ class Fedem:
     def train():
         raise NotImplementedError
     
-    def full_volume_metric(self, dataset, network="best", benchmark_metric="dicescore", save_pred=False, verbose=True, use_isles22_metrics=False):
-        """ Compute test metric for full volume of the test set
+    def full_volume_metric(self, dataset, network="best", benchmark_metric="dicescore",
+                           save_pred=False, verbose=True, use_isles22_metrics=False):
+        """ Compute the test metrics for every volume in the test set, stack the prediction for each slice and compare with
+            the full ground truth volume.
 
             network : if "best", the best model (dice loss on validation set) will be loaded and overwrite the current model
         """
@@ -284,14 +288,14 @@ class Fedem:
         holder_diceloss = []
         dice_metric.reset()
 
-        #### TMP : used to test the best approach to average the output
+        ### Used to test the best approach to average the output for test-time augmentation
         dice_metric_augm = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
         dice_metric_augm_no_thres = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
         holder_dicemetric_augm = []
         holder_dicemetric_augm_no_thres = []
         ### END TMP
 
-        ### TMP : for ISLES22 metrics functions
+        ### ISLES22 metrics functions
         isles_metrics = [[],[],[],[]]
         astral_voxel_size = 1.63*1.63*3
         ###
@@ -518,6 +522,8 @@ class Fedem:
         return np.round(np.mean(holder_dicemetric), 4), np.round(np.std(holder_dicemetric),4)
 
     def load_inputs(self, batch_data):
+        """ Wrapper for input loading, handle 2D and 3D segmentation model inputs.
+        """
         if self.options["use_torchio"]:
             #2D Net, potentially multi-channel
             if self.options["space_cardinality"]==2:
@@ -530,6 +536,8 @@ class Fedem:
             return batch_data[0][:,:,:,:,0].float().to(device), batch_data[1][:,:,:,:,0].to(device)
 
     def global_test(self, aggreg_dataloader_test):
+        """ Compute the performance of client models on their respective test-set.
+        """
         model = self.nn
         model.eval()
         
@@ -543,7 +551,13 @@ class Fedem:
         test(model, aggreg_dataloader_test)
 
 class FedAvg(Fedem):
+    """ Implementation of the Federated Average algorithm from B. McMahan et al. “Communication-Efficient Learning of Deep Networks from Decentralized Data”,
+        https://proceedings.mlr.press/v54/mcmahan17a.html
+    """
     def __init__(self, options):
+        """ Class constructor, define the scheme used to average the clients models.
+            Declare the segmentation model of both the server and the clients.
+        """
         super(FedAvg, self).__init__(options)
 
         self.weighting_scheme = options['weighting_scheme']
@@ -569,6 +583,9 @@ class FedAvg(Fedem):
             self.nns.append(temp)
 
     def aggregation(self, index, global_lr):
+        """ Average the clients models, several variations are available to weights the contribution of each clients
+            based on the number of subjects present in their training dataset.
+        """
         client_weights=[]
 
         #would be possible to use sampling here
@@ -589,6 +606,8 @@ class FedAvg(Fedem):
         self.nn.load_state_dict(global_weights)
 
     def train(self, ann, dataloader_train, local_epoch, local_lr):
+        """ Train the client model using the subjects present in its training dataset.
+        """
         #train client to train mode
         ann.train()
                 
@@ -606,7 +625,13 @@ class FedAvg(Fedem):
         return ann, loss.item()
 
 class Scaffold(Fedem):
+    """ Implementation of the Scaffold algorithm from S. P. Karimireddy et al. “SCAFFOLD: Stochastic Controlled Averaging for Federated Learning”, 
+    http://arxiv.org/abs/1910.06378
+    """
     def __init__(self, options):
+        """ Class constructor, define the control variables.
+            Declare the segmentation model of both the server and the clients.
+        """
         super(Scaffold, self).__init__(options)
 
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"SCAFFOLD"+options['suffix'])
@@ -633,13 +658,11 @@ class Scaffold(Fedem):
             temp.delta_control = copy.deepcopy(self.nn.delta_control)
             temp.delta_y       = copy.deepcopy(self.nn.delta_y)
 
-            #debug purpose, used to detect NaN in forward pass
-            #for submodule in temp.modules():
-            #    submodule.register_forward_hook(nan_hook)
-
             self.nns.append(temp)
 
     def aggregation(self, index, global_lr, **kwargs):
+        """ Average the clients models using the control variables.
+        """
         s = 0.0
         for j in index:
             # normal
@@ -666,7 +689,10 @@ class Scaffold(Fedem):
             v.data += global_lr / len(index) * x[k].data #len(index) = |S| in publication
             self.nn.control[k].data += c[k].data / len(index) #len(index) = N in publication
 
-    def train(self, ann, dataloader_train, local_epoch, local_lr):
+    def train(self, ann, dataloader_train, local_epoch, local_lr, method=0):
+        """ Train the client model using the subjects present in its training dataset.
+            Update the controls variables, the two approach introduced in the original article are implemented
+        """
         #creating copy of the client model to update the control variable
         #equals to the global model for the 1st client but then, server control variable are updated
         x = copy.deepcopy(ann)
@@ -687,62 +713,59 @@ class Scaffold(Fedem):
                 loss.backward()
                 optimizer.step(self.nn.control, ann.control) #performing SGD on the control variables
 
-        #equation (4), Option I
-        ann.control = {}
-        for epoch in range(local_epoch):
-            for batch_data in dataloader_train:
-                inputs, labels = self.load_inputs(batch_data)
-                #prediction using the global model
-                y_pred = self.nn(inputs)
-                loss = self.loss_function(y_pred, labels)
-                #gradient of local data, w.r.t the global model weights
-                gradients = torch.autograd.grad(loss, self.nn.parameters())
+        if method==0:
+            #equation (4), Option I
+            ann.control = {}
+            for epoch in range(local_epoch):
+                for batch_data in dataloader_train:
+                    inputs, labels = self.load_inputs(batch_data)
+                    #prediction using the global model
+                    y_pred = self.nn(inputs)
+                    loss = self.loss_function(y_pred, labels)
+                    #gradient of local data, w.r.t the global model weights
+                    gradients = torch.autograd.grad(loss, self.nn.parameters())
 
-                #sum the gradient over the local batches to obtain gradient of local data for global model
-                #TODO: might require normalization by the number of epochs?
-                for (k, v), grad in zip(ann.named_parameters(), gradients):
-                    if k in ann.control.keys():
-                        ann.control[k] += grad.data
-                    else:
-                        ann.control[k] = grad.data
+                    #sum the gradient over the local batches to obtain gradient of local data for global model
+                    #TODO: might require normalization by the number of epochs?
+                    for (k, v), grad in zip(ann.named_parameters(), gradients):
+                        if k in ann.control.keys():
+                            ann.control[k] += grad.data
+                        else:
+                            ann.control[k] = grad.data
 
-        for (k, v_old), (k_bis, v_new) in zip(x.named_parameters(), ann.named_parameters()):
-            ann.delta_y[k] = v_new.data - v_old.data #(y_i - x) from equation (5).1
-            ann.delta_control[k] = ann.control[k] - x.control[k] #(c+ - c_i) from equation (5).2
+            for (k, v_old), (k_bis, v_new) in zip(x.named_parameters(), ann.named_parameters()):
+                ann.delta_y[k] = v_new.data - v_old.data #(y_i - x) from equation (5).1
+                ann.delta_control[k] = ann.control[k] - x.control[k] #(c+ - c_i) from equation (5).2
 
-        """
-        #equation (4), Option II
+        else:
+            #equation (4), Option II
+            temp = {}
+            for k, v in ann.named_parameters():
+                temp[k] = v.data.clone() #temp[k] = y_i
+            for k, v in x.named_parameters():
+                #v.data = x, local_epoch = K, ann.control[k] = c_i, self.nn.control[k] = c
+                ann.control[k] = ann.control[k] - self.nn.control[k] + (v.data - temp[k]) / (local_epoch * local_lr)
+                ann.delta_y[k] = temp[k] - v.data #(y_i - x) from equation (5).1
+                ann.delta_control[k] = ann.control[k] - x.control[k] #(c+ - c_i)from equation (5).2
 
-        ### original implementation
-        #save the current model weights, including gradient
-        #temp = {}
-        #for k, v in ann.named_parameters():
-        #    temp[k] = v.data.clone() #temp[k] = y_i
-        #for k, v in x.named_parameters():
-        #    #v.data = x, local_epoch = K, ann.control[k] = c_i, self.nn.control[k] = c
-        #    ann.control[k] = ann.control[k] - self.nn.control[k] + (v.data - temp[k]) / (local_epoch * local_lr)
-        #    ann.delta_y[k] = temp[k] - v.data #(y_i - x) from equation (5).1
-        #    ann.delta_control[k] = ann.control[k] - x.control[k] #(c+ - c_i)from equation (5).2
-        ###
-
-        #using .data to prevent copy of the gradient
-        for (k, v_old), (k_bis, v_new) in zip(x.named_parameters(), ann.named_parameters()):
-            # c+ <- ci - c + (x - y_i)/(K * lr)
-            ann.control[k] = ann.control[k] - self.nn.control[k] + (v_old.data - v_new.data) / (local_epoch * local_lr)
-            ann.delta_y[k] = v_new.data - v_old.data #(y_i - x) from equation (5).1
-            ann.delta_control[k] = ann.control[k] - x.control[k] #(c+ - c_i) from equation (5).2
-        """
-        
-        #print("***")
-        #print("local control", ann.control[k])
-        #print("global control", self.nn.control[k])
+            #using .data to prevent copy of the gradient
+            for (k, v_old), (k_bis, v_new) in zip(x.named_parameters(), ann.named_parameters()):
+                # c+ <- ci - c + (x - y_i)/(K * lr)
+                ann.control[k] = ann.control[k] - self.nn.control[k] + (v_old.data - v_new.data) / (local_epoch * local_lr)
+                ann.delta_y[k] = v_new.data - v_old.data #(y_i - x) from equation (5).1
+                ann.delta_control[k] = ann.control[k] - x.control[k] #(c+ - c_i) from equation (5).2
 
         return ann, loss.item()
 
 class FedProx(Fedem):
-    """ Heavily inspired from this implementation: https://github.com/ki-ljl/FedProx-PyTorch
+    """ Implementation of the FedProx algorithm from T. Li et al. “Federated Optimization in Heterogeneous Networks”
+    https://proceedings.mlsys.org/paper/2020/file/38af86134b65d0f10fe33d30dd76442e-Paper.pdf
+    Inspired from the implementation found at https://github.com/ki-ljl/FedProx-PyTorch
     """
     def __init__(self, options):
+        """ Class constructor, define the mu hyper-parameter.
+            Declare the segmentation model of both the server and the clients.
+        """
         super(FedProx, self).__init__(options)
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"FEDPROX"+options['suffix'])
 
@@ -763,6 +786,8 @@ class FedProx(Fedem):
             self.nns.append(temp)
             
     def aggregation(self, index, global_lr, **kwargs):
+        """ Average the clients models, similar to the federated average algorithm
+        """
         s = 0.0
         for j in index:
             # normal
@@ -781,7 +806,9 @@ class FedProx(Fedem):
 
 
     def train(self, ann, dataloader_train, local_epoch, local_lr):
-        #set client model to train mode
+        """ Train the client model using the subjects present in its training dataset, the loss is
+            modified based on the mu hyperparameter and the norm between the global and local model.
+        """
         ann.train()
                 
         optimizer = Adam(ann.parameters(), local_lr)
@@ -805,12 +832,16 @@ class FedProx(Fedem):
         return ann, loss.item()
 
 class FedRod(Fedem):
+    """ Implementation of the FedProx algorithm from H. Chen et al. “On Bridging Generic and Personalized Federated Learning for Image Classification.”
+    """
     def __init__(self, options):
+        """ Class constructor, determine with layers of the segmentation network will be used to perform personnalized prediction.
+            Declare the segmentation model of both the server and the clients.
+        """
         super(FedRod, self).__init__(options)
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+"FEDROD"+options['suffix'])
         self.K = options['K']
-        #self.name_encoder_layers = ["model.0", "model.1.submodule.0", "model.1.submodule.1.submodule.2.0",
-        #                            "model.1.submodule.1.submodule.0", "model.1.submodule.1.submodule.1"]
+
         self.name_encoder_layers = ["model.0.conv.unit0.conv.weight",
                                     "model.0.conv.unit0.conv.bias",
                                     "model.0.conv.unit0.adn.A.weight",
@@ -865,7 +896,6 @@ class FedRod(Fedem):
                                     "model.2.1.conv.unit0.conv.bias"]
 
         self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
-        print(self.trainloaders_lengths)
         #server model
         self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"], fedrod=True).to(device)
         
@@ -879,9 +909,7 @@ class FedRod(Fedem):
                 if dec_layer == k:
                     self.nn.decoder_generic[k] = copy.deepcopy(v.data)
                     self.nn.decoder_personalized[k] = torch.zeros(v.data.shape)
-                    #self.nn.decoder_personalized[k] = copy.deepcopy(v.data)
                     
-        #print(self.nn.decoder_generic)
         #clients of the federation
         self.nns = []
         for i in range(len(options['clients'])):
@@ -892,20 +920,17 @@ class FedRod(Fedem):
             temp.decoder_personalized = copy.deepcopy(self.nn.decoder_personalized)            
             self.nns.append(temp)
             
-    
-
     def aggregation(self, index, global_lr, **kwargs):
+        """ Average the clients models, both personalized and generic heads.
+        """
         s = 0.0
         for j in index:
             # normal
             s += self.nns[j].len
-        #print(self.trainloaders_lengths)   
-        #print(sum(self.trainloaders_lengths)) 
+
         num_training_data_samples = np.sum([self.trainloaders_lengths[z] for z in index])        
-        #print(num_training_data_samples)
-        #print(index)
-        # Agregating the generic encoder from clients encoders
-        
+
+        # Agregating the generic encoder from clients encoders        
         avg_weights_encoder = copy.deepcopy(self.nns[0].encoder_generic)    
         for k, v in self.nn.named_parameters():    
         #for key in avg_weights_encoder:
@@ -930,6 +955,8 @@ class FedRod(Fedem):
 
 
     def train(self, ann, dataloader_train, local_epoch, local_lr):
+        """ Train the client models using the subjects present in its training dataset, both the personalized and generic heads are updated.
+        """
         #First the generic encoder-decoder are updated       
         ann.train()
         ann.len = len(dataloader_train)
@@ -937,8 +964,6 @@ class FedRod(Fedem):
         optimizer = torch.optim.Adam(ann.parameters(), lr=local_lr)
         loss_generic = self.loss_function(torch.tensor(np.zeros((1,10))), torch.tensor(np.zeros((1,10))))
         loss_personalized = self.loss_function(torch.tensor(np.zeros((1,10))), torch.tensor(np.zeros((1,10))))
-        # for k, v in self.nn.named_parameters():
-        # print(v.requires_grad, v.dtype, v.device, k)
 
         for epoch in range(local_epoch):
             for batch_data in dataloader_train:
@@ -971,9 +996,6 @@ class FedRod(Fedem):
                 if device.type =='cpu':
                     output_generic = copy.deepcopy(y_pred_generic.detach().numpy())
 
-                #print("OUTPUT SHAPE")
-                #print(output_generic.shape)
-
                 for k,v in ann.named_parameters():
                     for enc_layer_name in self.name_encoder_layers:
                         if enc_layer_name == k:
@@ -985,7 +1007,6 @@ class FedRod(Fedem):
                             v.data = ann.decoder_personalized[k].data.to(device) #"Swapping the heads"
                             v.requires_grad = True #Deriving gradients only wrt to the personalized head
                
-
                 #output_personalized = ann(inputs) + torch.tensor(output_generic).to(device) #regularized personalized output
                 output_personalized = ann(inputs) + output_generic.clone().detach().requires_grad_(requires_grad=True).to(device) #changed to stop a torch warning
                 loss_personalized = self.loss_function(output_personalized, labels)
@@ -1001,20 +1022,25 @@ class FedRod(Fedem):
 
 class Centralized(Fedem):
     def __init__(self, options):
+        """ Class constructor, all the clients datasets are merged into a single dataloader.
+            Declare the segmentation model of the server.
+        """
         super(Centralized, self).__init__(options)
-
-        #could verify that space_cardinality == spatial_dims!
 
         self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"]).to(device)
 
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options["network_name"]+options['suffix'])
 
-        #overwrite the argument to free space?
+        #overwrite the dataloaders to free space.
         self.dataloaders = [[] for i in range(len(self.options["clients"]))]
     
     #overwrite the superclass method since there are no client models
     def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False, early_stop_limit=-1):
-        metric_values = list()
+        """ Overwrite the Fedem method, a single model must be training using an unified dataloader. The number of epochs is equal to the multiplication
+            of the number of global epochs by the number of local epochs.
+            Induce an early stopping functionnality in the situation where the validation dice score does not change after a given number of epochs.
+        """
+        metric_values = []
         best_metric = -1
         best_metric_epoch = -1
 
@@ -1100,14 +1126,15 @@ class Centralized(Fedem):
                     else:
                         early_stop_val = epoch_valid_dice_loss
                         early_stop_count = 0
-
-        ## DEBUG: save the prediction for the training set
-        #self.full_volume_metric(dataset="training", network="self", save_pred=True)
+        
+        #empty cache to avoid memory leak
         torch.cuda.empty_cache()
         return self.nn
 
 #optimizer
 class ScaffoldOptimizer(Optimizer):
+    """ Optimizer specific to the Scaffold framework, perform stochastic gradient descent to update the control variables
+    """
     def __init__(self, params, lr, weight_decay):
         defaults = dict(lr=lr, weight_decay=weight_decay)
         super(ScaffoldOptimizer, self).__init__(params, defaults)
@@ -1128,8 +1155,25 @@ class ScaffoldOptimizer(Optimizer):
 
         return loss
 
+def nan_hook(self, inp, output):
+    """ utilitary function, used to detect nan in the forward pass of the network.
+    """
+    if not isinstance(output, tuple):
+        outputs = [output]
+    else:
+        outputs = output
+
+    for i, out in enumerate(outputs):
+        nan_mask = torch.isnan(out)
+        if nan_mask.any():
+            print("In", self.__class__.__name__)
+            print(torch.nansum(out))
+            raise RuntimeError(f"Found NAN in output {i} at indices: ", nan_mask.nonzero(), "where:", out[nan_mask.nonzero()[:, 0].unique(sorted=True)])
+
+
 """
 class ParallelTraining:
+    # Class used to train several models in paralleles to optimize GPU usage and bypass the CPU bottleneck
     def __init__(self, networks_name, networks_config):
         #create the frameworks to be trained in parallel
         frameworks = []

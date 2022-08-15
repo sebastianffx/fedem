@@ -1,7 +1,10 @@
 import monai
 
 def generate_nn(nn_name, nn_class, nn_params={}, scaff=False, fedrod=False, fedprox=False):
-
+    """ Generate the segmentation model based on the parameters passed in argument and additonnal 
+        attributes depending on the federated framework used.
+        This function heavily rely on the implementation of various models by the Monai library.
+    """
     if nn_class.lower()=="unet":
         nn=monai.networks.nets.UNet(**nn_params)
         print("Using UNET as segmentation network")
