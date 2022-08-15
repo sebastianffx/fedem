@@ -10,7 +10,7 @@ import warnings
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
     
-    path, clients, folder_struct = 'debug_dataset/', ["center1", "center2"], "site_simple"
+    path, clients, folder_struct = ['debug_dataset/'], ["center1", "center2"], "site_simple"
     #path, clients, folder_struct = '../../../../../downloads/dataset_ISLES22_rel1/', ["center1"], "OTHER"
 
     experience_name = "debug_only_adc" 
@@ -32,8 +32,8 @@ if __name__ == '__main__':
     default = {#federation parameters
                "g_epoch":30,
                "l_epoch":5,
-               "g_lr":0.001,
-               "l_lr":0.001,
+               "g_lr":0.1,
+               "l_lr":0.01,
                "K":len(clients),
                "clients":clients,
                #network parameters
@@ -43,7 +43,7 @@ if __name__ == '__main__':
                "hybrid_loss_weights":[1.4,0.6],
                "suffix":"exp5",
                #training parameters
-               "val_interval":30,
+               "val_interval":2,
                "modality":modality.lower(),
                "space_cardinality":2, #or 3, depending if you have a 2D or 3D network
                "batch_size":2,
@@ -65,7 +65,7 @@ if __name__ == '__main__':
                "use_isles22_metrics":True
                }
 
-    if "isle" in path.lower():
+    if "isle" in path[0].lower():
         """
         # 3D Unet, used for all Antoine's experiments
         default["padding"]    = (32,32,16)
@@ -83,8 +83,8 @@ if __name__ == '__main__':
         default["additional_modalities"] = [[]] # "adc" the adc maps will be used in addition to the dwi (default) to add "flair"
         default["no_deformation"] = 'isles'
     else:
-        #default["additional_modalities"] = [[] for i in range(number_site)]
-        default["additional_modalities"] = [[],["tra4_1", "tra4_2"]]
+        default["additional_modalities"] = [[] for i in range(number_site)]
+        #default["additional_modalities"] = [[],["tra4_1", "tra4_2"]]
 
     #only used when using blob loss, labels are used to identify the blob
     default["multi_label"] = "blob" in default["loss_fun"]

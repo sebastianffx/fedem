@@ -710,9 +710,6 @@ class Scaffold(Fedem):
             ann.delta_y[k] = v_new.data - v_old.data #(y_i - x) from equation (5).1
             ann.delta_control[k] = ann.control[k] - x.control[k] #(c+ - c_i) from equation (5).2
 
-        #assert x.parameters() != ann.parameters()
-        #it seems to behave correctly when using cpu as backend, not so much when using gpu...
-
         """
         #equation (4), Option II
 
@@ -1130,3 +1127,70 @@ class ScaffoldOptimizer(Optimizer):
                 p.data = p.data - group['lr'] * dp.data
 
         return loss
+
+"""
+class ParallelTraining:
+    def __init__(self, networks_name, networks_config):
+        #create the frameworks to be trained in parallel
+        frameworks = []
+        for i, conf in enumerate(networks_config):
+            conf["network_name"] = networks_name[i]
+
+            if "scaff" in conf.keys() and conf["scaff"]:
+                frameworks.append(Scaffold(conf))
+            elif "fedrod" in conf.keys() and conf["fedrod"]:
+                frameworks.append(FedRod(conf))
+            elif "fedprox" in conf.keys() and conf["fedprox"]:
+                frameworks.append(FedProx(conf))
+            elif 'weighting_scheme' in conf.keys():
+                frameworks.append(FedAvg(conf))
+            elif "centralized" in conf.keys() and conf["centralized"]:
+                print("centralized model cannot be trained using this superclass")
+            else:
+                print("missing argument for network type")
+
+        #retain the dataloader from the first framework only, discard the others to save memory
+
+        #should check that the global_epochs and local_epochs is identical across frameworks
+
+    def train():
+        
+        #optimizer for all the clients of all the frameworks
+        optimizers = [[Adam(client_nn.parameters(), local_lr) if ("scaff" in self.options.keys() and self.options["scaff"]) else ScaffoldOptimizer(client_nn.parameters(), lr=local_lr, weight_decay=0) for client_nn in framework.nns] for framework in frameworks]
+        
+        #global epoch loop
+        for g_epoch in range(global_epoch):
+
+            # dispatch ALL THE FRAMEWORKS
+            #self.dispatch(index)
+
+            #local updating --> "client_update"
+            for l_epoch in range(local_epoch):
+                #train the k-th client of all the frameworks
+                for k, client_dataloader in enumerate(self.dataloaders):
+
+                    for batch_data in client_dataloader:
+                        #load inputs
+                        inputs, labels = self.load_inputs(batch_data)
+
+                        #perform all predictions
+                        y_preds = [framework.nns[k](inputs) for framework in frameworks]
+
+                        #compute all the losses
+                        losses = [self.loss_function(y_pred, labels) for y_pred in y_preds]
+                        
+                        #reset gradient
+                        for framework_optimizer in optimizers:
+                            framework_optimizer[k].zero_grad()
+
+                        #compute gradient
+                        for loss in losses:
+                            loss.backward()
+
+                        #update weights
+                        for framework_optimizer in optimizers:
+                            framework_optimizer[k].optimizer.step()
+
+            # aggregate ALL THE FRAMEWORKS
+            #self.aggregation(index, global_lr)
+"""

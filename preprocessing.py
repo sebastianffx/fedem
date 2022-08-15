@@ -453,6 +453,21 @@ def torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deforma
         print("flipping and rotation in addition to scaling and padding")
         return transform, transform_valid
 
+def bern_torchio_create_transfo(clamp_min, clamp_max, padding, patch_size, no_deformation=False, forced_channel=-1):
+    print("using generic preprocessing transformations")
+    clamp = tio.Clamp(out_min=clamp_min, out_max=clamp_max)
+    rescale = tio.RescaleIntensity(out_min_max=(0, 1))
+    padding = tio.Pad(padding=padding, padding_mode="edge") #padding is typicaly equals to half the size of the patch_size
+    toCanon = tio.ToCanonical() #reorder the voxel and correct affine matrix to have RAS+ convention
+    #resample to the CHUV voxel spacing
+    resample = tio.Resample((1.6, 1.6, 3))
+
+    #normalization only, no spatial transformation or data augmentation
+    transform_valid = tio.Compose([select_channel, toCanon, resample, clamp, rescale])
+    transform = tio.Compose([select_channel, toCanon, resample, clamp, rescale, padding])
+    return transform, transform_valid
+
+
 def isles22_torchio_create_transform(padding, patch_size, no_deformation):
     """Normalize each modality differently using hardcoded values.
        The order of the modalities in the channel dimensionsis assumed to be either:
