@@ -605,7 +605,7 @@ class FedAvg(Fedem):
         # Update global weights with the averaged model weights.
         self.nn.load_state_dict(global_weights)
 
-    def train(self, ann, dataloader_train, local_epoch, local_lr):
+    def train(self, ann, dataloader_train, local_epoch, local_lr, batch_per_epoch=250):
         """ Train the client model using the subjects present in its training dataset.
         """
         #train client to train mode
@@ -614,8 +614,8 @@ class FedAvg(Fedem):
         optimizer = Adam(ann.parameters(), local_lr)
 
         for epoch in range(local_epoch):
-            for batch_data in dataloader_train:
-                inputs, labels = self.load_inputs(batch_data)
+            for batch in range(batch_per_epoch):
+                inputs, labels = self.load_inputs(next(dataloader_train))
                 y_pred = ann(inputs)
                 loss = self.loss_function(y_pred, labels)
                 optimizer.zero_grad()        
