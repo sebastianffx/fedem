@@ -104,7 +104,7 @@ class Fedem:
                                                          lambda_ce=self.options["hybrid_loss_weights"][1]
                                                          )
 
-    def train_server(self, global_epoch, local_epoch, global_lr, local_lr, early_stop_limit=-1):
+    def train_server(self, global_epoch, local_epoch, global_lr, local_lr, batch_per_epoch, early_stop_limit=-1):
         """ Method encapsulating the server and clients training, take care of the global model dispatch, the clients updates
             and the models aggregation.
             Also comprise of an early stop functionnality to interrupt the training if the validation dice score does not change
@@ -129,7 +129,7 @@ class Fedem:
             # dispatch
             self.dispatch(index)
             # local updating
-            self.client_update(index, local_epoch, local_lr, cur_epoch)
+            self.client_update(index, local_epoch, local_lr, cur_epoch, batch_per_epoch)
             # aggregation
             self.aggregation(index, global_lr)
 
@@ -163,16 +163,16 @@ class Fedem:
     def validation(self,index):        
         return NotImplementedError
     
-    def client_update(self, index, local_epoch, local_lr, cur_epoch):
+    def client_update(self, index, local_epoch, local_lr, cur_epoch, batch_per_epoch):
         """ Call each client update function at each global epoch.
         """
         tmp=0
         #round loss is assumed to be the generic model loss 
         for i in index:
             if "fedrod" in self.options.keys():
-                self.nns[i], round_loss, round_loss_personalized_m = self.train(self.nns[i], self.dataloaders[i][0], local_epoch, local_lr)            
+                self.nns[i], round_loss, round_loss_personalized_m = self.train(self.nns[i], self.dataloaders[i][0], local_epoch, local_lr, batch_per_epoch)            
             else:
-                self.nns[i], round_loss = self.train(self.nns[i], self.dataloaders[i][0], local_epoch, local_lr)
+                self.nns[i], round_loss = self.train(self.nns[i], self.dataloaders[i][0], local_epoch, local_lr, batch_per_epoch)
             print(self.nns[i].name+" loss:", round_loss)
             self.writer.add_scalar('training loss '+self.nns[i].name, round_loss, cur_epoch)
             tmp+=round_loss
@@ -605,7 +605,7 @@ class FedAvg(Fedem):
         # Update global weights with the averaged model weights.
         self.nn.load_state_dict(global_weights)
 
-    def train(self, ann, dataloader_train, local_epoch, local_lr, batch_per_epoch=250):
+    def train(self, ann, dataloader_train, local_epoch, local_lr, batch_per_epoch):
         """ Train the client model using the subjects present in its training dataset.
         """
         #train client to train mode
@@ -614,8 +614,11 @@ class FedAvg(Fedem):
         optimizer = Adam(ann.parameters(), local_lr)
 
         for epoch in range(local_epoch):
-            for batch in range(batch_per_epoch):
-                inputs, labels = self.load_inputs(next(dataloader_train))
+            for batch_idx, batch in enumerate(dataloader_train):
+                # ugly fix to force the same number of batch for all epochs, batch_per_epoch should be smaller than len(dataloader)
+                if batch_idx == batch_per_epoch:
+                    break
+                inputs, labels = self.load_inputs(batch)
                 y_pred = ann(inputs)
                 loss = self.loss_function(y_pred, labels)
                 optimizer.zero_grad()        
@@ -689,7 +692,7 @@ class Scaffold(Fedem):
             v.data += global_lr / len(index) * x[k].data #len(index) = |S| in publication
             self.nn.control[k].data += c[k].data / len(index) #len(index) = N in publication
 
-    def train(self, ann, dataloader_train, local_epoch, local_lr, method=0):
+    def train(self, ann, dataloader_train, local_epoch, local_lr, batch_per_epoch, method=0):
         """ Train the client model using the subjects present in its training dataset.
             Update the controls variables, the two approach introduced in the original article are implemented
         """
@@ -703,7 +706,10 @@ class Scaffold(Fedem):
         optimizer = ScaffoldOptimizer(ann.parameters(), lr=local_lr, weight_decay=0)
 
         for epoch in range(local_epoch):
-            for batch_data in dataloader_train:
+            for batch_idx, batch in enumerate(dataloader_train):
+                # ugly fix to force the same number of batch for all epochs, batch_per_epoch should be smaller than len(dataloader)
+                if batch_idx == batch_per_epoch:
+                    break
                 inputs, labels = self.load_inputs(batch_data)
                 y_pred = ann(inputs)
                 loss = self.loss_function(y_pred, labels)
@@ -713,11 +719,15 @@ class Scaffold(Fedem):
                 loss.backward()
                 optimizer.step(self.nn.control, ann.control) #performing SGD on the control variables
 
+        #likely that the dataloader does not sample the same patches, causing mismatch between gradient and control variable
         if method==0:
             #equation (4), Option I
             ann.control = {}
             for epoch in range(local_epoch):
-                for batch_data in dataloader_train:
+                for batch_idx, batch in enumerate(dataloader_train):
+                    # ugly fix to force the same number of batch for all epochs, batch_per_epoch should be smaller than len(dataloader)
+                    if batch_idx == batch_per_epoch:
+                        break
                     inputs, labels = self.load_inputs(batch_data)
                     #prediction using the global model
                     y_pred = self.nn(inputs)
@@ -805,7 +815,7 @@ class FedProx(Fedem):
             v.data = params[k].data.clone()
 
 
-    def train(self, ann, dataloader_train, local_epoch, local_lr):
+    def train(self, ann, dataloader_train, local_epoch, local_lr, batch_per_epoch):
         """ Train the client model using the subjects present in its training dataset, the loss is
             modified based on the mu hyperparameter and the norm between the global and local model.
         """
@@ -814,7 +824,10 @@ class FedProx(Fedem):
         optimizer = Adam(ann.parameters(), local_lr)
 
         for epoch in range(local_epoch):
-            for batch_data in dataloader_train:
+            for batch_idx, batch in enumerate(dataloader_train):
+                # ugly fix to force the same number of batch for all epochs, batch_per_epoch should be smaller than len(dataloader)
+                if batch_idx == batch_per_epoch:
+                    break
                 inputs, labels = self.load_inputs(batch_data)
                 y_pred = ann(inputs)
                 optimizer.zero_grad()
@@ -954,7 +967,7 @@ class FedRod(Fedem):
                 v.data = torch.div(avg_weights_decoder[k], len(index))
 
 
-    def train(self, ann, dataloader_train, local_epoch, local_lr):
+    def train(self, ann, dataloader_train, local_epoch, local_lr, batch_per_epoch):
         """ Train the client models using the subjects present in its training dataset, both the personalized and generic heads are updated.
         """
         #First the generic encoder-decoder are updated       
@@ -966,7 +979,10 @@ class FedRod(Fedem):
         loss_personalized = self.loss_function(torch.tensor(np.zeros((1,10))), torch.tensor(np.zeros((1,10))))
 
         for epoch in range(local_epoch):
-            for batch_data in dataloader_train:
+            for batch_idx, batch in enumerate(dataloader_train):
+                # ugly fix to force the same number of batch for all epochs, batch_per_epoch should be smaller than len(dataloader)
+                if batch_idx == batch_per_epoch:
+                    break
                 #(1)Optimization of the Generic path here equation (8) of the paper
                 for k, v in ann.named_parameters(): #Transfering data from the generic head is done in dispatch()
                     v.requires_grad = True #deriving gradients to all the generic layers
@@ -1035,7 +1051,7 @@ class Centralized(Fedem):
         self.dataloaders = [[] for i in range(len(self.options["clients"]))]
     
     #overwrite the superclass method since there are no client models
-    def train_server(self, global_epoch, local_epoch, global_lr, local_lr, save_train_pred=False, early_stop_limit=-1):
+    def train_server(self, global_epoch, local_epoch, global_lr, local_lr, batch_per_epoch, save_train_pred=False, early_stop_limit=-1):
         """ Overwrite the Fedem method, a single model must be training using an unified dataloader. The number of epochs is equal to the multiplication
             of the number of global epochs by the number of local epochs.
             Induce an early stopping functionnality in the situation where the validation dice score does not change after a given number of epochs.
@@ -1063,7 +1079,10 @@ class Centralized(Fedem):
             step = 0
             dice_metric.reset()
 
-            for batch_data in self.all_train_loader:
+            for batch_idx, batch in enumerate(dataloader_train):
+                # ugly fix to force the same number of batch for all epochs, batch_per_epoch should be smaller than len(dataloader)
+                if batch_idx == batch_per_epoch:
+                    break
                 for k, v in self.nn.named_parameters():
                     v.requires_grad = True
                 

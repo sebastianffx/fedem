@@ -99,18 +99,20 @@ if __name__ == '__main__':
     networks_name = []
     #storing the best parameters
     lr = 0.001694
+    g_lr = 0.0001
+    l_lr= 0.01
     weight_comb = [1,1]
     #for lr in np.linspace(1e-5, 1e-2, 5):
     #for lr in [0.0005985, 0.001694, 0.00994, 0.01164]:
     for weight_comb in [[1.4,0.6]]: #sum up to 2 to keep the same range as first experient with 1,1
         tmp = default.copy()
-        #tmp.update({"centralized":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
+        tmp.update({"weighting_scheme":"FEDAVG", "l_lr":lr, "g_lr":g_lr})
         #tmp.update({"fedprox":True})
-        tmp.update({"scaff":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
+        #tmp.update({"scaff":True, "l_lr":lr, "hybrid_loss_weights":weight_comb})
         networks_config.append(tmp)
-        networks_name.append(f"{experience_name}_SCAFF_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
-        #legacy network naming, no lambdas (valid for v1 to v4)
-        #networks_name.append(f"{experience_name}_CENTRALIZED_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}")
+        networks_name.append(f"{experience_name}_FEDAVG_llr{l_lr}_glr{g_lr}_batch{tmp['batch_size']}_ge{tmp['g_epoch']}_le{tmp['l_epoch']}")
+        #networks_name.append(f"{experience_name}_CENT_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
+        #networks_name.append(f"{experience_name}_SCAFF_lr{lr}_batch{tmp['batch_size']}_epoch{tmp['g_epoch']*tmp['l_epoch']}_lambdas{str(tmp['hybrid_loss_weights'][0])}_{str(tmp['hybrid_loss_weights'][1])}")
 
     fedrod = default.copy()
     fedrod.update({"fedrod":True})
