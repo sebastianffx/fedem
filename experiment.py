@@ -15,7 +15,7 @@ def check_config(config):
 def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp_name=None, modality="ADC",
                   additional_modalities= [], additional_labels=False, multi_label=False,
                   clients=[], size_crop=100, folder_struct="site_nested", train=True,
-                  use_isles22_metrics=False,
+                  runValidation=True, use_isles22_metrics=False,
                   print_conf=True):
 
     print("Experiment using the ", datapath, "dataset")
@@ -94,7 +94,8 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
                 network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'], early_stop_limit=conf['early_stop_limit'])
 
             # compute validation and test dice loss/score using full volume (instead of slice-wise) and the best possible model
-            valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best", save_pred=False))
+            if runValidation:
+                valid_dicemetric.append(network.full_volume_metric(dataset="valid", network="best", save_pred=False))
             test_dicemetric.append(network.full_volume_metric(dataset="test", network="best", save_pred=True,
                                                               use_isles22_metrics=use_isles22_metrics)
                                   )

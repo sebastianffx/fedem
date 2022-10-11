@@ -454,7 +454,7 @@ def torchio_create_transform(clamp_min, clamp_max, padding, patch_size, no_defor
         return transform, transform_valid
 
 def bern_torchio_create_transform(clamp_min, clamp_max, padding, patch_size, no_deformation=False, forced_channel=-1):
-    print("using generic preprocessing transformations")
+    print("using bern preprocessing transformations")
     clamp = tio.Clamp(out_min=clamp_min, out_max=clamp_max)
     rescale = tio.RescaleIntensity(out_min_max=(0, 1))
     padding = tio.Pad(padding=padding, padding_mode="edge") #padding is typicaly equals to half the size of the patch_size
