@@ -89,9 +89,14 @@ def runExperiment(datapath, num_repetitions, networks_config, networks_name, exp
             else:
                 print("missing argument for network type")
 
+            # maximum number of batch considering each site dataset size
+            conf['batch_per_epoch'] = min([len(center[0][0]) for center in centers_partitions])*conf["patches_per_volume"] // conf["batch_size"]
+            print(f"batch_per_epoch is set to the smallest site training site size; {conf['batch_per_epoch']}")
+
             if train:
                 #train the network, each batch contain one ranodm slice for each subject
-                network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'], early_stop_limit=conf['early_stop_limit'])
+                network.train_server(conf['g_epoch'], conf['l_epoch'], conf['g_lr'], conf['l_lr'], conf['batch_per_epoch'],
+                                     early_stop_limit=conf['early_stop_limit'])
 
             # compute validation and test dice loss/score using full volume (instead of slice-wise) and the best possible model
             if runValidation:

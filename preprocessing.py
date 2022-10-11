@@ -204,19 +204,24 @@ def center_dataloaders(partitions_paths_center, transfo, batch_size=2):
     center_ds_train = ArrayDataset(partitions_paths_center[0][0], transfo['imtrans'],
                                    partitions_paths_center[1][0], transfo['segtrans'])
     center_train_loader = torch.utils.data.DataLoader(
-    	center_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+    	center_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available(),
+        shuffle=True
     	)
+
+    print(f"** {len(center_train_loader)} **")
 
     center_ds_valid = ArrayDataset(partitions_paths_center[0][1], transfo['imtrans'],
                                    partitions_paths_center[1][1], transfo['segtrans'])
     center_valid_loader = torch.utils.data.DataLoader(
-    	center_ds_valid, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+    	center_ds_valid, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available(),
+        shuffle=True
     	)
 
     center_ds_test = ArrayDataset(partitions_paths_center[0][2], transfo['imtrans_test'],
                                   partitions_paths_center[1][2], transfo['segtrans_test'])
     center_test_loader = torch.utils.data.DataLoader(
-        center_ds_test, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+        center_ds_test, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available(),
+        shuffle=True
     	)
     """
     center_ds_train = ArrayDataset(partitions_paths_center[0][0], transfo['debug'], partitions_paths_center[1][0], transfo['debug'])
@@ -346,7 +351,8 @@ def generate_loaders(partitions_paths, batch_size, modality, size_crop=224):
     all_ds_train = ArrayDataset([i for l in partitions_train_imgs for i in l], transfo['imtrans'],
                                 [i for l in partitions_train_lbls for i in l], transfo['segtrans'])
     all_train_loader   = torch.utils.data.DataLoader(
-        all_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available()
+        all_ds_train, batch_size=batch_size, num_workers=1, pin_memory=torch.cuda.is_available(),
+        shuffle=True
     )
 
     partitions_test_imgs = [partitions_paths[i][0][2] for i in range(len(partitions_paths))]
@@ -356,7 +362,8 @@ def generate_loaders(partitions_paths, batch_size, modality, size_crop=224):
     all_ds_test = ArrayDataset([i for l in partitions_test_imgs for i in l], transfo['imtrans'], #in the future, should use imtrans_test
                                [i for l in partitions_test_lbls for i in l], transfo['segtrans'])
     all_test_loader   = torch.utils.data.DataLoader(
-        all_ds_test, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available()
+        all_ds_test, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available(),
+        shuffle=True
     )
 
     partitions_valid_imgs = [partitions_paths[i][0][1] for i in range(len(partitions_paths))]
@@ -365,7 +372,8 @@ def generate_loaders(partitions_paths, batch_size, modality, size_crop=224):
     all_ds_valid = ArrayDataset([i for l in partitions_valid_imgs for i in l], transfo['imtrans'], #in the future, should use imtrans_test
                                 [i for l in partitions_valid_lbls for i in l], transfo['segtrans'])
     all_valid_loader   = torch.utils.data.DataLoader(
-        all_ds_valid, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available()
+        all_ds_valid, batch_size=1, num_workers=1, pin_memory=torch.cuda.is_available(),
+        shuffle=True
     )
 
     return centers_data_loaders, all_test_loader, all_valid_loader, all_train_loader
@@ -744,7 +752,8 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                                           patches_per_volume,
                                                                           sampler_weighted_probs
                                                                           ),
-                                                                 batch_size=batch_size
+                                                                 batch_size=batch_size,
+                                                                 shuffle=True
                                                                  ),
                                      #validation and test don't need the patch sampler (hence no queue)
                                      torch.utils.data.DataLoader(tio.SubjectsDataset(site_valid_subjects,
@@ -780,7 +789,9 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
                                                              max_queue_length,
                                                              patches_per_volume,
                                                              sampler_weighted_probs),
-                                                   batch_size=batch_size)
+                                                   batch_size=batch_size,
+                                                   shuffle=True
+                                                   )
 
     #validation and test don't need the patch sampler
     all_valid_loader = torch.utils.data.DataLoader(all_valid_subjects, batch_size=1)
@@ -794,7 +805,9 @@ def torchio_generate_loaders(partitions_paths, batch_size, clamp_min=0, clamp_ma
 
         external_loader = torch.utils.data.DataLoader(tio.SubjectsDataset(external_subjects,
                                                                           transform=transform_valid),
-                                                      batch_size=1)
+                                                      batch_size=1,
+                                                      shuffle=True
+                                                      )
     else:
         external_loader = None
     
