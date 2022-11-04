@@ -45,14 +45,16 @@ def average_weights_beta(local_trained_weights, loaders_lengths, beta_val=0.9):
 
 
 
-def average_weights(local_trained_weights):
+def average_weights(local_trained_weights, loaders_lengths):
     """Returns the average of the weights.
        local_trained_weights: The list of tensors (of the same shape) that will be averaged
     """
-    # Initialize copy model weights with the untrained model weights.
-    avg_weights = copy.deepcopy(local_trained_weights[0])
+    total_loaders_length = np.array(loaders_lengths).sum()
+    # Initialize global model with the first client model.
+    avg_weights = copy.deepcopy(local_trained_weights[0])*loaders_lengths[0]
     for key in avg_weights.keys():
         for i in range(1, len(local_trained_weights)):
-            avg_weights[key] += local_trained_weights[i][key]
-        avg_weights[key] = torch.div(avg_weights[key], len(local_trained_weights))
+            avg_weights[key] += local_trained_weights[i][key]*loaders_lengths[i]
+        # if we normalize by the size of the training loader
+        avg_weights[key] = torch.div(avg_weights[key], total_loaders_length)
     return avg_weights

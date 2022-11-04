@@ -563,14 +563,10 @@ class FedAvg(Fedem):
         self.weighting_scheme = options['weighting_scheme']
         self.writer = SummaryWriter(f"runs/llr{options['l_lr']}_glr{options['g_lr']}_le{options['l_epoch']}_ge{options['g_epoch']}_{options['K']}sites_"+options['weighting_scheme']+options['suffix'])
 
-
+        self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
         if options['weighting_scheme'] == 'BETA':
             self.beta_val = options['beta_val']
             #extract length of trianing loader for each site
-            self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
-        elif options['weighting_scheme'] == 'SOFTMAX':
-            #extract length of trianing loader for each site
-            self.trainloaders_lengths = [len(ldtr[0]) for ldtr in self.dataloaders]
         
         #server model
         self.nn = generate_nn(nn_name="server", nn_class=options["nn_class"], nn_params=options["nn_params"]).to(device)
@@ -587,6 +583,7 @@ class FedAvg(Fedem):
             based on the number of subjects present in their training dataset.
         """
         client_weights=[]
+        sub_trainloaders_lengths = [self.trainloaders_lengths[idx] for idx in index]
 
         #would be possible to use sampling here
         for client_nn in self.nns:
@@ -594,12 +591,10 @@ class FedAvg(Fedem):
 
         #Agregating the weights with the selected weighting scheme
         if self.weighting_scheme =='FEDAVG':
-            global_weights = average_weights(client_weights)
+            global_weights = average_weights(client_weights, sub_trainloaders_lengths)
         if self.weighting_scheme =='BETA':
-            sub_trainloaders_lengths = [self.trainloaders_lengths[idx] for idx in index]
             global_weights = average_weights_beta(client_weights,sub_trainloaders_lengths,self.beta_val)
         if self.weighting_scheme =='SOFTMAX':
-            sub_trainloaders_lengths = [self.trainloaders_lengths[idx] for idx in index]
             global_weights = average_weights_softmax(client_weights,sub_trainloaders_lengths)
 
         # Update global weights with the averaged model weights.
